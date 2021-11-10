@@ -1,2 +1,2 @@
 # stat_reliability_measure
-Hello
+In this repository we implement in python statistical methods for reliability assessment.
