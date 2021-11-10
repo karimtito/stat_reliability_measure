@@ -2,7 +2,7 @@ import numpy as np
 from dev.langevin_utils import TimeStep
 
 def dichotomic_search_d(f, a, b, thresh=0, n_max =50):
-    """Implementation of dichotomic search of minimum solution for an increasing function
+    """Implementation of dichotomic search of minimum solution for an decreasing function
         Args:
             -f: increasing function
             -a: lower bound of search space
