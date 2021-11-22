@@ -58,6 +58,11 @@ for k,v in vars(args).items():
 epsilon=config.epsilon
 d=config.d
 
+if not os.path.exists('./logs'):
+    os.mkdir('./logs')
+    os.mkdir(config.log_dir)
+
+
 loc_time= float_to_file_float(time())
 log_name=method_name+'_'+loc_time
 log_path=os.path.join(config.log_dir,log_name)

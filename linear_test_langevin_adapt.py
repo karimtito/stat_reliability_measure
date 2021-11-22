@@ -21,7 +21,7 @@ class config:
     verbose=0
     min_rate=0.40
     T=1
-    rho=90
+    rho=None
     alpha=0.1
     n_max=5000
     tqdm_opt=True
@@ -57,6 +57,10 @@ print(config.json)
 
 epsilon=config.epsilon
 d=config.d
+
+if not os.path.exists('./logs'):
+    os.mkdir('./logs')
+    os.mkdir(config.log_dir)
 
 loc_time= float_to_file_float(time())
 log_name=method_name+'_'+loc_time
