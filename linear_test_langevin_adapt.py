@@ -28,7 +28,7 @@ class config:
     p_t=1e-15
     d = 1024
     epsilon = 1
-    
+    save_config=True
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -42,7 +42,8 @@ parser.add_argument('--alpha',type=float,default=config.alpha)
 parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--epsilon',type=float, default=config.epsilon)
 parser.add_argument('--tqdm_opt',type=bool,default=config.tqdm_opt)
-
+parser.add_argument('--T',type=int,default=config.T)
+parser.add_argument('--save_config',type=bool, default=config.save_config)
 
 args=parser.parse_args()
 
@@ -69,7 +70,7 @@ assert np.isclose(a=config.p_t, b=P_target), "The dichotomic search was not prec
 
 c=1-h
 V_batch = lambda X: np.clip(c-X[:,0],a_min=0, a_max = np.inf)
-gradV_batch = lambda X: -e_1[None]*(X[:,0]<c)[:,None] 
+gradV_batch = lambda X: -e_1[None]*(X[:,0]<c)[:,None]
 if config.verbose>5:
     print(f"P_target:{P_target}")
 
@@ -102,12 +103,16 @@ plt.hist(times, bins=10)
 plt.savefig(os.path.join(log_path,'times_hist.png'))
 plt.hist(estimates,bins=10)
 plt.savefig(os.path.join(log_path,'estimates_hist.png'))
-plt.hist(rel_errors,bins=10)
-plt.savefig(os.path.join(log_path,'rel_errors_hist.png'))
+plt.hist(np.log(estimates),bins=10)
+plt.savefig(os.path.join(log_path,'log_estimates_hist.png'))
+plt.hist(np.log(estimates),bins=10)
+plt.savefig(os.path.join(log_path,'log_estimates_hist.png'))
+
 #with open(os.path.join(log_path,'results.txt'),'w'):
-results={'p_t':config.p_t,'method':method_name
-,'N':config.N,'rho':config.rho,'n_rep':config.n_rep,'T':config.T,'alpha':config.alpha,'min_rate':pd.NA,
-'mean time':times.mean(),'std time':times.std(),'mean abs error':abs_errors.mean(),
+columns=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est','bias','mean abs error','mean rel error','std est']
+results={'p_t':config.p_t,'method':method_name,
+'N':config.N,'rho':config.rho,'n_rep':config.n_rep,'T':config.T,'alpha':config.alpha,'min_rate':config.min_rate,
+'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),'bias':estimates.mean()-config.p_t,'mean abs error':abs_errors.mean(),
 'mean rel error':rel_errors.mean(),'std est':estimates.std()}
 results_df=pd.DataFrame([results])
 results_df.to_csv(os.path.join(log_path,'results.csv'),)

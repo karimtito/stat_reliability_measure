@@ -28,7 +28,9 @@ class config:
     p_t=1e-15
     d = 1024
     epsilon = 1
-    
+    save_config = True
+    print_config=True
+    update_agg_res=True
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -42,15 +44,16 @@ parser.add_argument('--alpha',type=float,default=config.alpha)
 parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--epsilon',type=float, default=config.epsilon)
 parser.add_argument('--tqdm_opt',type=bool,default=config.tqdm_opt)
-
+parser.add_argument('--T',type=int,default=config.T)
+parser.add_argument('--save_config', type=bool, default=config.save_config)
+parser.add_argument('--print_config',type=bool , default=config.print_config)
+parser.add_argument('--update_agg_res', type=bool,default=config.update_agg_res)
 
 args=parser.parse_args()
 
 for k,v in vars(args).items():
     setattr(config, k, v)
 
-config.json=vars(args)
-print(config.json)
 
 epsilon=config.epsilon
 d=config.d
@@ -59,6 +62,12 @@ loc_time= float_to_file_float(time())
 log_name=method_name+'_'+loc_time
 log_path=os.path.join(config.log_dir,log_name)
 os.mkdir(path=log_path)
+config.json=vars(args)
+if config.print_config:
+    print(config.json)
+if config.save_config:
+    with open(file=os.path.join(),mode='w') as f:
+        f.write(config.json)
 
 
 e_1 = np.array([1]+[0]*(config.d-1))
@@ -103,6 +112,11 @@ plt.hist(times, bins=10)
 plt.savefig(os.path.join(log_path,'times_hist.png'))
 plt.hist(estimates,bins=10)
 plt.savefig(os.path.join(log_path,'estimates_hist.png'))
+plt.hist(np.log(estimates),bins=10)
+plt.savefig(os.path.join(log_path,'log_estimates_hist.png'))
+plt.hist(np.log(estimates),bins=10)
+plt.savefig(os.path.join(log_path,'log_estimates_hist.png'))
+
 #with open(os.path.join(log_path,'results.txt'),'w'):
 results={'p_t':config.p_t,'method':method_name
 ,'N':config.N,'rho':config.rho,'n_rep':config.n_rep,'T':config.T,'alpha':config.alpha,'min_rate':config.min_rate,
@@ -110,4 +124,14 @@ results={'p_t':config.p_t,'method':method_name
 'mean rel error':rel_errors.mean(),'std est':estimates.std()}
 results_df=pd.DataFrame([results])
 results_df.to_csv(os.path.join(log_path,'results.csv'),)
+aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+if config.update_agg_results:
+    if not os.path.exists(aggr_res_path):
+        cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est','bias','mean abs error','mean rel error','std est']
+        agg_res_df= pd.DataFrame(columns=cols)
+    else:
+        agg_res_df=pd.read_csv(aggr_res_path,index_col=0)
+    agg_res_df = pd.concat()
+
+        
 

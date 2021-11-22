@@ -14,3 +14,4 @@ def TimeStep(V,X,gradV,p=1):
     V_mean= V(X).mean()
     V_grad_norm_mean = ((np.linalg.norm(gradV(X),axis = 1)**p).mean())**(1/p)
     return V_mean/V_grad_norm_mean
+
