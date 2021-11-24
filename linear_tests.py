@@ -38,6 +38,7 @@ parser.add_argument('--save_config', type=bool, default=config.save_config)
 parser.add_argument('--print_config',type=bool , default=config.print_config)
 parser.add_argument('--update_aggr_res', type=bool,default=config.update_aggr_res)
 parser.add_argument('--method',type=str,default=config.method)
+parser.add_argument('--rho',type=str,default=config.rho)
 
 args=parser.parse_args()
 
@@ -67,8 +68,17 @@ else:
 
 for p in p_t_list:
     for t in T_list:
-        for a in alpha_list: 
-            for r in rho_list:
-                for N in N_list:    
-                    cmd_list = f"python {script_name} --min_rate {config.min_rate} --epsilon {config.epsilon} --n_max {config.n_max} --T {t} --p_t {p} --alpha {a} --rho {r} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d}".split(' ')
-                    subprocess.run(cmd_list)
+        for N in N_list: 
+            if "langevin" in config.method:
+                for a in alpha_list: 
+                    if 'base' in config.method:
+                        for r in rho_list:
+                   
+                            cmd_list = f"python {script_name} --min_rate {config.min_rate} --epsilon {config.epsilon} --n_max {config.n_max} --T {t} --p_t {p} --alpha {a} --rho {r} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d}".split(' ')
+                            subprocess.run(cmd_list)
+                    else:
+                        cmd_list = f"python {script_name} --min_rate {config.min_rate} --epsilon {config.epsilon} --n_max {config.n_max} --T {t} --p_t {p} --alpha {a} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d}".split(' ')
+                        subprocess.run(cmd_list)
+            else:
+                cmd_list = f"python {script_name} --epsilon {config.epsilon} --p_t {p} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d}".split(' ')
+                subprocess.run(cmd_list)
