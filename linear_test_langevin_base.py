@@ -48,6 +48,7 @@ parser.add_argument('--T',type=int,default=config.T)
 parser.add_argument('--save_config', type=bool, default=config.save_config)
 parser.add_argument('--print_config',type=bool , default=config.print_config)
 parser.add_argument('--update_aggr_res', type=bool,default=config.update_aggr_res)
+parser.add_argument('--rho',type=float,default=config.rho)
 
 args=parser.parse_args()
 

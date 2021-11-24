@@ -46,6 +46,7 @@ parser.add_argument('--tqdm_opt',type=bool,default=config.tqdm_opt)
 parser.add_argument('--T',type=int,default=config.T)
 parser.add_argument('--save_config',type=bool, default=config.save_config)
 parser.add_argument('--update_agg_res',type=bool,default=config.update_agg_res)
+parser.add_argument('--rho',type=float,default=None)
 
 args=parser.parse_args()
 
