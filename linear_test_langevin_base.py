@@ -8,9 +8,9 @@ import os
 import argparse
 from tqdm import tqdm
 
-from dev.langevin_utils import project_ball, projected_langevin_kernel
+from dev.langevin_utils import langevin_kernel, project_ball, projected_langevin_kernel
 from dev.langevin_base import LangevinSMCBase
-from dev.utils import dichotomic_search, float_to_file_float
+from dev.utils import dichotomic_search, float_to_file_float,str2bool
 
 method_name="langevin_base"
 
@@ -31,6 +31,7 @@ class config:
     save_config = True
     print_config=True
     update_aggr_res=True
+    gaussian_latent ='False'
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -49,12 +50,15 @@ parser.add_argument('--save_config', type=bool, default=config.save_config)
 parser.add_argument('--print_config',type=bool , default=config.print_config)
 parser.add_argument('--update_aggr_res', type=bool,default=config.update_aggr_res)
 parser.add_argument('--rho',type=float,default=config.rho)
+parser.add_argument('--gaussian_latent',type=str, default=config.gaussian_latent)
 
 args=parser.parse_args()
 
 for k,v in vars(args).items():
     setattr(config, k, v)
 
+gaussian_latent= True if config.gaussian_latent.lower() in ('true','yes','y') else False
+assert type(gaussian_latent)==bool, "The conversion of string gaussian_latent failed"
 
 epsilon=config.epsilon
 d=config.d
@@ -77,30 +81,41 @@ if config.print_config:
 
 
 e_1 = np.array([1]+[0]*(config.d-1))
-
+if gaussian_latent:
+    e_1_d=np.array([1]+[0]*(config.d+1))
 p_target=lambda h: 0.5*betainc(0.5*(d+1),0.5,(2*epsilon*h-h**2)/(epsilon**2))
 h,P_target = dichotomic_search(f=p_target,a=0,b=1,thresh=config.p_t )
 assert np.isclose(a=config.p_t, b=P_target), "The dichotomic search was not precise enough."
-
 c=1-h
-V_batch = lambda X: np.clip(c-X[:,0],a_min=0, a_max = np.inf)
-gradV_batch = lambda X: -e_1[None]*(X[:,0]<c)[:,None] 
+
+if gaussian_latent:
+    print("utilisation of gaussian latent space")
+    V_batch = lambda X: np.clip(c-X[:,0]/LA.norm(X,axis=1),a_min=0,a_max=np.inf)
+    gradV_batch = lambda X: (X[:,0]<c)[:,None]*(X/LA.norm(X,axis=1)[:,None]-e_1_d)
+    mixing_kernel = langevin_kernel
+    X_gen=lambda N: np.random.normal(size=(N,d+2))
+else:
+    V_batch = lambda X: np.clip(c-X[:,0],a_min=0, a_max = np.inf)
+    gradV_batch = lambda X: -e_1[None]*(X[:,0]<c)[:,None]
+    prjct_epsilon = lambda X: project_ball(X, R=epsilon)
+    mixing_kernel = lambda X, gradV, delta_t,beta: projected_langevin_kernel(X,gradV,delta_t,beta, projection=prjct_epsilon)
+    big_gen=lambda N: np.random.normal(size= (N,d+2))
+    norm_and_select= lambda X: (X/LA.norm(X, axis=1)[:,None])[:,:d] 
+    X_gen = lambda N: epsilon*norm_and_select(big_gen(N))
+
 if config.verbose>5:
     print(f"P_target:{P_target}")
 
-prjct_epsilon = lambda X: project_ball(X, R=epsilon)
-prjct_epsilon_langevin_kernel = lambda X, gradV, delta_t,beta: projected_langevin_kernel(X,gradV,delta_t,beta, projection=prjct_epsilon)
 
-big_gen= lambda N: np.random.normal(size=(N,d+2))
-norm_and_select= lambda X: (X/LA.norm(X, axis=1)[:,None])[:,:d] 
-alt_uniform_gen_epsilon = lambda N: epsilon*norm_and_select(big_gen(N))
+
+
 
 iterator=tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
 times,estimates=[],[]
 for i in iterator:
     t=time()
-    Langevin_est = LangevinSMCBase(alt_uniform_gen_epsilon , V=V_batch, gradV= gradV_batch,min_rate=config.min_rate, N=config.N,
-     beta_0 = 0, rho=config.rho, l_kernel = prjct_epsilon_langevin_kernel, alpha = config.alpha, n_max=config.n_max, T=config.T, verbose=config.verbose)
+    Langevin_est = LangevinSMCBase(gen=X_gen, l_kernel=mixing_kernel , V=V_batch, gradV= gradV_batch,min_rate=config.min_rate, N=config.N,
+     beta_0 = 0, rho=config.rho, alpha = config.alpha, n_max=config.n_max, T=config.T, verbose=config.verbose)
     t=time()-t
     times.append(t)
     estimates.append(Langevin_est)
@@ -119,16 +134,17 @@ plt.savefig(os.path.join(log_path,'times_hist.png'))
 plt.hist(estimates,bins=10)
 plt.savefig(os.path.join(log_path,'estimates_hist.png'))
 #with open(os.path.join(log_path,'results.txt'),'w'):
-results={'p_t':config.p_t,'method':method_name
+results={'p_t':config.p_t,'method':method_name,'gaussian_latent':str(config.gaussian_latent)
 ,'N':config.N,'rho':config.rho,'n_rep':config.n_rep,'T':config.T,'alpha':config.alpha,'min_rate':config.min_rate,
 'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),'bias':estimates.mean()-config.p_t,'mean abs error':abs_errors.mean(),
-'mean rel error':rel_errors.mean(),'std est':estimates.std()}
+'mean rel error':rel_errors.mean(),'std est':estimates.std(),'freq underest':(estimates<config.p_t).mean()}
+
 results_df=pd.DataFrame([results])
 results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
 aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
 if config.update_aggr_res:
     if not os.path.exists(aggr_res_path):
-        cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est','bias','mean abs error','mean rel error','std est']
+        cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est','bias','mean abs error','mean rel error','std est','freq underest']
         aggr_res_df= pd.DataFrame(columns=cols)
     else:
         aggr_res_df=pd.read_csv(aggr_res_path)

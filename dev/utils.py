@@ -1,4 +1,6 @@
 
+import argparse
+
 def dichotomic_search(f, a, b, thresh=0, n_max =50):
     """Implementation of dichotomic search of minimum solution for an increasing function
         Args:
@@ -27,3 +29,11 @@ def dichotomic_search(f, a, b, thresh=0, n_max =50):
 def float_to_file_float(x):
     x=str(x).replace('.','_').replace(',','_')
     return x
+
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')

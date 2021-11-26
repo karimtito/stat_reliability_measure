@@ -5,10 +5,7 @@ import numpy.linalg as LA
 from dev.langevin_utils import TimeStep
 
 
-def langevin_kernel(X,gradV,delta_t,beta):
-    G_noise = np.random.normal(size = X.shape)
-    X_new =X-delta_t*gradV(X)+np.sqrt(2*delta_t/beta)*G_noise
-    return X_new
+
 
 """ Basic implementation of Langevin Sequential Monte Carlo """
 def LangevinSMCBase(gen, l_kernel,   V, gradV,rho=1,beta_0=0, min_rate=0.8,alpha =0.1,N=300,T = 1,n_max=300, verbose=False,adapt_func=None):

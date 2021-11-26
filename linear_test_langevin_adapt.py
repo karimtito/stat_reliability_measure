@@ -7,10 +7,11 @@ import pandas as pd
 import os
 import argparse
 from tqdm import tqdm
-
-from dev.langevin_utils import project_ball, projected_langevin_kernel
+import psutil
+import GPUtil
+from dev.langevin_utils import langevin_kernel,project_ball, projected_langevin_kernel
 from dev.langevin_adapt import SimpAdaptLangevinSMC
-from dev.utils import dichotomic_search, float_to_file_float
+from dev.utils import dichotomic_search, float_to_file_float, str2bool
 
 method_name="langevin_adapt"
 
@@ -30,6 +31,9 @@ class config:
     epsilon = 1
     save_config=True
     update_agg_res=True
+    gaussian_latent='False'
+    project_kernel=True
+    allow_multi_gpu=False
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -42,17 +46,20 @@ parser.add_argument('--min_rate',type=float,default=config.min_rate)
 parser.add_argument('--alpha',type=float,default=config.alpha)
 parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--epsilon',type=float, default=config.epsilon)
-parser.add_argument('--tqdm_opt',type=bool,default=config.tqdm_opt)
+parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
 parser.add_argument('--T',type=int,default=config.T)
-parser.add_argument('--save_config',type=bool, default=config.save_config)
-parser.add_argument('--update_agg_res',type=bool,default=config.update_agg_res)
-parser.add_argument('--rho',type=float,default=None)
-
+parser.add_argument('--save_config',type=str2bool, default=config.save_config)
+parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
+parser.add_argument('--rho',type=float,default=config.rho)
+parser.add_argument('--gaussian_latent',type=str, default=config.gaussian_latent)
+parser.add_argument('--allow_multi_gpu',type=str2bool)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
     setattr(config, k, v)
 
+gaussian_latent= True if config.gaussian_latent.lower() in ('true','yes','y') else False
+assert type(gaussian_latent)==bool, "The conversion of string gaussian_latent failed"
 config.json=vars(args)
 print(config.json)
 
@@ -70,29 +77,42 @@ os.mkdir(path=log_path)
 
 
 e_1 = np.array([1]+[0]*(config.d-1))
-
-p_target=lambda h: 0.5*betainc(0.5*(d+1),0.5,(2*epsilon*h-h**2)/(epsilon**2))
-h,P_target = dichotomic_search(f=p_target,a=0,b=1,thresh=config.p_t )
-assert np.isclose(a=config.p_t, b=P_target), "The dichotomic search was not precise enough."
-
-c=1-h
-V_batch = lambda X: np.clip(c-X[:,0],a_min=0, a_max = np.inf)
-gradV_batch = lambda X: -e_1[None]*(X[:,0]<c)[:,None]
-if config.verbose>5:
-    print(f"P_target:{P_target}")
-
-prjct_epsilon = lambda X: project_ball(X, R=epsilon)
-prjct_epsilon_langevin_kernel = lambda X, gradV, delta_t,beta: projected_langevin_kernel(X,gradV,delta_t,beta, projection=prjct_epsilon)
+if gaussian_latent:
+    e_1_d = np.array([1]+[0]*(config.d+1))
 
 big_gen= lambda N: np.random.normal(size=(N,d+2))
 norm_and_select= lambda X: (X/LA.norm(X, axis=1)[:,None])[:,:d] 
 alt_uniform_gen_epsilon = lambda N: epsilon*norm_and_select(big_gen(N))
 
+#computing hyperspherical cap of height h
+p_target=lambda h: 0.5*betainc(0.5*(d+1),0.5,(2*epsilon*h-h**2)/(epsilon**2))
+h,P_target = dichotomic_search(f=p_target,a=0,b=1,thresh=config.p_t )
+assert np.isclose(a=config.p_t, b=P_target), "The dichotomic search was not precise enough."
+c=1-h
+if gaussian_latent:
+    print('using gaussian space')
+    V_batch = lambda X: np.clip(c-X[:,0]/LA.norm(X,axis=1),a_min=0,a_max=np.inf)
+    gradV_batch = lambda X: (X[:,0]<c)[:,None]*(c*X/LA.norm(X,axis=1)[:,None]-e_1_d[None])
+    mixing_kernel = langevin_kernel
+    X_gen=lambda N: np.random.normal(size=(N,d+2))
+else:
+    V_batch = lambda X: np.clip(c-X[:,0],a_min=0, a_max = np.inf)
+    gradV_batch = lambda X: -e_1[None]*(X[:,0]<c)[:,None]
+    prjct_epsilon = lambda X: project_ball(X, R=epsilon)
+    mixing_kernel = lambda X, gradV, delta_t,beta: projected_langevin_kernel(X,gradV,delta_t,beta, projection=prjct_epsilon)
+    big_gen=lambda N: np.random.normal(size= (N,d+2))
+    norm_and_select= lambda X: (X/LA.norm(X, axis=1)[:,None])[:,:d] 
+    X_gen = lambda N: epsilon*norm_and_select(big_gen(N))
+
+
+if config.verbose>3:
+    print(f"P_target:{P_target}")
+
 iterator=tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
 times,estimates=[],[]
 for i in iterator:
     t=time()
-    Langevin_est = SimpAdaptLangevinSMC(alt_uniform_gen_epsilon , V=V_batch, gradV= gradV_batch, N =config.N,l_kernel = prjct_epsilon_langevin_kernel, alpha = config.alpha, n_max=config.n_max, T=config.T, verbose=config.verbose)
+    Langevin_est = SimpAdaptLangevinSMC(gen=X_gen, V=V_batch, gradV= gradV_batch, N =config.N,l_kernel = mixing_kernel, alpha = config.alpha, n_max=config.n_max, T=config.T, verbose=config.verbose)
     t=time()-t
     times.append(t)
     estimates.append(Langevin_est)
@@ -116,10 +136,10 @@ plt.savefig(os.path.join(log_path,'rel_errors.png'))
 
 #with open(os.path.join(log_path,'results.txt'),'w'):
 columns=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est','bias','mean abs error','mean rel error','std est']
-results={'p_t':config.p_t,'method':method_name,
+results={'p_t':config.p_t,'method':method_name,'gaussian_latent':str(config.gaussian_latent),
 'N':config.N,'rho':config.rho,'n_rep':config.n_rep,'T':config.T,'alpha':config.alpha,'min_rate':config.min_rate,
 'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),'bias':estimates.mean()-config.p_t,'mean abs error':abs_errors.mean(),
-'mean rel error':rel_errors.mean(),'std est':estimates.std()}
+'mean rel error':rel_errors.mean(),'std est':estimates.std(),'freq underest':(estimates<config.p_t).mean()}
 results_df=pd.DataFrame([results])
 results_df.to_csv(os.path.join(log_path,'results.csv'),)
 aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
@@ -127,7 +147,7 @@ aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
 if config.update_agg_res:
     if not os.path.exists(aggr_res_path):
         print('aggregate results csv file not found')
-        cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est','bias','mean abs error','mean rel error','std est']
+        cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est','bias','mean abs error','mean rel error','std est','freq underest']
         agg_res_df= pd.DataFrame(columns=cols)
 
     else:
