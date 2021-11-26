@@ -78,8 +78,8 @@ assert np.isclose(a=config.p_t, b=P_target), "The dichotomic search was not prec
 c=1-h
 V_batch = lambda X: np.clip(c-X[:,0],a_min=0, a_max = np.inf)
 gradV_batch = lambda X: -e_1[None]*(X[:,0]<c)[:,None]
-if config.verbose>5:
-    print(f"P_target:{P_target}")
+
+
 
 prjct_epsilon = lambda X: project_ball(X, R=epsilon)
 prjct_epsilon_langevin_kernel = lambda X, gradV, delta_t,beta: projected_langevin_kernel(X,gradV,delta_t,beta, projection=prjct_epsilon)
