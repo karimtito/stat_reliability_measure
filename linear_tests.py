@@ -1,6 +1,8 @@
 import argparse
 import subprocess
 
+from dev.utils import str2bool
+
 class config:
     log_dir="./logs/linear_tests"
     n_rep='10'
@@ -20,6 +22,7 @@ class config:
     update_aggr_res=True
     method="langevin_base"
     script_name="linear_test_"
+    gaussian_latent='False'
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -39,6 +42,9 @@ parser.add_argument('--print_config',type=bool , default=config.print_config)
 parser.add_argument('--update_aggr_res', type=bool,default=config.update_aggr_res)
 parser.add_argument('--method',type=str,default=config.method)
 parser.add_argument('--rho',type=str,default=config.rho)
+parser.add_argument('--gaussian_latent',type=str, default=config.gaussian_latent)
+
+
 
 args=parser.parse_args()
 
@@ -54,6 +60,9 @@ for k,v in vars(args).items():
 # p_t_list=str_to_type_list(config.alpha, out_type=float)
 # alpha_list=str_to_type_list(config.alphat, out_type= float)
 # rho_list=str_to_type_list(config.rho,out_type=float)
+
+gaussian_latent= True if config.gaussian_latent.lower() in ('true','yes','y') else False
+assert type(gaussian_latent)==bool, "The conversion of string gaussian_latent failed"
 
 T_list=(config.T).split(',')
 p_t_list=(config.p_t).split(',')
@@ -73,7 +82,6 @@ for p in p_t_list:
                 for a in alpha_list: 
                     if 'base' in config.method:
                         for r in rho_list:
-                   
                             cmd_list = f"python {script_name} --min_rate {config.min_rate} --epsilon {config.epsilon} --n_max {config.n_max} --T {t} --p_t {p} --alpha {a} --rho {r} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d}".split(' ')
                             subprocess.run(cmd_list)
                     else:
