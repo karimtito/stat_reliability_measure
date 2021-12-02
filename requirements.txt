@@ -4,4 +4,5 @@ tensorflow>=2.4
 scipy 
 tqdm
 matplotlib
-gputil
+GPUtil
+cpuinfo #psutil

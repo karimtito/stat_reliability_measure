@@ -23,6 +23,9 @@ class config:
     method="langevin_base"
     script_name="linear_test_"
     gaussian_latent='False'
+    g_target=0.9
+    track_cpu=True
+    track_gpu=True
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -43,6 +46,9 @@ parser.add_argument('--update_aggr_res', type=bool,default=config.update_aggr_re
 parser.add_argument('--method',type=str,default=config.method)
 parser.add_argument('--rho',type=str,default=config.rho)
 parser.add_argument('--gaussian_latent',type=str, default=config.gaussian_latent)
+parser.add_argument('--g_target', type=float, default=config.g_target)
+parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
+parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
 
 
 
@@ -61,7 +67,7 @@ for k,v in vars(args).items():
 # alpha_list=str_to_type_list(config.alphat, out_type= float)
 # rho_list=str_to_type_list(config.rho,out_type=float)
 
-gaussian_latent= True if config.gaussian_latent.lower() in ('true','yes','y') else False
+gaussian_latent= True if config.gaussian_latent.lower() in ('true','yes','y','t','o','ok') else False
 assert type(gaussian_latent)==bool, "The conversion of string gaussian_latent failed"
 
 T_list=(config.T).split(',')
@@ -69,6 +75,7 @@ p_t_list=(config.p_t).split(',')
 alpha_list=(config.alpha).split(',')
 N_list=(config.N).split(',')
 rho_list=(config.rho).split(',')
+
 
 if config.method in ("langevin_base","langevin_adapt"):
     script_name=config.script_name+config.method+".py"
@@ -82,11 +89,17 @@ for p in p_t_list:
                 for a in alpha_list: 
                     if 'base' in config.method:
                         for r in rho_list:
-                            cmd_list = f"python {script_name} --min_rate {config.min_rate} --epsilon {config.epsilon} --n_max {config.n_max} --T {t} --p_t {p} --alpha {a} --rho {r} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d}".split(' ')
-                            subprocess.run(cmd_list)
+                            cmd = f"python {script_name} --min_rate {config.min_rate} --epsilon {config.epsilon} --n_max {config.n_max} --T {t} --p_t {p} --alpha {a} --rho {r} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d}"
+                            
                     else:
-                        cmd_list = f"python {script_name} --min_rate {config.min_rate} --epsilon {config.epsilon} --n_max {config.n_max} --T {t} --p_t {p} --alpha {a} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d}".split(' ')
-                        subprocess.run(cmd_list)
+                        
+                        cmd = f"python {script_name} --min_rate {config.min_rate} --epsilon {config.epsilon} --n_max {config.n_max} --T {t} --p_t {p} --alpha {a} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d} --g_target {config.g_target}"
+                        
             else:
-                cmd_list = f"python {script_name} --epsilon {config.epsilon} --p_t {p} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d}".split(' ')
-                subprocess.run(cmd_list)
+                cmd = f"python {script_name} --epsilon {config.epsilon} --p_t {p} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d}"
+                
+            
+            cmd+= f" --track_cpu {config.track_cpu}"
+            cmd+= f" --track_gpu {config.track_gpu}"
+            cmd_list = cmd.split(' ')
+            subprocess.run(cmd_list)    
