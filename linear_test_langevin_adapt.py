@@ -114,6 +114,9 @@ p_target=lambda h: 0.5*betainc(0.5*(d+1),0.5,(2*epsilon*h-h**2)/(epsilon**2))
 h,P_target = dichotomic_search(f=p_target,a=0,b=1,thresh=config.p_t )
 assert np.isclose(a=config.p_t, b=P_target), "The dichotomic search was not precise enough."
 c=1-h
+
+
+
 if gaussian_latent:
     print('using gaussian space')
     V_batch = lambda X: np.clip(c-X[:,0]/LA.norm(X,axis=1),a_min=0,a_max=np.inf)
@@ -133,6 +136,7 @@ else:
 
 if config.verbose>3:
     print(f"P_target:{P_target}")
+
 
 iterator=tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
 times,estimates=[],[]
