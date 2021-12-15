@@ -90,16 +90,23 @@ for p in p_t_list:
                     if 'base' in config.method:
                         for r in rho_list:
                             cmd = f"python {script_name} --min_rate {config.min_rate} --epsilon {config.epsilon} --n_max {config.n_max} --T {t} --p_t {p} --alpha {a} --rho {r} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d}"
+                            cmd+= f" --track_cpu {config.track_cpu}"
+                            cmd+= f" --track_gpu {config.track_gpu}"
+                            cmd_list = cmd.split(' ')
+                            subprocess.run(cmd_list)  
                             
                     else:
                         
                         cmd = f"python {script_name} --min_rate {config.min_rate} --epsilon {config.epsilon} --n_max {config.n_max} --T {t} --p_t {p} --alpha {a} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d} --g_target {config.g_target}"
-                        
+                        cmd+= f" --track_cpu {config.track_cpu}"
+                        cmd+= f" --track_gpu {config.track_gpu}"
+                        cmd_list = cmd.split(' ')
+                        subprocess.run(cmd_list)  
             else:
                 cmd = f"python {script_name} --epsilon {config.epsilon} --p_t {p} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d}"
                 
             
-            cmd+= f" --track_cpu {config.track_cpu}"
-            cmd+= f" --track_gpu {config.track_gpu}"
-            cmd_list = cmd.split(' ')
-            subprocess.run(cmd_list)    
+                cmd+= f" --track_cpu {config.track_cpu}"
+                cmd+= f" --track_gpu {config.track_gpu}"
+                cmd_list = cmd.split(' ')
+                subprocess.run(cmd_list)    
