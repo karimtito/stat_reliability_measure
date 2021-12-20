@@ -20,6 +20,7 @@ class config:
     save_config = True
     print_config=True
     update_aggr_res=True
+    aggr_res_path=None
     method="langevin_base"
     script_name="linear_test_"
     gaussian_latent='False'
@@ -43,6 +44,7 @@ parser.add_argument('--T',type=str,default=config.T)
 parser.add_argument('--save_config', type=bool, default=config.save_config)
 parser.add_argument('--print_config',type=bool , default=config.print_config)
 parser.add_argument('--update_aggr_res', type=bool,default=config.update_aggr_res)
+parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
 parser.add_argument('--method',type=str,default=config.method)
 parser.add_argument('--rho',type=str,default=config.rho)
 parser.add_argument('--gaussian_latent',type=str, default=config.gaussian_latent)
@@ -82,6 +84,8 @@ if config.method in ("langevin_base","langevin_adapt"):
 else:
     raise RuntimeError("Input method must be chosen in ('langevin_base','langevin_adapt'")
 
+
+
 for p in p_t_list:
     for t in T_list:
         for N in N_list: 
@@ -92,6 +96,8 @@ for p in p_t_list:
                             cmd = f"python {script_name} --min_rate {config.min_rate} --epsilon {config.epsilon} --n_max {config.n_max} --T {t} --p_t {p} --alpha {a} --rho {r} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d}"
                             cmd+= f" --track_cpu {config.track_cpu}"
                             cmd+= f" --track_gpu {config.track_gpu}"
+                            if config.aggr_res_path is not None:
+                                cmd+= f" --aggr_res_path {config.aggr_res_path}"
                             cmd_list = cmd.split(' ')
                             subprocess.run(cmd_list)  
                             
@@ -100,6 +106,8 @@ for p in p_t_list:
                         cmd = f"python {script_name} --min_rate {config.min_rate} --epsilon {config.epsilon} --n_max {config.n_max} --T {t} --p_t {p} --alpha {a} --N {N} --n_rep {config.n_rep} --verbose {config.verbose} --d {config.d} --g_target {config.g_target}"
                         cmd+= f" --track_cpu {config.track_cpu}"
                         cmd+= f" --track_gpu {config.track_gpu}"
+                        if config.aggr_res_path is not None:
+                                cmd+= f" --aggr_res_path {config.aggr_res_path}"
                         cmd_list = cmd.split(' ')
                         subprocess.run(cmd_list)  
             else:
@@ -108,5 +116,7 @@ for p in p_t_list:
             
                 cmd+= f" --track_cpu {config.track_cpu}"
                 cmd+= f" --track_gpu {config.track_gpu}"
+                if config.aggr_res_path is not None:
+                                cmd+= f" --aggr_res_path {config.aggr_res_path}"
                 cmd_list = cmd.split(' ')
                 subprocess.run(cmd_list)    

@@ -79,8 +79,8 @@ def compute_V_grad_pyt(model, input_, target_class):
     return v,grad
 
 def compute_V_pyt(model, input_, target_class):
+    """Return potentials for given inputs, model and target classes"""
     with torch.no_grad():
-        """Return potentials for given inputs, model and target classes"""
         logits = model(input_) 
         val, ind= torch.topk(logits,k=2)
         output=val[:,0]-val[:,1]

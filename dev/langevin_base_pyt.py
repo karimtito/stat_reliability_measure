@@ -1,5 +1,5 @@
 import torch
-from torch_utils import TimeStepPyt
+from dev.torch_utils import TimeStepPyt
 
 # def TimeStepPyt(V,X,gradV,p=1,p_p=2):
 #     V_mean= V(X).mean()
@@ -50,7 +50,8 @@ verbose=False,adapt_func=None,accept_zero_est=False,device=None):
     v = V(X) # computes their potentials
     Count_v = N # Number of calls to function V or it's  gradient
     delta_t = alpha*TimeStepPyt(V,X,gradV)
-    print(delta_t)
+    if verbose>=5:
+        print(delta_t)
     Count_v+=2*N
     beta_old = beta_0
     ## For
@@ -67,11 +68,12 @@ verbose=False,adapt_func=None,accept_zero_est=False,device=None):
         beta=beta.item()
         
         G = torch.exp(-(beta-beta_old)*v).to('cpu') #computes current value fonction
-       
-        print(G) 
+        
         
         w = w * G #updates weights
-        print(w)
+        if verbose>=5:
+            print(G) 
+            print(w)
         n += 1 # increases iteration number
         if n >=n_max:
             if accept_zero_est:
@@ -87,7 +89,8 @@ verbose=False,adapt_func=None,accept_zero_est=False,device=None):
         v = V(X).detach().cpu()
         Count_v+= N
         beta_old = beta
-    print(v<=0)
+    if verbose>=5:
+        print(v<=0)
     
     P_est = (w.cpu()*(v.detach().cpu()<=0).float()).sum()        
     return P_est

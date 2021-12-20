@@ -31,7 +31,9 @@ class config:
     d = 1024
     epsilon = 1
     save_config=True
-    update_agg_res=True
+    print_config=True
+    update_agg_res='True'
+    aggr_res_path=None
     gaussian_latent='False'
     project_kernel=True
     allow_multi_gpu=False
@@ -41,6 +43,7 @@ class config:
     gpu_name=None
     cpu_name=None
     cores_number=None
+    
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -56,13 +59,14 @@ parser.add_argument('--epsilon',type=float, default=config.epsilon)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
 parser.add_argument('--T',type=int,default=config.T)
 parser.add_argument('--save_config',type=str2bool, default=config.save_config)
-parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
+parser.add_argument('--update_agg_res',type=str2bool,default=True)
 parser.add_argument('--rho',type=float,default=config.rho)
 parser.add_argument('--gaussian_latent',type=str, default=config.gaussian_latent)
-parser.add_argument('--allow_multi_gpu',type=str2bool)
+parser.add_argument('--allow_multi_gpu',type=str2bool,default=config.allow_multi_gpu)
 parser.add_argument('--g_target',type=float,default=config.g_target)
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
 parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
+parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -94,11 +98,21 @@ d=config.d
 if not os.path.exists('./logs'):
     os.mkdir('./logs')
     os.mkdir(config.log_dir)
+raw_logs_path=os.path.join(config.log_dir,'raw_logs')
+if not os.path.exists(raw_logs_path):
+    os.mkdir(raw_logs_path)
+
 
 loc_time= float_to_file_float(time())
 log_name=method_name+'_'+loc_time
-log_path=os.path.join(config.log_dir,log_name)
+log_path=os.path.join(raw_logs_path,log_name)
 os.mkdir(path=log_path)
+config.json=vars(args)
+if config.print_config:
+    print(config.json)
+# if config.save_config:
+
+
 
 
 e_1 = np.array([1]+[0]*(config.d-1))
@@ -174,7 +188,10 @@ results={'p_t':config.p_t,'method':method_name,'gaussian_latent':str(config.gaus
 ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,'g_target':config.g_target}
 results_df=pd.DataFrame([results])
 results_df.to_csv(os.path.join(log_path,'results.csv'),)
-aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+if config.aggr_res_path is None:
+    aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+else: 
+    aggr_res_path=config.aggr_res_path
 
 if config.update_agg_res:
     if not os.path.exists(aggr_res_path):

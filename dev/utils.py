@@ -37,3 +37,9 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+def str2list(in_str,split_chr=',',type_out=None):
+    l = in_str.strip('[').strip(']').split(split_chr)
+    if type_out is not None:
+        l=[type_out(e) for e in l]
+    return l
