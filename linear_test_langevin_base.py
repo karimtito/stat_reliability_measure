@@ -29,6 +29,7 @@ class config:
     tqdm_opt=True
     p_t=1e-15
     d = 1024
+    allow_zero_est=True
     epsilon = 1
     save_config = True
     print_config=True
@@ -65,7 +66,7 @@ parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
 parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
 parser.add_argument('--allow_multi_gpu',type=str2bool,default=config.allow_multi_gpu)
-
+parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_est)
 args=parser.parse_args()
 
 
@@ -108,7 +109,7 @@ os.mkdir(path=log_path)
 config.json=vars(args)
 if config.print_config:
     print(config.json)
-# if config.save_config:
+# if config.save_confi
 # if config.save_config:
 #     with open(file=os.path.join(),mode='w') as f:
 #         f.write(config.json)
@@ -149,7 +150,8 @@ times,estimates=[],[]
 for i in iterator:
     t=time()
     Langevin_est = LangevinSMCBase(gen=X_gen, l_kernel=mixing_kernel , V=V_batch, gradV= gradV_batch,min_rate=config.min_rate, N=config.N,
-     beta_0 = 0, rho=config.rho, alpha = config.alpha, n_max=config.n_max, T=config.T, verbose=config.verbose)
+     beta_0 = 0, rho=config.rho, alpha = config.alpha, n_max=config.n_max, T=config.T, verbose=config.verbos,
+    allow_zero_est=True)
     t=time()-t
     times.append(t)
     estimates.append(Langevin_est)

@@ -9,7 +9,7 @@ from dev.langevin_utils import TimeStep
 
 """ Basic implementation of Langevin Sequential Monte Carlo """
 def LangevinSMCBase(gen, l_kernel,   V, gradV,rho=1,beta_0=0, min_rate=0.8,alpha =0.1,N=300,T = 1,n_max=300, 
-verbose=False,adapt_func=None, accept_zero_est=False):
+verbose=False,adapt_func=None, allow_zero_est=False):
     """
       Basic version of a Langevin-based SMC estimator
       Args:
@@ -67,7 +67,7 @@ verbose=False,adapt_func=None, accept_zero_est=False):
         w = w * G #updates weights
         n += 1 # increases iteration number
         if n >=n_max:
-            if accept_zero_est:
+            if allow_zero_est:
                 return  0
             else:
                 raise RuntimeError('The estimator failed. Increase n_max?')

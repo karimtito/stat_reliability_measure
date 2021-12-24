@@ -6,3 +6,4 @@ tqdm
 matplotlib
 GPUtil
 cpuinfo #psutil
+torch==1.10
