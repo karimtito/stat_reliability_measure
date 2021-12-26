@@ -132,7 +132,7 @@ for p_t in config.p_range:
                     ests = []
                     for i in iterator:
                         t=time()
-                        p_est=smc_pyt.LangevinSMCBasePyt(gen=uniform_ball_gen_pyt,l_kernel=prjct_epsilon_langevin_kernel,N=N,min_rate=config.min_rate,
+                        p_est,finish_flag=smc_pyt.LangevinSMCBasePyt(gen=uniform_ball_gen_pyt,l_kernel=prjct_epsilon_langevin_kernel,N=N,min_rate=config.min_rate,
                         rho=rho,alpha=alpha,T=T,V= V,gradV=gradV,verbose=config.verbose,n_max=config.n_max)
                         t1=time()-t
                         times.append(t1)

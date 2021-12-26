@@ -38,7 +38,7 @@ verbose=False,adapt_func=None, allow_zero_est=False):
  
     #d =gen(1).shape[-1] # dimension of the random vectors
     n = 1 # Number of iterations
-
+    unfinished_flag=True
     ## Init
     # step A0: generate & compute potentials
     X = gen(N) # generate N samples
@@ -68,7 +68,7 @@ verbose=False,adapt_func=None, allow_zero_est=False):
         n += 1 # increases iteration number
         if n >=n_max:
             if allow_zero_est:
-                return  0
+                return  (w*(v<=0).astype(int)).sum(),False 
             else:
                 raise RuntimeError('The estimator failed. Increase n_max?')
         
@@ -78,6 +78,6 @@ verbose=False,adapt_func=None, allow_zero_est=False):
         v = V(X)
         Count_v+= N
         beta_old = beta
-
+    
     P_est = (w*(v<=0).astype(int)).sum()        
-    return P_est
+    return P_est,True

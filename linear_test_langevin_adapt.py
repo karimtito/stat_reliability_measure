@@ -30,6 +30,7 @@ class config:
     p_t=1e-15
     d = 1024
     epsilon = 1
+    allow_zero_est=False
     save_config=True
     print_config=True
     update_agg_res='True'
@@ -43,12 +44,16 @@ class config:
     gpu_name=None
     cpu_name=None
     cores_number=None
+    np_seed=None
+    torch_seed=None
+    tf_seed=None
     
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--N',type=int,default=config.N)
+parser.add_argument('--allow_zero_est',type=str2bool,default=config.allow_zero_est)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--d',type=int,default=config.d)
 parser.add_argument('--p_t',type=float,default=config.p_t)
@@ -67,10 +72,15 @@ parser.add_argument('--g_target',type=float,default=config.g_target)
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
 parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
 parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
+parser.add_argument('--np_seed',type=float, default=config.np_seed)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
     setattr(config, k, v)
+
+if config.np_seed is None:
+    config.np_seed=int(time.time())
+np.random.seed(seed=config.np_seed)
 
 if not config.allow_multi_gpu:
     os.environ["CUDA_VISIBLE_DEVICES"]="0"
@@ -94,6 +104,7 @@ print(config.json)
 
 epsilon=config.epsilon
 d=config.d
+
 
 if not os.path.exists('./logs'):
     os.mkdir('./logs')
@@ -153,21 +164,30 @@ if config.verbose>3:
 
 
 iterator=tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
-times,estimates=[],[]
+times,estimates,finished=[],[],[]
 for i in iterator:
     t=time()
-    Langevin_est = SimpAdaptLangevinSMC(gen=X_gen, V=V_batch, gradV= gradV_batch, N =config.N,
+    Langevin_est,finish_flag = SimpAdaptLangevinSMC(gen=X_gen, V=V_batch, gradV= gradV_batch, N =config.N,
     l_kernel = mixing_kernel, alpha = config.alpha, n_max=config.n_max, T=config.T, verbose=config.verbose,
-    g_target=config.g_target)
+    g_target=config.g_target, allow_zero_est=config.allow_zero_est)
     t=time()-t
     times.append(t)
     estimates.append(Langevin_est)
+    finished.append(finish_flag)
 
 times=np.array(times)
 estimates = np.array(estimates)
+finished=np.array(finish_flag)
 abs_errors=np.abs(estimates-config.p_t)
 rel_errors=abs_errors/config.p_t
 bias=np.mean(estimates)-config.p_t
+freq_finished=finished.mean()
+freq_zero_est=(estimates==0).mean()
+unfinish_est=estimates[~finished]
+unfinish_times=times[~finished]
+unfinished_mean_est=unfinish_est.mean()
+unfinished_mean_time=unfinish_times.mean()
+
 
 np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
 np.savetxt(fname=os.path.join(log_path,'estimates.txt'),X=estimates)
@@ -185,7 +205,9 @@ results={'p_t':config.p_t,'method':method_name,'gaussian_latent':str(config.gaus
 'N':config.N,'rho':config.rho,'n_rep':config.n_rep,'T':config.T,'alpha':config.alpha,'min_rate':config.min_rate,
 'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),'bias':estimates.mean()-config.p_t,'mean abs error':abs_errors.mean(),
 'mean rel error':rel_errors.mean(),'std est':estimates.std(),'freq underest':(estimates<config.p_t).mean()
-,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,'g_target':config.g_target}
+,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,'g_target':config.g_target,
+'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,'unfinished_mean_est':unfinished_mean_est
+, 'np_seed':config.np_seed}
 results_df=pd.DataFrame([results])
 results_df.to_csv(os.path.join(log_path,'results.csv'),)
 if config.aggr_res_path is None:
@@ -195,9 +217,10 @@ else:
 
 if config.update_agg_res:
     if not os.path.exists(aggr_res_path):
-        print('aggregate results csv file not found')
+        print(f'aggregate results csv file not found /n it will be build at {aggr_res_path}')
         cols=['p_t','method','gaussian_latent','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est',
         'bias','mean abs error','mean rel error','std est','freq underest','gpu_name','cpu_name','g_target']
+        cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
         agg_res_df= pd.DataFrame(columns=cols)
 
     else:

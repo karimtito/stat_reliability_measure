@@ -73,7 +73,7 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBeta,rho=1,allow_zero_est=False)
  
     #d =gen(1).shape[-1] # dimension of the random vectors
     n = 1 # Number of iterations
-
+    finish_flag=False
     ## Init
     # step A0: generate & compute potentials
     X = gen(N) # generate N samples
@@ -107,7 +107,7 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBeta,rho=1,allow_zero_est=False)
         n += 1 # increases iteration number
         if n >=n_max:
             if allow_zero_est:
-                return  0
+                return  np.prod(g_), False
             else:
                 raise RuntimeError('The estimator failed. Increase n_max?')
         
@@ -119,8 +119,8 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBeta,rho=1,allow_zero_est=False)
         beta_old = beta
         beta,g_iter=SimpAdaptBeta(beta_old=beta_old,v=v,g_target=g_target,multi_output=True,max_beta=max_beta)
         g_.append(g_iter)
-        
+    #finish_flag=True
     P_est = np.prod(g_)
    
 
-    return P_est
+    return P_est,True

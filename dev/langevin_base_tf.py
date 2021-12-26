@@ -2,7 +2,8 @@ import tensorflow as tf
 from dev.tf_utils import TimeStepTF
 
 
-def LangevinSMCBaseTF(gen, l_kernel,   V, gradV,rho=1,beta_0=0, min_rate=0.8,alpha =0.1,N=300,T = 1,n_max=300,step_decay=0., verbose=False,adapt_func=None):
+def LangevinSMCBaseTF(gen, l_kernel,   V, gradV,rho=1,beta_0=0, min_rate=0.8,alpha =0.1,N=300,T = 1,n_max=300,
+step_decay=0., verbose=False,adapt_func=None, allow_zero_est=False):
     """
       Basic version of a Langevin-based SMC estimator
       Args:
@@ -64,7 +65,10 @@ def LangevinSMCBaseTF(gen, l_kernel,   V, gradV,rho=1,beta_0=0, min_rate=0.8,alp
         w = w * G #updates weights
         n += 1 # increases iteration number
         if n >=n_max:
-            raise RuntimeError('The estimator failed. Increase n_max?')
+            if allow_zero_est: 
+                return tf.math.reduce_sum(w*tf.cast(v<=0,dtype=tf.float32)),False
+            else:
+                raise RuntimeError('The estimator failed. Increase n_max?')
         
         for t in range(T):
             X=l_kernel(X, gradV, delta_t, beta)
@@ -76,4 +80,4 @@ def LangevinSMCBaseTF(gen, l_kernel,   V, gradV,rho=1,beta_0=0, min_rate=0.8,alp
         if verbose>1.5:
             print(f"New time step: dt={delta_t}")
     P_est = tf.math.reduce_sum(w*tf.cast(v<=0,dtype=tf.float32))
-    return P_est
+    return P_est,True

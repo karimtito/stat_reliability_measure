@@ -10,7 +10,7 @@ from dev.torch_utils import TimeStepPyt
 
 """ Basic implementation of Langevin Sequential Monte Carlo """
 def LangevinSMCBasePyt(gen, l_kernel,   V, gradV,rho=10,beta_0=0, min_rate=0.8,alpha =0.1,N=300,T = 1,n_max=300, 
-verbose=False,adapt_func=None,accept_zero_est=False,device=None):
+verbose=False,adapt_func=None,allow_zero_est=False,device=None):
     """
       Basic version of a Langevin-based SMC estimator
       Args:
@@ -76,8 +76,8 @@ verbose=False,adapt_func=None,accept_zero_est=False,device=None):
             print(w)
         n += 1 # increases iteration number
         if n >=n_max:
-            if accept_zero_est:
-                return  0
+            if allow_zero_est:
+                return  (w.cpu()*(v.detach().cpu()<=0).float()).sum(),False
             else:
                 raise RuntimeError('The estimator failed. Increase n_max?')
         
@@ -93,4 +93,4 @@ verbose=False,adapt_func=None,accept_zero_est=False,device=None):
         print(v<=0)
     
     P_est = (w.cpu()*(v.detach().cpu()<=0).float()).sum()        
-    return P_est
+    return P_est, True

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import argparse
+from torch.random import seed
 from tqdm import tqdm
 #import psutil
 import cpuinfo
@@ -30,6 +31,7 @@ class config:
     p_t=1e-15
     d = 1024
     epsilon = 1
+    allow_zero_est=False
     save_config=True
     print_config=True
     update_agg_res=True
@@ -37,6 +39,7 @@ class config:
     gaussian_latent=False
     project_kernel=True
     allow_multi_gpu=False
+
     g_target=None
     track_gpu=True
     track_cpu=True
@@ -44,6 +47,9 @@ class config:
     cpu_name=None
     cores_number=None
     device=None
+    torch_seed=0
+    np_seed=0
+    tf_seed=None
     
 
 parser=argparse.ArgumentParser()
@@ -69,13 +75,28 @@ parser.add_argument('--g_target',type=float,default=config.g_target)
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
 parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
 parser.add_argument('--device',type=str, default=config.device)
+parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_est)
+parser.add_argument('--torch_seed',type=int, default=config.torch_seed)
+parser.add_argument('--np_seed',type=int, default=config.np_seed)
 args=parser.parse_args()
+
+
+
 
 for k,v in vars(args).items():
     setattr(config, k, v)
 
 if not config.allow_multi_gpu:
     os.environ["CUDA_VISIBLE_DEVICES"]="0"
+
+if config.np_seed is None:
+    config.np_seed=int(time.time())
+np.random.seed(seed=config.np_seed)
+
+if config.torch_seed is None:
+    config.torch_seed=int(time.time())
+torch.manual_seed(config.torch_seed)
+
 
 if config.track_gpu:
     gpus=GPUtil.getGPUs()
@@ -178,7 +199,8 @@ results={'p_t':config.p_t,'method':method_name,'gaussian_latent':str(config.gaus
 'N':config.N,'rho':config.rho,'n_rep':config.n_rep,'T':config.T,'alpha':config.alpha,'min_rate':config.min_rate,
 'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),'bias':estimates.mean()-config.p_t,'mean abs error':abs_errors.mean(),
 'mean rel error':rel_errors.mean(),'std est':estimates.std(),'freq underest':(estimates<config.p_t).mean()
-,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number}
+,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,'torch_seed':config.torch_seed,
+'np_seed':config.np_seed}
 
 results_df=pd.DataFrame([results])
 results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
@@ -186,7 +208,7 @@ results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
 if config.update_agg_res:
     if not os.path.exists(aggr_res_path):
         cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est',
-        'bias','mean abs error','mean rel error','std est','freq underest','gpu_name','cpu_name']
+        'bias','mean abs error','mean rel error','std est','freq underest','gpu_name','cpu_name','allow']
         aggr_res_df= pd.DataFrame(columns=cols)
     else:
         aggr_res_df=pd.read_csv(aggr_res_path)
