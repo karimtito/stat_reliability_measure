@@ -1,5 +1,5 @@
 import torch
-
+import torch.nn as nn
 def TimeStepPyt(V,X,gradV,p=1,p_p=2):
     V_mean= V(X).mean()
     V_grad_norm_mean = ((torch.norm(gradV(X),dim = 1,p=p_p)**p).mean())**(1/p)
