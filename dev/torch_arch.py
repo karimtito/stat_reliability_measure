@@ -49,9 +49,9 @@ class CNN_custom(nn.Module):
         out=nn.ReLU()(self.linear1(out ))
         out= self.linear2(out)
         return out
-model_dnn_2.load_state_dict(torch.load("model_dnn_2.pt"))
-model_dnn_4.load_state_dict(torch.load("model_dnn_4.pt"))
-model_cnn.load_state_dict(torch.load("model_cnn.pt"))
+#model_dnn_2.load_state_dict(torch.load("model_dnn_2.pt"))
+#model_dnn_4.load_state_dict(torch.load("model_dnn_4.pt"))
+#model_cnn.load_state_dict(torch.load("model_cnn.pt"))
 
 class CNN(nn.Module):
     def __init__(self, block, num_blocks, num_classes=10, in_planes=64):
