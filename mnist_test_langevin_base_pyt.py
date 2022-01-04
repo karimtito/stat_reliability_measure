@@ -13,7 +13,7 @@ import cpuinfo
 from torch import optim
 import argparse
 import os
-import dev.langevin_base as smc_pyt
+import dev.langevin_base_pyt as smc_pyt
 from importlib import reload
 from time import time
 from dev.torch_utils import project_ball_pyt, projected_langevin_kernel_pyt, multi_unsqueeze, compute_V_grad_pyt, compute_V_pyt
@@ -25,6 +25,7 @@ import dev.torch_utils as t_u
 #setting PRNG seeds for reproducibility
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
+low_str=lambda x: str(x).lower()
 
 method_name="langevin_base_pyt"
 
@@ -33,16 +34,18 @@ class config:
     n_rep=10
     N=40
     verbose=0
-    min_rate=0.40
+    min_rate=0.51
     T=1
     rho=90
     alpha=0.025
-    n_max=5000
+    n_max=2000
     tqdm_opt=True
-    p_t=1e-15
     d = 1024
-    epsilons = [0.01]
-    allow_zero_est=False
+    epsilons = None
+    eps_max=1
+    eps_min=0.0001 
+    eps_num=5
+    allow_zero_est=True
     save_config=True
     print_config=True
     update_agg_res=True
@@ -62,9 +65,13 @@ class config:
     np_seed=0
     tf_seed=None
     export_to_onnx=False
-    use_attack=False
+    use_attack=True
     attack='PGD'
-    
+    lirpa_bounds=True
+    download=False
+    train_model=False
+    noise_dist='uniform'
+    a=0
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -72,7 +79,6 @@ parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--d',type=int,default=config.d)
-parser.add_argument('--p_t',type=float,default=config.p_t)
 parser.add_argument('--min_rate',type=float,default=config.min_rate)
 parser.add_argument('--alpha',type=float,default=config.alpha)
 parser.add_argument('--n_max',type=int,default=config.n_max)
@@ -96,10 +102,23 @@ parser.add_argument('--use_attack',type=str2bool,default=config.use_attack)
 parser.add_argument('--attack',type=str,default=config.attack)
 parser.add_argument('--epsilons',type=str2floatList,default=config.epsilons)
 parser.add_argument('--input_index',type=int,default=config.input_index)
+parser.add_argument('--lirpa_bounds',type=str2bool, default=config.lirpa_bounds)
+parser.add_argument('--eps_min',type=float, default=config.eps_min)
+parser.add_argument('--eps_max',type=float, default=config.eps_max)
+parser.add_argument('--eps_num',type=int,default=config.eps_num)
+parser.add_argument('--train_model',type=str2bool,default=config.train_model)
+parser.add_argument('--noise_dist',type=str, default=config.noise_dist)
+parser.add_argument('--a',type=float, default=config.a)
 args=parser.parse_args()
+
 for k,v in vars(args).items():
     setattr(config, k, v)
 
+if config.noise_dist is not None:
+    config.noise_dist=config.noise_dist.lower()
+
+if config.noise_dist not in ['uniform','gaussian']:
+    raise NotImplementedError("Only uniform and Gaussian distributions are implemented.")
 
 if not config.allow_multi_gpu:
     os.environ["CUDA_VISIBLE_DEVICES"]="0"
@@ -133,18 +152,23 @@ else:
     device=config.device
 
 d=config.d
-epsilon=config.epsilon
+#epsilon=config.epsilon
 
 
 if not os.path.exists('./logs'):
     os.mkdir('./logs')
+if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
+
 raw_logs_path=os.path.join(config.log_dir,'raw_logs')
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
 
-
+if config.epsilons is None:
+    log_min,log_max=np.log(config.eps_min),np.log(config.eps_max)
+    log_line=np.linspace(start=log_min,stop=log_max,num=config.eps_num)
+    config.epsions=np.exp(log_line)
 
 if config.aggr_res_path is None:
     aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
@@ -156,9 +180,13 @@ else:
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 dim=784
-mnist_train = datasets.MNIST("../data", train=True, download=False, transform=transforms.ToTensor())
-mnist_test = datasets.MNIST("../data", train=False, download=False, transform=transforms.ToTensor())
-train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True)
+num_classes=10
+if not os.path.exists("../data/MNIST"):
+    config.download=True
+
+mnist_train = datasets.MNIST("../data", train=True, download=config.download, transform=transforms.ToTensor())
+mnist_test = datasets.MNIST("../data", train=False, download=config.download, transform=transforms.ToTensor())
+train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
 test_loader = DataLoader(mnist_test, batch_size = 100, shuffle=False)
 
   
@@ -169,17 +197,13 @@ model_CNN=model_CNN.to(device)
 model_path="model_CNN.pt"
 
 
-
-
-
-
 if config.train_model:
     opt = optim.SGD(model_CNN.parameters(), lr=1e-1)
 
     print("Train Err", "Train Loss", "Test Err", "Test Loss", sep="\t")
     for _ in range(10):
-        train_err, train_loss = epoch(train_loader, model_CNN, opt)
-        test_err, test_loss = epoch(test_loader, model_CNN)
+        train_err, train_loss = epoch(train_loader, model_CNN, opt, device=config.device)
+        test_err, test_loss = epoch(test_loader, model_CNN, device=config.device)
         print(*("{:.6f}".format(i) for i in (train_err, train_loss, test_err, test_loss)), sep="\t")
     torch.save(model_CNN.state_dict(), model_path)
 
@@ -207,6 +231,7 @@ for X,y in test_loader:
     break
 
 X.requires_grad=True
+
 l=config.input_index
 
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
@@ -222,40 +247,111 @@ with torch.no_grad():
 if config.use_attack:
     fmodel = fb.PyTorchModel(model_CNN, bounds=(0,1))
     attack=fb.attacks.LinfPGD()
-    fb.attacks.Linf
+    
     #epsilons= np.array([0.0, 0.001, 0.01, 0.03,0.04,0.05,0.07,0.08,0.0825,0.085,0.086,0.087,0.09, 0.1, 0.3, 0.5, 1.0])
     _, advs, success = attack(fmodel, X_correct, label_correct, epsilons=config.epsilons)
+
+if config.lirpa_bounds:
+    from auto_LiRPA import BoundedModule, BoundedTensor
+    from auto_LiRPA.perturbations import *
+    import auto_LiRPA.operators
+    with torch.no_grad():
+        image=x_0.view(1,1,28,28)
+    bounded_model=BoundedModule(model_CNN,global_input=torch.zeros_like(input=image),bound_opts={"conv_mode": "patches"})
+            
 
 for i in range(len(config.epsilons)):
     loc_time= float_to_file_float(time())
     log_name=method_name+'_'+float_to_file_float(config.epsilons[i])+loc_time
     log_path=os.path.join(raw_logs_path,log_name)
-    pgd_succes= success[i][l] if config.use_attack else None 
+    os.mkdir(log_path)
+    epsilon = config.epsilons[i]
+    pgd_success= success[i][l] if config.use_attack else None 
+    p_l,p_u=None,None
+    if config.lirpa_bounds:
+        # Step 2: define perturbation. Here we use a Linf perturbation on input image.
+        
+        norm = np.inf
+        ptb = PerturbationLpNorm(norm = norm, eps = config.epsilons[i])
+        # Input tensor is wrapped in a BoundedTensor object.
+        bounded_image = BoundedTensor(image, ptb)
+        # We can use BoundedTensor to get model prediction as usual. Regular forward/backward propagation is unaffected.
+        print('Model prediction:', bounded_model(bounded_image))
+        layer_nodes_names=[ ]
+        for val in  bounded_model._modules.values():
+            if type(val) not in [auto_LiRPA.operators.leaf.BoundInput,auto_LiRPA.operators.leaf.BoundParams]:
+                layer_nodes_names.append(val.name)
+        input_layer_name=layer_nodes_names[0]
+        print(bounded_model._modules)
+        last_layer_name=layer_nodes_names[-1]
+        needed_dict={last_layer_name:[input_layer_name]}
+        with torch.no_grad():
+            lb, ub, A_dict = bounded_model.compute_bounds(x=(bounded_image,),return_A=True,return_b=False,needed_A_dict=needed_dict, b_dict=needed_dict, method='CROWN',need_A_only=False)
+
+        first_to_last_data= A_dict[last_layer_name][input_layer_name]
+        lA=first_to_last_data['lA']
+        uA=first_to_last_data['uA']
+        l_bias=first_to_last_data['lbias']
+        u_bias=first_to_last_data['ubias']
+        x_rshp=image.reshape((784,))
+        lA_rshp=lA.reshape((10,784))
+        uA_rshp=uA.reshape((10,784))
+        l_bias=first_to_last_data['lbias']
+        u_bias=first_to_last_data['ubias']
+        mu_l=torch.matmul(lA_rshp,x_rshp)+l_bias.reshape((num_classes,))
+        mu_u=torch.matmul(uA_rshp,x_rshp)+u_bias.reshape((num_classes,))
+        tlA=torch.transpose(lA_rshp, dim0=1,dim1=0)
+        tuA=torch.transpose(uA_rshp, dim0=1,dim1=0)
+        if config.noise_dist=='gaussian':
+            l_sigmas=torch.matmul(lA_rshp,tlA).diag()
+            u_sigmas=torch.matmul(uA_rshp,tuA).diag()
+
+            gamma_l=0.5-0.5*torch.erf(input= (-mu_l/(np.sqrt(2)*torch.sqrt(l_sigmas))))
+            gamma_u=0.5-0.5*torch.erf(input= (-mu_u/(np.sqrt(2)*torch.sqrt(u_sigmas))))
+        elif config.noise_dist=='uniform':
+            pos_gap_l=(mu_l-config.a>=0).float()
+            neg_gap_u=mu_u-config.a<=0
+            gamma_l=  pos_gap_l*(1-torch.exp(-(mu_l-config.a)**2/(2*epsilon**2*torch.norm(input=lA_rshp,dim=1))))
+            gamma_u= neg_gap_u*(torch.exp(-(mu_u-config.a)**2/(2*epsilon**2*torch.norm(input=uA_rshp, dim=1)))) +(1-neg_gap_u)
+        else:
+            raise NotImplementedError("Only uniform and Gaussian distributions are implemented for lirpa bounds.")
+        
+        y_0_flag= torch.arange(num_classes)==y_0
+         
+        pre_p_l=1-torch.prod(1-gamma_l)/(1-gamma_l[y_0]) if gamma_l[y_0]<1 else 
+        p_l=torch.clamp(,min=0,max=1) 
+        p_u=torch.clamp(gamma_u.sum()-gamma_u[y_0],min=0,max=1)
+            
     iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
     ests,times,finish_flags = [],[],[]
     normal_gen=lambda N: torch.randn(size=(N,dim),requires_grad=True).to(device)
     uniform_gen_eps = lambda N: epsilon*(2*torch.rand(size=(N,dim), device=device )-1)
     V_ = lambda X: V_pyt(X,x_0=x_0,model=model_CNN,epsilon=epsilon, target_class=y_0,gaussian_latent=True)
     gradV_ = lambda X: gradV_pyt(X,x_0=x_0,model=model_CNN, target_class=y_0,epsilon=epsilon, gaussian_latent=True)
-    
+    x_0.requires_grad=True
     for _ in iterator:
         # Gaussian latent space version
         t=time()
         p_est,finish_flag=smc_pyt.LangevinSMCBasePyt(gen=normal_gen, l_kernel=t_u.langevin_kernel_pyt,V=V_, gradV=gradV_,rho=config.rho,beta_0=0, min_rate=config.min_rate,
-            alpha =config.alpha,N=config.N,T = config.T,n_max=1000, verbose=2,adapt_func=None,allow_zero_est=config.allow_zero_est)
+            alpha =config.alpha,N=config.N,T = config.T,n_max=config.n_max, verbose=config.verbose,adapt_func=None,allow_zero_est=config.allow_zero_est)
         time_comp=time()-t
-        times.append(time_comp)
         ests.append(p_est)
+        times.append(time_comp)
         finish_flags.append(finish_flag)
+
     times=np.array(times)
     estimates = np.array(ests)
-    finished=np.array(finish_flag)
-    freq_finished=finished.mean()
+    finish_flags=np.array(finish_flags)
+    freq_finished=finish_flags.mean()
     freq_zero_est=(estimates==0).mean()
-    unfinish_est=estimates[~finished]
-    unfinish_times=times[~finished]
-    unfinished_mean_est=unfinish_est.mean()
-    unfinished_mean_time=unfinish_times.mean()
+    #finished=np.array(finish_flag)
+    if freq_finished<1:
+        unfinish_est=estimates[~finish_flags]
+        unfinish_times=times[~finish_flags]
+        unfinished_mean_est=unfinish_est.mean()
+        unfinished_mean_time=unfinish_times.mean()
+    else:
+        unfinished_mean_est,unfinished_mean_time=None,None
 
 
     np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
@@ -269,11 +365,11 @@ for i in range(len(config.epsilons)):
 
     #with open(os.path.join(log_path,'results.txt'),'w'):
     results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),
-    'N':config.N,'rho':config.rho,'n_rep':config.n_rep,'T':config.T,'alpha':config.alpha,'min_rate':config.min_rate,
+    'N':config.N,'rho':config.rho,'epsilon':config.epsilons[i],'n_rep':config.n_rep,'T':config.T,'alpha':config.alpha,'min_rate':config.min_rate,
     'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
     'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,'g_target':config.g_target,
     'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,'unfinished_mean_est':unfinished_mean_est
-    , 'np_seed':config.np_seed,'pgd_success':pgd_success}
+    , 'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success.item(),'p_l':p_l.item(),'p_u':p_u.item()}
     results_df=pd.DataFrame([results])
     results_df.to_csv(os.path.join(log_path,'results.csv'),)
     if config.aggr_res_path is None:
@@ -284,10 +380,10 @@ for i in range(len(config.epsilons)):
     if config.update_agg_res:
         if not os.path.exists(aggr_res_path):
             print(f'aggregate results csv file not found /n it will be build at {aggr_res_path}')
-            cols=['method','gaussian_latent','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est',
-            'bias','mean abs error','mean rel error','std est','freq underest','gpu_name','cpu_name','g_target']
+            cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean time','std time','mean est',
+            'std est','freq underest','g_target']
             cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
-            cols+=['pgd_success','p_l','p_u']
+            cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed']
             agg_res_df= pd.DataFrame(columns=cols)
 
         else:
