@@ -5,5 +5,5 @@ scipy
 tqdm
 matplotlib
 GPUtil
-cpuinfo #psutil
-torch==1.10
+py-cpuinfo #psutil
+torch>=1.10
