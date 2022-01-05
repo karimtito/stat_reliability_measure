@@ -25,6 +25,7 @@ import dev.torch_utils as t_u
 #setting PRNG seeds for reproducibility
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
+str2intList=lambda x: str2list(in_str=x, type_out=int)
 low_str=lambda x: str(x).lower()
 
 method_name="langevin_base_pyt"
@@ -33,11 +34,15 @@ class config:
     log_dir="./logs/mnist_tests"
     n_rep=10
     N=40
+    N_list=[]
     verbose=0
     min_rate=0.51
     T=1
+    T_list=[]
     rho=90
+    rho_list=[]
     alpha=0.025
+    alpha_list=[]
     n_max=2000
     tqdm_opt=True
     d = 1024
@@ -109,6 +114,10 @@ parser.add_argument('--eps_num',type=int,default=config.eps_num)
 parser.add_argument('--train_model',type=str2bool,default=config.train_model)
 parser.add_argument('--noise_dist',type=str, default=config.noise_dist)
 parser.add_argument('--a',type=float, default=config.a)
+parser.add_argument('--N_list',type=str2intList,default=config.N_list)
+parser.add_argument('--T_list',type=str2intList,default=config.T_list)
+parser.add_argument('--rho_list', type=str2floatList,default=config.rho_list)
+parser.add_argument('--alpha_list',type=str2floatList,default=config.alpha_list)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -131,6 +140,14 @@ if config.torch_seed is None:
     config.torch_seed=int(time.time())
 torch.manual_seed(seed=config.torch_seed)
 
+if len(config.T_list)<1:
+    config.T_list=[config.T]
+if len(config.N_list)<1:
+    config.N_list=[config.N]
+if len(config.rho_list)<1:
+    config.rho_list=[config.rho]
+if len(config.alpha_list)<1:
+    config.alpha_list=[config.alpha]
 
 if config.track_gpu:
     gpus=GPUtil.getGPUs()
@@ -310,86 +327,93 @@ for i in range(len(config.epsilons)):
             gamma_u=0.5-0.5*torch.erf(input= (-mu_u/(np.sqrt(2)*torch.sqrt(u_sigmas))))
         elif config.noise_dist=='uniform':
             pos_gap_l=(mu_l-config.a>=0).float()
-            neg_gap_u=mu_u-config.a<=0
+            neg_gap_u=(mu_u-config.a<=0).float()
             gamma_l=  pos_gap_l*(1-torch.exp(-(mu_l-config.a)**2/(2*epsilon**2*torch.norm(input=lA_rshp,dim=1))))
             gamma_u= neg_gap_u*(torch.exp(-(mu_u-config.a)**2/(2*epsilon**2*torch.norm(input=uA_rshp, dim=1)))) +(1-neg_gap_u)
         else:
             raise NotImplementedError("Only uniform and Gaussian distributions are implemented for lirpa bounds.")
         
-        y_0_flag= torch.arange(num_classes)==y_0
+        y_0_flag= torch.arange(num_classes,device=config.device)==y_0
          
-        pre_p_l=1-torch.prod(1-gamma_l)/(1-gamma_l[y_0]) if gamma_l[y_0]<1 else 
-        p_l=torch.clamp(,min=0,max=1) 
+        pre_p_l=1-torch.prod(1-gamma_l)/(1-gamma_l[y_0]) 
+        p_l=torch.clamp(pre_p_l,min=0,max=1) 
         p_u=torch.clamp(gamma_u.sum()-gamma_u[y_0],min=0,max=1)
             
     iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
-    ests,times,finish_flags = [],[],[]
+    
     normal_gen=lambda N: torch.randn(size=(N,dim),requires_grad=True).to(device)
     uniform_gen_eps = lambda N: epsilon*(2*torch.rand(size=(N,dim), device=device )-1)
     V_ = lambda X: V_pyt(X,x_0=x_0,model=model_CNN,epsilon=epsilon, target_class=y_0,gaussian_latent=True)
     gradV_ = lambda X: gradV_pyt(X,x_0=x_0,model=model_CNN, target_class=y_0,epsilon=epsilon, gaussian_latent=True)
     x_0.requires_grad=True
-    for _ in iterator:
-        # Gaussian latent space version
-        t=time()
-        p_est,finish_flag=smc_pyt.LangevinSMCBasePyt(gen=normal_gen, l_kernel=t_u.langevin_kernel_pyt,V=V_, gradV=gradV_,rho=config.rho,beta_0=0, min_rate=config.min_rate,
-            alpha =config.alpha,N=config.N,T = config.T,n_max=config.n_max, verbose=config.verbose,adapt_func=None,allow_zero_est=config.allow_zero_est)
-        time_comp=time()-t
-        ests.append(p_est)
-        times.append(time_comp)
-        finish_flags.append(finish_flag)
-
-    times=np.array(times)
-    estimates = np.array(ests)
-    finish_flags=np.array(finish_flags)
-    freq_finished=finish_flags.mean()
-    freq_zero_est=(estimates==0).mean()
-    #finished=np.array(finish_flag)
-    if freq_finished<1:
-        unfinish_est=estimates[~finish_flags]
-        unfinish_times=times[~finish_flags]
-        unfinished_mean_est=unfinish_est.mean()
-        unfinished_mean_time=unfinish_times.mean()
-    else:
-        unfinished_mean_est,unfinished_mean_time=None,None
-
-
-    np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
-    np.savetxt(fname=os.path.join(log_path,'estimates.txt'),X=estimates)
-
-    plt.hist(times, bins=10)
-    plt.savefig(os.path.join(log_path,'times_hist.png'))
-    plt.hist(estimates,bins=10)
-    plt.savefig(os.path.join(log_path,'estimates_hist.png'))
     
+    for T in config.T_list: 
+        for N in config.N_list: 
+            for rho in config.rho_list:
+                for alpha in config.alpha_list:
+                    ests,times,finish_flags = [],[],[]
+                    for _ in iterator:
+                        # Gaussian latent space version
+                        t=time()
+                        p_est,finish_flag=smc_pyt.LangevinSMCBasePyt(gen=normal_gen, l_kernel=t_u.langevin_kernel_pyt,V=V_, gradV=gradV_,rho=rho,beta_0=0, min_rate=config.min_rate,
+                            alpha =alpha,N=N,T = T,n_max=config.n_max, verbose=config.verbose,adapt_func=None,allow_zero_est=config.allow_zero_est)
+                        time_comp=time()-t
+                        ests.append(p_est)
+                        times.append(time_comp)
+                        finish_flags.append(finish_flag)
 
-    #with open(os.path.join(log_path,'results.txt'),'w'):
-    results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),
-    'N':config.N,'rho':config.rho,'epsilon':config.epsilons[i],'n_rep':config.n_rep,'T':config.T,'alpha':config.alpha,'min_rate':config.min_rate,
-    'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
-    'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,'g_target':config.g_target,
-    'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,'unfinished_mean_est':unfinished_mean_est
-    , 'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success.item(),'p_l':p_l.item(),'p_u':p_u.item()}
-    results_df=pd.DataFrame([results])
-    results_df.to_csv(os.path.join(log_path,'results.csv'),)
-    if config.aggr_res_path is None:
-        aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
-    else: 
-        aggr_res_path=config.aggr_res_path
+                    times=np.array(times)
+                    estimates = np.array(ests)
+                    finish_flags=np.array(finish_flags)
+                    freq_finished=finish_flags.mean()
+                    freq_zero_est=(estimates==0).mean()
+                    #finished=np.array(finish_flag)
+                    if freq_finished<1:
+                        unfinish_est=estimates[~finish_flags]
+                        unfinish_times=times[~finish_flags]
+                        unfinished_mean_est=unfinish_est.mean()
+                        unfinished_mean_time=unfinish_times.mean()
+                    else:
+                        unfinished_mean_est,unfinished_mean_time=None,None
 
-    if config.update_agg_res:
-        if not os.path.exists(aggr_res_path):
-            print(f'aggregate results csv file not found /n it will be build at {aggr_res_path}')
-            cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean time','std time','mean est',
-            'std est','freq underest','g_target']
-            cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
-            cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed']
-            agg_res_df= pd.DataFrame(columns=cols)
 
-        else:
-            agg_res_df=pd.read_csv(aggr_res_path)
-        agg_res_df = pd.concat([agg_res_df,results_df],ignore_index=True)
-        agg_res_df.to_csv(aggr_res_path,index=False)
+                    np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
+                    np.savetxt(fname=os.path.join(log_path,'estimates.txt'),X=estimates)
+
+                    plt.hist(times, bins=10)
+                    plt.savefig(os.path.join(log_path,'times_hist.png'))
+                    plt.hist(estimates,bins=10)
+                    plt.savefig(os.path.join(log_path,'estimates_hist.png'))
+                    
+
+                    #with open(os.path.join(log_path,'results.txt'),'w'):
+                    results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),
+                    'N':config.N,'rho':config.rho,'epsilon':config.epsilons[i],'n_rep':config.n_rep,'T':config.T,'alpha':config.alpha,'min_rate':config.min_rate,
+                    'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
+                    'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,'g_target':config.g_target,
+                    'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,'unfinished_mean_est':unfinished_mean_est
+                    , 'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success.item(),'p_l':p_l.item(),'p_u':p_u.item(),
+                    'noise_dist':config.noise_dist}
+                    results_df=pd.DataFrame([results])
+                    results_df.to_csv(os.path.join(log_path,'results.csv'),)
+                    if config.aggr_res_path is None:
+                        aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                    else: 
+                        aggr_res_path=config.aggr_res_path
+
+                    if config.update_agg_res:
+                        if not os.path.exists(aggr_res_path):
+                            print(f'aggregate results csv file not found /n it will be build at {aggr_res_path}')
+                            cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean time','std time','mean est',
+                            'std est','freq underest','g_target']
+                            cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
+                            cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist']
+                            agg_res_df= pd.DataFrame(columns=cols)
+
+                        else:
+                            agg_res_df=pd.read_csv(aggr_res_path)
+                        agg_res_df = pd.concat([agg_res_df,results_df],ignore_index=True)
+                        agg_res_df.to_csv(aggr_res_path,index=False)
 
 
     
