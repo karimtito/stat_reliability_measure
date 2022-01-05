@@ -5,7 +5,7 @@ from dev.utils import dichotomic_search
 """ Implementation of last particle variant """
 
 def ImportanceSplittingLp(gen,kernel,h,tau=0,N=100,s=0.1,decay=0.9,T = 20, accept_ratio = 0.9, 
-alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_c = 10**(-20),n_max = int(10**6), 
+alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_c = 10**(-20),n_max = int(10**4), 
   reject_forget_rate =0, gain_forget_rate=0, reject_thresh=0.005):
     """
       Importance splitting last particle estimator, i.e. the importance splitting algorithm with K=N-1
@@ -42,17 +42,17 @@ alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_
     #d =gen(1).shape[-1] # dimension of the random vectors
     k = 1 # Number of iterations
     p = (N-1)/N       
-    confidence_level_m = lambda y :stat.gamma.sf(-np.log(p_c),a=y, scale =1/N) 
+    confidence_level_m = lambda y :stat.gamma.sf(-torch.log(p_c),a=y, scale =1/N) 
     m, _ = dichotomic_search(f = confidence_level_m, a=100, b=n_max, thresh=alpha_test)
     m = int(m)+1
     if verbose:
         print(f"Starting Last Particle algorithm with {m}, to certify p<p_c={p_c}, with confidence level alpha ={1-alpha_test}.")
     if m>=n_max:
         raise AssertionError(f"Confidence level requires more than n_max={n_max} iterations... increase n_max ?")
-    tau_j = -np.inf
+    tau_j = -torch.inf
     P_est = 0
     Var_est = 0
-    CI_est = np.zeros((2))
+    CI_est = torch.zeros((2))
     kernel_pass=0
     Count_accept = 0
     check=0
@@ -67,10 +67,10 @@ alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_
     ## While
     while (k<=m):
         #find new threshold
-        i_dead = np.argmin(SX,axis = None) # sort in descending order
+        i_dead = torch.argmin(SX,axis = None) # sort in descending order
         #print(SX[i_dead], tau_j )
-        if tau_j!=-np.inf:
-            gain = np.abs((SX[i_dead]-tau_j)/tau_j)
+        if tau_j!=-torch.inf:
+            gain = torch.abs((SX[i_dead]-tau_j)/tau_j)
         else:
             gain=0
 
@@ -91,10 +91,13 @@ alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_
         check+=1
         
         # Refresh samples
-        i_new = np.random.choice(list(set(range(N))-set([i_dead])))
+        weights=torch.ones(size =N)
+        weights[i_dead]=0
+        #i_new = torch.random.choice(list(set(range(N))-set([i_dead])))
+        i_new=torch.multinomial(input=weights,num_samples=1,replacement=True)
         z0 = X[i_new,:]
         sz0 = SX[i_new]
-        for t in range(T):
+        for _ in range(T):
             w = kernel(z0,s)
             sw = h(w)
             if sw>=tau_j:
@@ -124,8 +127,8 @@ alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_
     
     if tau_j>tau:
         Var_est = P_est**2*(P_est**(-1/N)-1)    
-        CI_est[0] = P_est*np.exp(-q/np.sqrt(N)*np.sqrt(-np.log(P_est)+(q**2)/4/N) - (q**2)/2/N)
-        CI_est[1] = P_est*np.exp(q/np.sqrt(N)*np.sqrt(-np.log(P_est)+(q**2)/4/N) - (q**2)/2/N)
+        CI_est[0] = P_est*torch.exp(-q/torch.sqrt(N)*torch.sqrt(-torch.log(P_est)+(q**2)/4/N) - (q**2)/2/N)
+        CI_est[1] = P_est*torch.exp(q/torch.sqrt(N)*torch.sqrt(-torch.log(P_est)+(q**2)/4/N) - (q**2)/2/N)
         s_out = {'Var_est':Var_est,'CI_est':CI_est,'Iter':k,'Calls':Count_h,'Sample size':N}
         s_out['Cert']=False    
         s_out['Xrare'] = X
