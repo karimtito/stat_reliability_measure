@@ -43,3 +43,7 @@ def str2list(in_str,split_chr=',',type_out=None):
     if type_out is not None:
         l=[type_out(e) for e in l]
     return l
+
+str2floatList=lambda x: str2list(in_str=x, type_out=float)
+str2intList=lambda x: str2list(in_str=x, type_out=int)
+low_str=lambda x: str(x).lower()
