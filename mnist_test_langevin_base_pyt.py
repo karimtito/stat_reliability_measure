@@ -119,6 +119,7 @@ parser.add_argument('--N_list',type=str2intList,default=config.N_list)
 parser.add_argument('--T_list',type=str2intList,default=config.T_list)
 parser.add_argument('--rho_list', type=str2floatList,default=config.rho_list)
 parser.add_argument('--alpha_list',type=str2floatList,default=config.alpha_list)
+parser.add_argument('--download',type=str2bool, default=config.download)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -202,8 +203,8 @@ num_classes=10
 if not os.path.exists("../data/MNIST"):
     config.download=True
 
-mnist_train = datasets.MNIST("../data", train=True, download=config.download, transform=transforms.ToTensor())
-mnist_test = datasets.MNIST("../data", train=False, download=config.download, transform=transforms.ToTensor())
+mnist_train = datasets.MNIST("./data", train=True, download=config.download, transform=transforms.ToTensor())
+mnist_test = datasets.MNIST("./data", train=False, download=config.download, transform=transforms.ToTensor())
 train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
 test_loader = DataLoader(mnist_test, batch_size = 100, shuffle=False)
 
@@ -391,12 +392,15 @@ for i in range(len(config.epsilons)):
 
                     #with open(os.path.join(log_path,'results.txt'),'w'):
                     results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),
-                    'N':N,'rho':rho,'epsilon':config.epsilons[i],'n_rep':config.n_rep,'T':T,'alpha':alpha,'min_rate':config.min_rate,
+                    'N':N,'rho':rho,'epsilon':config.epsilons[i],'n_rep':config.n_rep,'T':T,'alpha':alpha,
+                    'min_rate':config.min_rate,
                     'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
-                    'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,'g_target':config.g_target,
-                    'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,'unfinished_mean_est':unfinished_mean_est
-                    , 'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success.item(),'p_l':p_l.item(),'p_u':p_u.item(),
-                    'noise_dist':config.noise_dist,'datetime':loc_time}
+                    'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
+                    'cores_number':config.cores_number,'g_target':config.g_target,
+                    'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
+                    'unfinished_mean_est':unfinished_mean_est
+                    ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success.item(),'p_l':p_l.item(),
+                    'p_u':p_u.item(),'noise_dist':config.noise_dist,'datetime':loc_time}
                     results_df=pd.DataFrame([results])
                     results_df.to_csv(os.path.join(log_path,'results.csv'),)
                     if config.aggr_res_path is None:
@@ -417,8 +421,3 @@ for i in range(len(config.epsilons)):
                             agg_res_df=pd.read_csv(aggr_res_path)
                         agg_res_df = pd.concat([agg_res_df,results_df],ignore_index=True)
                         agg_res_df.to_csv(aggr_res_path,index=False)
-
-
-    
-
-
