@@ -39,14 +39,32 @@ def epoch(loader, model, opt=None,device='cpu'):
         total_loss += loss.item() * X.shape[0]
     return total_err / len(loader.dataset), total_loss / len(loader.dataset)
 
-def langevin_kernel_pyt(X,gradV,delta_t,beta,device=None):
+def langevin_kernel_pyt(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sigma=1):
     """performs one step of langevin kernel with inverse temperature beta"""
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
-    G_noise = torch.randn(size = X.shape).to(device)
+    
     grad=gradV(X)
     with torch.no_grad():
-        X_new =X-delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise
+        G_noise = torch.randn(size = X.shape).to(device)
+        X_new =X-delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise 
+        if gaussian:
+            X_new=X_new-(delta_t/beta)*gauss_sigma*X # U(x)=beta*V(x)+(1/2)x^T*Sigma*x
+    return X_new
+
+
+
+def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sigma=1):
+    """performs one step of langevin kernel with inverse temperature beta"""
+    if device is None:
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
+    
+    grad=gradV(X)
+    with torch.no_grad():
+        G_noise = torch.randn(size = X.shape).to(device)
+        X_new =X-delta_t*beta*grad+torch.sqrt(2*delta_t)*G_noise 
+        if gaussian:
+            X_new=X_new-delta_t*gauss_sigma*X # U(x)=beta*V(x)+(1/2)x^T*Sigma*x
     return X_new
 
 def multi_unsqueeze(input_,k,dim=-1):
