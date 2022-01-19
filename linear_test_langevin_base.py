@@ -150,7 +150,7 @@ times,estimates=[],[]
 for i in iterator:
     t=time()
     Langevin_est = LangevinSMCBase(gen=X_gen, l_kernel=mixing_kernel , V=V_batch, gradV= gradV_batch,min_rate=config.min_rate, N=config.N,
-     beta_0 = 0, rho=config.rho, alpha = config.alpha, n_max=config.n_max, T=config.T, verbose=config.verbos,
+     beta_0 = 0, rho=config.rho, alpha = config.alpha, n_max=config.n_max, T=config.T, verbose=config.verbose,
     allow_zero_est=True)
     t=time()-t
     times.append(t)
