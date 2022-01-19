@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+
 def TimeStepPyt(V,X,gradV,p=1,p_p=2):
     V_mean= V(X).mean()
     V_grad_norm_mean = ((torch.norm(gradV(X),dim = 1,p=p_p)**p).mean())**(1/p)
@@ -22,6 +23,7 @@ def projected_langevin_kernel_pyt(X,gradV,delta_t,beta, projection,device=None):
     with torch.no_grad():
         X_new =projection(X-delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise)
     return X_new
+
 def epoch(loader, model, opt=None,device='cpu'):
     total_loss, total_err = 0.,0.
     for X,y in loader:
@@ -36,6 +38,7 @@ def epoch(loader, model, opt=None,device='cpu'):
         total_err += (yp.max(dim=1)[1] != y).sum().item()
         total_loss += loss.item() * X.shape[0]
     return total_err / len(loader.dataset), total_loss / len(loader.dataset)
+
 def langevin_kernel_pyt(X,gradV,delta_t,beta,device=None):
     """performs one step of langevin kernel with inverse temperature beta"""
     if device is None:
@@ -74,7 +77,7 @@ def compute_V_grad_pyt2(model, input_, target_class):
 def compute_V_grad_pyt(model, input_, target_class):
     """ Returns potentials and associated gradients for given inputs, model and target classes """
     if input_.requires_grad!=True:
-        print("/!\\ gradient")
+        print("/!\\ input does not require gradient")
         input_.requires_grad=True
     #input_.retain_grad()
     logits = model(input_) 
