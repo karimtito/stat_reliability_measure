@@ -1,10 +1,11 @@
 import scipy.stats as stat 
 import numpy as np 
+import torch
 
 
-def ImportanceSplitting(gen,kernel,h,tau,N=2000,K=1000,s=1,decay=0.95,T = 30,n_max = 300, alpha = 0.95,
+def ImportanceSplittingPyt(gen,kernel,h,tau,N=2000,K=1000,s=1,decay=0.95,T = 30,n_max = 300, alpha = 0.95,
 verbose=1, track_rejection=False, rejection_ctrl = False, rej_threshold=0.9, gain_rate = 1.0001, 
-prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5):
+prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None):
     """
       Importance splitting estimator
       Args:
@@ -29,7 +30,9 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5):
            -dic_out.['Xrare']: Examples of the rare event 
     """
 
-    # Internals
+    if device is None:
+        device= "cuda:0" if torch.cuda.is_available() else "cpu"
+    # Internals 
     q = -stat.norm.ppf((1-alpha)/2) # gaussian quantile
     d =gen(1).shape[-1] # dimension of the random vectors
     n = 1 # Number of iterations
@@ -41,18 +44,20 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5):
     Count_h = N # Number of calls to function h
     
     #step B: find new threshold
-    ind = np.argsort(SX,axis=None)[::-1] # sort in descending order
+    ind= torch.argsort(input=SX,dim=0,descending=True).squeeze(-1)
+    
+    pass
     S_sort= SX[ind]
     tau_j = S_sort[K] # set the threshold to (K+1)-th
     h_mean = SX.mean()
     if verbose>=1:
-        print('Iter = ',n, ' tau_j = ', tau_j, "h_mean",h_mean,  " Calls = ", Count_h)
+        print('Iter = ',n, ' tau_j = ', tau_j.item(), "h_mean",h_mean.item(),  " Calls = ", Count_h)
 
     rejection_rate=0
     kernel_pass=0
     rejection_rates=[0]
     ## While
-    while (n<n_max) and (tau_j<tau):
+    while (n<n_max) and (tau_j<tau).item():
         n += 1 # increase iteration number
         if n >=n_max:
             raise RuntimeError('The estimator failed. Increase n_max?')
@@ -60,11 +65,17 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5):
         Y = X[ind[0:K],:]
         SY = SX[ind[0:K]] # Keep their scores in SY
         # step D: refresh samples
-        Z = np.zeros((N-K,d))
-        SZ = np.zeros((N-K,1))
+        Z = torch.zeros((N-K,d),device=device)
+        SZ = torch.zeros((N-K,1),device=device)
+
+        #ind=torch.multinomial(input=torch.ones(size=(K,)),num_samples=N-K,replacement=False)
+
         for k in range(N-K):
-            u = np.random.choice(range(K),size=1,replace=False) # pick a sample at random in Y
-            z0 = Y[u,:]
+            i=torch.multinomial(input=torch.ones(size=(K,)),num_samples=1,replacement=False)
+            #u = np.random.choice(range(K),size=1,replace=False) # pick a sample at random in Y
+            
+            z0 = Y[i,:]
+            
             accept_flag = False
             for t in range(T):
                 w = kernel(z0,s) # propose a refreshed sample
@@ -72,21 +83,25 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5):
                 
                     
                 sw = h(w) # compute its score
+                
                 Count_h = Count_h + 1
-                if sw>tau_j: # accept if true
+                if sw.item()>tau_j.item(): # accept if true
                     z0 = w
                     sz0 = sw
+                    
                     accept_flag = True # monitor if accepted
                 elif track_rejection:
                     rejection_rate=((kernel_pass-1.)/kernel_pass)*rejection_rate+(1/kernel_pass)
             Z[k,:] = z0 # a fresh sample
             SZ[k] = sz0 # its score
+            
             if rejection_ctrl and rejection_rate>=rej_threshold:
                 
                 s = s*decay if not clip_s else np.clip(s*decay,a_min=s_min,a_max=s_max)
                 if verbose>1:
                     print('Strength of kernel diminished!')
                     print(f's={s}')
+            
             if not accept_flag:
                 s = s * decay if not clip_s else np.clip(s*decay,a_min=s_min,a_max=s_max)# decrease the strength of the mixing kernel
 
@@ -98,15 +113,15 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5):
         X[K:N,:] = Z # copy paste the new samples of Z into X
         SX[K:N] = SZ
         # step B: Find new threshold
-        ind = np.argsort(SX,axis=None)[::-1] # sort in descending order
+        ind = torch.argsort(SX,dim=0,descending=True).squeeze(-1) # sort in descending order
         S_sort= SX[ind]
         new_tau = S_sort[K]
+        
         if (new_tau-tau_j)/tau_j<prog_thresh:
             s = s*gain_rate if not clip_s else np.clip(s*decay,s_min,s_max)
-
             if verbose>1:
-                    print('Strength of kernel diminished!')
-                    print(f's={s}')
+                print('Strength of kernel increased!')
+                print(f's={s}')
 
         tau_j = S_sort[K] # set the threshold to (K+1)-th
 
@@ -120,7 +135,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5):
             rejection_rates+=[rejection_rate]
 
     # step E: Last round
-    K_last = (SX>=tau).sum() # count the nb of score above the target threshold
+    K_last = (SX>=tau).sum().item() # count the nb of score above the target threshold
 
     #Estimation
     p = K/N
