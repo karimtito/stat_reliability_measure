@@ -32,7 +32,7 @@ low_str=lambda x: str(x).lower()
 method_name="langevin_base_pyt"
 
 class config:
-    log_dir="./logs/mnist_tests"
+    log_dir="./logs/cifar10_tests"
     n_rep=10
     N=40
     N_list=[]
@@ -209,10 +209,10 @@ num_classes=10
 if not os.path.exists("../data/"):
     config.download=True
 
-mnist_train = datasets.MNIST("../data", train=True, download=config.download, transform=transforms.ToTensor())
-mnist_test = datasets.MNIST("../data", train=False, download=config.download, transform=transforms.ToTensor())
-train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
-test_loader = DataLoader(mnist_test, batch_size = 100, shuffle=False)
+cifar10_train = datasets.CIFAR10("../data", train=True, download=config.download, transform=transforms.ToTensor())
+cifar10_test  = datasets.CIFAR10("../data", train=False, download=config.download, transform=transforms.ToTensor())
+train_loader = DataLoader(cifar10_train, batch_size = 100, shuffle=True,)
+test_loader = DataLoader(cifar10_test , batch_size = 100, shuffle=False)
 
   
 
