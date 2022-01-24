@@ -56,6 +56,7 @@ class config:
     device = None
 
     log_dir="./logs/linear_tests"
+    batch_opt=False
     allow_multi_gpu=False
     track_gpu=True
     track_cpu=True
@@ -100,6 +101,7 @@ parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
 parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
 parser.add_argument('--log_dir',default=config.log_dir)
 parser.add_argument('--allow_multi_gpu',type=str2bool,default=config.allow_multi_gpu)
+parser.add_argument('--batch_opt',type=str2bool,default=config.batch_opt)
 
 args=parser.parse_args()
 for k,v in vars(args).items():
@@ -200,7 +202,14 @@ for p_t in config.p_range:
                     estimates = [] 
                     for i in tqdm(range(config.n_rep)):
                         t=time()
-                        amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
+                        if config.batch_opt:
+                            amls_res=amls_pyt.ImportanceSplittingPytBatch(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
+                        tau=0 , n_max=config.n_max,clip_s=config.clip_s , 
+                        s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
+                        device=config.device)
+
+                        else:
+                            amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
                         tau=0 , n_max=config.n_max,clip_s=config.clip_s , 
                         s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                         device=config.device)
@@ -228,7 +237,8 @@ for p_t in config.p_range:
                     ,'min_rate':config.min_rate,'mean time':times.mean(),'std time':times.std()
                     ,'mean est':estimates.mean(),'bias':estimates.mean()-p_t,'mean abs error':abs_errors.mean(),
                     'mean rel error':rel_errors.mean(),'std est':estimates.std(),'freq underest':(estimates<p_t).mean()
-                    ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number}
+                    ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
+                    'batch_opt':config.batch_opt}
 
                     results_df=pd.DataFrame([results])
                     results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
