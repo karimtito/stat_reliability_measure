@@ -1,12 +1,12 @@
 import numpy as np 
 import numpy.linalg as LA
-from time import time
 from scipy.special import betainc
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import argparse
 from tqdm import tqdm
+from time import time
 #import psutil
 import cpuinfo
 import GPUtil
@@ -79,7 +79,7 @@ for k,v in vars(args).items():
     setattr(config, k, v)
 
 if config.np_seed is None:
-    config.np_seed=int(time.time())
+    config.np_seed=int(time())
 np.random.seed(seed=config.np_seed)
 
 if not config.allow_multi_gpu:

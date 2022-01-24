@@ -175,7 +175,7 @@ iterator=tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
 times,estimates=[],[]
 for i in iterator:
     t=time()
-    Langevin_est = LangevinSMCBasePyt(gen=X_gen, l_kernel=mixing_kernel , V=V_batch, gradV= gradV_batch,min_rate=config.min_rate, N=config.N,
+    Langevin_est,_ = LangevinSMCBasePyt(gen=X_gen, l_kernel=mixing_kernel , V=V_batch, gradV= gradV_batch,min_rate=config.min_rate, N=config.N,
      beta_0 = 0, rho=config.rho, alpha = config.alpha, n_max=config.n_max, T=config.T, verbose=config.verbose)
     t=time()-t
     times.append(t)

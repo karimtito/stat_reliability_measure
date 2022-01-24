@@ -1,5 +1,6 @@
 import torch 
 import math
+import numpy as np
 from dev.torch_utils import TimeStepPyt
 
 def dichotomic_search_d(f, a, b, thresh=0, n_max =50):
@@ -27,14 +28,13 @@ def dichotomic_search_d(f, a, b, thresh=0, n_max =50):
 
     return high, f(high)
 
-
 def SimpAdaptBetaPyt(beta_old,v,g_target,search_method=dichotomic_search_d,max_beta=1e6,verbose=0,multi_output=False):
 
     ess_beta = lambda beta : (-(beta-beta_old)*v).mean() #increasing funtion of the parameter beta
     assert ((g_target>0) and (g_target<1)),"The target average weigh g_target must be a positive number in (0,1)"
     log_thresh= math.log(g_target)
     results= search_method(f=ess_beta,a=beta_old,b=max_beta,  thresh = log_thresh)
-    new_beta, g = results[0],results[-1]
+    new_beta, g = results[0],math.exp(results[-1])
     if verbose>0:
         print(f"g_target: {g_target}, actual g: {g}")
 
@@ -43,9 +43,11 @@ def SimpAdaptBetaPyt(beta_old,v,g_target,search_method=dichotomic_search_d,max_b
     else:
         return new_beta
 
+
 """Implementation of Langevin Sequential Monte Carlo with adaptative tempering"""
 def LangevinSMCSimpAdaptPyt(gen, l_kernel,   V, gradV,g_target=0.9,min_rate=0.8,alpha =0.1,N=300,T = 1,n_max=300, 
-max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False):
+max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,device=None,mh_opt=False,mh_every=1,track_accept=False
+,track_beta=False,return_log_p=False,gaussian=True):
     """
       Adaptive Langevin SMC estimator  
       Args:
@@ -70,9 +72,11 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False):
         
     """
     
-
+    if device is None: 
+        device= "cuda:0" if torch.cuda.is_available() else "cpu"
     # Internals
- 
+    if mh_opt and track_accept:
+        accept_rates=[]
     #d =gen(1).shape[-1] # dimension of the random vectors
     n = 1 # Number of iterations
     finish_flag=False
@@ -86,44 +90,95 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False):
     delta_t = alpha*TimeStepPyt(V,X,gradV)
     Count_v+=2*N
     beta_old = 0
-    
+    if track_beta:
+        betas= [beta_old]
     beta,g_0=adapt_func(beta_old=beta_old,v=v,g_target=g_target,multi_output=True,max_beta=max_beta) 
-    g_ =[g_0]
+    g_prod=g_0
+    print(f"g_0:{g_0}")
     ## For
-    while (v<=0).sum()<N:
+    while (v<=0).float().mean()<min_rate:
         
         v_mean = v.mean()
         v_std = v.std()
         if verbose:
-            print('Iter = ',n, ' v_mean = ', v_mean, " Calls = ", Count_v, "v_std = ", v_std)
+            print('Iter = ',n, ' v_mean = ', v_mean.item(), " Calls = ", Count_v, "v_std = ", v_std.item())
+        if verbose>=2:
             print(f'Beta old {beta_old}, new beta {beta}, delta_beta={beta_old-beta}')
         
         
         
         G = torch.exp(-(beta-beta_old)*v) #computes current value fonction
         
-        U = torch.rand(size=N)
-        to_renew = G<U
-        renew_idx=torch.multinomial(input=G/G.sum(), num_samples=to_renew.sum())
-        #renew_idx = np.random.choice(a=np.arange(N),size=to_renew.sum(),p=G/G.sum())
-        X[to_renew] = X[renew_idx]
+        U = torch.rand(size=(N,),device=device)
+        to_renew = (G<U)
+        nb_to_renew=to_renew.int().sum()
+        if nb_to_renew>0:
+            renew_idx=torch.multinomial(input=G/G.sum(), num_samples=nb_to_renew)
+            #renew_idx = np.random.choice(a=np.arange(N),size=to_renew.sum(),p=G/G.sum())
+            X[to_renew] = X[renew_idx]
         n += 1 # increases iteration number
         if n >=n_max:
             if allow_zero_est:
-                return  torch.prod(g_), False
+                return  g_prod, False
             else:
                 raise RuntimeError('The estimator failed. Increase n_max?')
         
-        for _ in range(T):
-            X=l_kernel(X, gradV, delta_t, beta)
-            Count_v+= 2*N
+        for t in range(T):
+            
+            assert mh_every==1,"Metropolis-Hastings for more than one kernel step  is not implemented."
+            if mh_opt and ((n*T+t)%mh_every==0):
+                cand_X=l_kernel(X,gradV, delta_t,beta)
+                with torch.no_grad():
+                    #cand_v=V(cand_X).detach()
+                    cand_v = V(cand_X)
+                    Count_v+=N
+                high_diff= (X-cand_X-delta_t*gradV(cand_X)).detach()
+                log_a_high=-beta*(cand_v+(1/(4*delta_t))*torch.norm(high_diff,p=2 ,dim=1)**2)
+                
+                low_diff=(cand_X-X-delta_t*gradV(X)).detach()
+                log_a_low= -beta*(v+(1/(4*delta_t))*torch.norm(low_diff,p=2,dim=1)**2)
+                if gaussian: 
+                    log_a_high-= 0.5*torch.sum(cand_X**2,dim=1)
+                    log_a_low-= 0.5*torch.sum(X**2,dim=1)
+                #alpha=torch.clamp(input=torch.exp(log_a_high-log_a_low),max=1) /!\ clamping is not necessary
+                alpha=torch.exp(log_a_high-log_a_low)
+                U=torch.rand(size=(N,),device=device)
+                accept=U<alpha
+                if track_accept:
+                    accept_rates.append(accept.float().mean().item())
+                X=torch.where(accept.unsqueeze(-1),input=cand_X,other=X)
+                # with torch.no_grad():
+                #     v2 = V(X)
+                #     Count_v+= N
+                v=torch.where(accept, input=cand_v,other=v)
+                # assert torch.equal(v,v2),"/!\ error in potential computation"
+            else:
+                X=l_kernel(X, gradV, delta_t, beta)
+            
+            Count_v+= N
+
         v = V(X)
         Count_v+= N
         beta_old = beta
         beta,g_iter=adapt_func(beta_old=beta_old,v=v,g_target=g_target,multi_output=True,max_beta=max_beta)
-        g_.append(g_iter)
+        g_prod*=g_iter
+        if verbose>=1.5:
+            print(f"g_iter:{g_iter},g_prod:{g_prod}")
+           
+        
     #finish_flag=True
-    P_est = torch.prod(g_)
-   
-
-    return P_est,True
+    P_est = (g_prod*(v<=0).float().mean()).item()
+    dic_out = {'p_est':P_est,'X':X,'v':v,'finished':finish_flag}
+    if mh_opt and track_accept:
+        dic_out['accept_rates']=np.array(accept_rates)
+    else:
+        dic_out['accept_rates']=None
+    if track_beta:
+        dic_out['betas']=np.array(betas) 
+    else:
+        dic_out['betas']=None
+    if return_log_p and P_est>0:
+        dic_out['log_p_est']=math.log(P_est)
+    else:
+        dic_out['log_p_est']=None
+    return P_est,dic_out
