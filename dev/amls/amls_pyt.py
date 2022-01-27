@@ -5,9 +5,9 @@ import torch
 
 def ImportanceSplittingPyt(gen,kernel,h,tau,N=2000,K=1000,s=1,decay=0.95,T = 30,n_max = 300, alpha = 0.95,
 verbose=1, track_rejection=False, rejection_ctrl = False, rej_threshold=0.9, gain_rate = 1.0001, 
-prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None):
+prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False):
     """
-      Importance splitting estimator
+      PyTorch implementationf of Importance splitting estimator 
       Args:
          gen: generator of iid samples X_i                            [fun]
          kernel: mixing kernel invariant to f_X                       [fun]
@@ -36,7 +36,8 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None):
     q = -stat.norm.ppf((1-alpha)/2) # gaussian quantile
     d =gen(1).shape[-1] # dimension of the random vectors
     n = 1 # Number of iterations
-
+    if track_accept: 
+        accept_rates=[]
     ## Init
     # step A0: generate & compute scores
     X = gen(N) # generate N samples
@@ -75,8 +76,8 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None):
         for k in range(N-K):
             i=torch.multinomial(input=torch.ones(size=(K,)),num_samples=1,replacement=False)
             #u = np.random.choice(range(K),size=1,replace=False) # pick a sample at random in Y
-            
-            
+            #TODO implemen tracking of instant accept rate
+            #accept=0 
             accept_flag = False
             z0 = Y[i,:]
             for t in range(T):
@@ -94,6 +95,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None):
                     accept_flag = True # monitor if accepted
                 elif track_rejection:
                     rejection_rate=((kernel_pass-1.)/kernel_pass)*rejection_rate+(1/kernel_pass)
+
             Z[k,:] = z0 # a fresh sample
             SZ[k] = sz0 # its score
             
@@ -161,7 +163,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None):
 
 def ImportanceSplittingPytBatch(gen,kernel,h,tau,N=2000,K=1000,s=1,decay=0.95,T = 30,n_max = 300, alpha = 0.95,
 verbose=1, track_rejection=False, rejection_ctrl = False, rej_threshold=0.9, gain_rate = 1.0001, 
-prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None):
+prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False):
     """
       Importance splitting estimator
       Args:
@@ -212,7 +214,11 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None):
     rejection_rate=0
     kernel_pass=0
     rejection_rates=[0]
+    if track_accept:
+        accept_rates=[]
+        accept_rates_mcmc=[]
     ## While
+    
     while (n<n_max) and (tau_j<tau).item():
         n += 1 # increase iteration number
         if n >=n_max:
@@ -230,7 +236,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None):
        
         SZ=SY[ind]
         
-        
+        l_accept_rates=[]
         for _ in range(T):
             W = kernel(Z,s) # propose a refreshed samples
             kernel_pass+=(N-K)
@@ -243,17 +249,21 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None):
             
             SZ=torch.where(accept_flag,input=SW,other=SZ)
             rejection_rate  = (kernel_pass-(N-K))/kernel_pass*rejection_rate+(1./kernel_pass)*(1-accept_flag.float().mean().item())
-            
+            if track_accept:
+                l_accept_rates.append(accept_flag.float().mean())
+                accept_rates.append(accept_flag.float().mean())
 
-        
+
             if rejection_ctrl and rejection_rate>=rej_threshold:
                 
                 s = s*decay if not clip_s else np.clip(s*decay,a_min=s_min,a_max=s_max)
                 if verbose>1:
                     print('Strength of kernel diminished!')
                     print(f's={s}')
-
-
+        
+        if track_accept:
+            accept_rate_mcmc=np.array(l_accept_rates).mean()
+            accept_rates_mcmc.append(accept_rate_mcmc)
 
        
         # step A: update set X and the scores
@@ -299,7 +309,10 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None):
     if track_rejection:
         dic_out["rejection_rates"]=np.array(rejection_rates)
         dic_out["Avg. rejection rate"]=rejection_rate
-    
+    if track_accept:
+        dic_out['accept_rates']=np.array(accept_rates)
+        dic_out['accept_rates_mcmc']=np.array(accept_rates_mcmc)
+
 
        
     return P_est,dic_out
