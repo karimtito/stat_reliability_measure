@@ -47,7 +47,9 @@ def SimpAdaptBetaPyt(beta_old,v,g_target,search_method=dichotomic_search_d,max_b
 """Implementation of Langevin Sequential Monte Carlo with adaptative tempering"""
 def LangevinSMCSimpAdaptPyt(gen, l_kernel,   V, gradV,g_target=0.9,min_rate=0.8,alpha =0.1,N=300,T = 1,n_max=300, 
 max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,device=None,mh_opt=False,mh_every=1,track_accept=False
-,track_beta=False,return_log_p=False,gaussian=True):
+,track_beta=False,return_log_p=False,gaussian=False, projection=None,track_calls=True,
+track_v_means=True,adapt_d_t=False,target_accept=0.574,accept_spread=0.1,d_t_decay=0.999,d_t_gain=None,
+debug=False):
     """
       Adaptive Langevin SMC estimator  
       Args:
@@ -71,7 +73,8 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,dev
          P_est: estimated probability
         
     """
-    
+    if adapt_d_t and d_t_gain is None:
+        d_t_gain= 1/d_t_decay
     if device is None: 
         device= "cuda:0" if torch.cuda.is_available() else "cpu"
     # Internals
@@ -79,11 +82,12 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,dev
         accept_rates=[]
     #d =gen(1).shape[-1] # dimension of the random vectors
     n = 1 # Number of iterations
-    finish_flag=False
+    finished_flag=False
     ## Init
     # step A0: generate & compute potentials
     X = gen(N) # generate N samples
-    
+    if track_v_means: 
+        v_means=[]
     
     v = V(X) # computes their potentials
     Count_v = N # Number of calls to function V or it's  gradient
@@ -102,6 +106,8 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,dev
         v_std = v.std()
         if verbose:
             print('Iter = ',n, ' v_mean = ', v_mean.item(), " Calls = ", Count_v, "v_std = ", v_std.item())
+        if track_v_means: 
+            v_means.append(v_mean.item())
         if verbose>=2:
             print(f'Beta old {beta_old}, new beta {beta}, delta_beta={beta_old-beta}')
         
@@ -119,23 +125,30 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,dev
         n += 1 # increases iteration number
         if n >=n_max:
             if allow_zero_est:
-                return  g_prod, False
+                break
             else:
                 raise RuntimeError('The estimator failed. Increase n_max?')
         
         for t in range(T):
-            
-            assert mh_every==1,"Metropolis-Hastings for more than one kernel step  is not implemented."
-            if mh_opt and ((n*T+t)%mh_every==0):
+            if mh_every!=1:
+                raise NotImplementedError("Metropolis-Hastings for more than one kernel step  is not implemented.")
+            if mh_opt and ((n*T+t)%1==0):
                 cand_X=l_kernel(X,gradV, delta_t,beta)
                 with torch.no_grad():
                     #cand_v=V(cand_X).detach()
                     cand_v = V(cand_X)
                     Count_v+=N
-                high_diff= (X-cand_X-delta_t*gradV(cand_X)).detach()
+
+                
+                if projection is None:
+                    high_diff= (X-cand_X-delta_t*gradV(cand_X)).detach()
+                    low_diff=(cand_X-X-delta_t*gradV(X)).detach()
+                
+
                 log_a_high=-beta*(cand_v+(1/(4*delta_t))*torch.norm(high_diff,p=2 ,dim=1)**2)
                 
-                low_diff=(cand_X-X-delta_t*gradV(X)).detach()
+                
+                
                 log_a_low= -beta*(v+(1/(4*delta_t))*torch.norm(low_diff,p=2,dim=1)**2)
                 if gaussian: 
                     log_a_high-= 0.5*torch.sum(cand_X**2,dim=1)
@@ -144,14 +157,22 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,dev
                 alpha=torch.exp(log_a_high-log_a_low)
                 U=torch.rand(size=(N,),device=device)
                 accept=U<alpha
+                accept_rate=accept.float().mean().item()
                 if track_accept:
-                    accept_rates.append(accept.float().mean().item())
+                    accept_rates.append(accept_rate)
+                if adapt_d_t:
+                    if accept_rate>target_accept+accept_spread:
+                        delta_t*=d_t_gain
+                    elif accept_rate<target_accept-accept_spread: 
+                        accept_rate*=d_t_decay
                 X=torch.where(accept.unsqueeze(-1),input=cand_X,other=X)
-                # with torch.no_grad():
-                #     v2 = V(X)
-                #     Count_v+= N
+                
                 v=torch.where(accept, input=cand_v,other=v)
-                # assert torch.equal(v,v2),"/!\ error in potential computation"
+                if debug:
+                    with torch.no_grad():
+                        v2 = V(X)
+                        Count_v+= N
+                    assert torch.equal(v,v2),"/!\ error in potential computation"
             else:
                 X=l_kernel(X, gradV, delta_t, beta)
             
@@ -166,9 +187,10 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,dev
             print(f"g_iter:{g_iter},g_prod:{g_prod}")
            
         
-    #finish_flag=True
+    if (v<=0).float().mean()<min_rate:
+        finished_flag=True
     P_est = (g_prod*(v<=0).float().mean()).item()
-    dic_out = {'p_est':P_est,'X':X,'v':v,'finished':finish_flag}
+    dic_out = {'p_est':P_est,'X':X,'v':v,'finished':finished_flag}
     if mh_opt and track_accept:
         dic_out['accept_rates']=np.array(accept_rates)
     else:
@@ -181,4 +203,8 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,dev
         dic_out['log_p_est']=math.log(P_est)
     else:
         dic_out['log_p_est']=None
+    if track_calls:
+        dic_out['calls']=Count_v
+    if track_v_means: 
+        dic_out['v_means']=np.array(v_means)
     return P_est,dic_out

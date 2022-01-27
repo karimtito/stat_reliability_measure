@@ -43,7 +43,7 @@ def SimpAdaptBeta(beta_old,v,g_target,search_method=dichotomic_search_d,max_beta
 """Implementation of Langevin Sequential Monte Carlo with adaptative tempering"""
 #TODO def AdaptLangevinSMC: 
 def SimpAdaptLangevinSMC(gen, l_kernel,   V, gradV,g_target=0.9,min_rate=0.8,alpha =0.1,N=300,T = 1,n_max=300, 
-max_beta=1e6, verbose=False,adapt_func=SimpAdaptBeta,rho=1,allow_zero_est=False):
+max_beta=1e6, verbose=False,adapt_func=SimpAdaptBeta,rho=1,allow_zero_est=False,gaussian=False):
     """
       Adaptive Langevin SMC estimator  
       Args:

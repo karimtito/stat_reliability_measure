@@ -62,13 +62,14 @@ parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--N',type=int,default=config.N)
+parser.add_argument('--N_range',type=str2intList,default=config.N_range)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--d',type=int,default=config.d)
 parser.add_argument('--p_t',type=float,default=config.p_t)
 parser.add_argument('--p_range',type=str2floatList,default=config.p_range)
 parser.add_argument('--min_rate',type=float,default=config.min_rate)
 parser.add_argument('--alpha',type=float,default=config.alpha)
-parser.add_argument('--alpha_range',type=str2intList, default=config.alpha_range)
+parser.add_argument('--alpha_range',type=str2floatList, default=config.alpha_range)
 parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--epsilon',type=float, default=config.epsilon)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
@@ -176,7 +177,7 @@ for p_t in config.p_range:
                         c=1-h
                         e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
                         if config.gaussian_latent:
-                            print("utilisation of gaussian latent space")
+                            print("using gaussian latent space")
                             e_1_d=torch.Tensor([1]+[0]*(d+1)).to(device)
                             V_batch = lambda X: torch.clamp(c-X[:,0]/torch.norm(X,axis=1),min=0,max=torch.inf)
                             gradV_batch = lambda X: (X[:,0]<c)[:,None]*(X/torch.norm(X,dim=1)[:,None]-e_1_d)
@@ -230,7 +231,7 @@ for p_t in config.p_range:
                         'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),'bias':estimates.mean()-p_t,'mean abs error':abs_errors.mean(),
                         'mean rel error':rel_errors.mean(),'std est':estimates.std(),'freq underest':(estimates<p_t).mean()
                         ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,'torch_seed':config.torch_seed,
-                        'np_seed':config.np_seed,'g_target':g_t}
+                        'np_seed':config.np_seed,'g_target':g_t,"mh_opt":config.mh_opt}
 
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
