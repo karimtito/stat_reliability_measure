@@ -22,7 +22,8 @@ class config:
     min_rate=0.90
     rho_range=[1,10,100]
     alpha_range=[0.1]
-    p_range=[1e-15]
+    p_range=[]
+    p_t=1e-15
     n_rep=10
     mh_opt=False
     save_config=False 
@@ -42,6 +43,7 @@ class config:
     allow_multi_gpu=False
     tqdm_opt=True
     allow_zero_est=True
+    track_accept=True
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -69,19 +71,22 @@ parser.add_argument('--torch_seed',type=int, default=config.torch_seed)
 
 #parser.add_argument('--noise_dist',type=str, default=config.noise_dist)
 parser.add_argument('--sigma', type=float,default=config.sigma)
-
+parser.add_argument('--p_t',type=float,default=config.p_t)
+parser.add_argument('--p_range',type=str2floatList,default=config.p_range)
 parser.add_argument('--N_range',type=str2intList,default=config.N_range)
 parser.add_argument('--T_range',type=str2intList,default=config.T_range)
 parser.add_argument('--rho_range', type=str2floatList,default=config.rho_range)
 parser.add_argument('--alpha_range',type=str2floatList,default=config.alpha_range)
 parser.add_argument('--v1_kernel',type=str2bool,default=config.v1_kernel)
+parser.add_argument('--track_accept',type=str2bool,default=config.track_accept)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
     setattr(config, k, v)
 
 
-
+if len(config.p_range)==0:
+    config.p_range= [config.p_t]
 
 
 
@@ -149,7 +154,7 @@ param_lens=np.array([len(l) for l in param_ranges])
 nb_runs= np.prod(param_lens)
 
 mh_str="adjusted" if config.mh_opt else "unadjusted"
-method="langevin_base_"+mh_str
+method=method_name+'_'+mh_str
 save_every = 1
 d=5
 
@@ -178,12 +183,14 @@ for p_t in config.p_range:
                     ests = []
                     finished_flags=[]
                     iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
+                    print(f"Starting simulations with p_t:{p_t},rho:{rho},T:{T},alpha:{alpha},N:{N}")
                     for i in iterator:
                         t=time()
-                        p_est,res_dict,=smc_pyt.LangevinSMCBasePyt2(gen=norm_gen,
+                        p_est,res_dict,=smc_pyt.LangevinSMCBasePyt(gen=norm_gen,
                         l_kernel=kernel_function,N=N,min_rate=config.min_rate,
                         rho=rho,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
-                        verbose=5, mh_opt=config.mh_opt,track_accept=True,allow_zero_est=True)
+                        verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
+                        allow_zero_est=config.allow_zero_est)
                         t1=time()-t
                         print(p_est)
                         finish_flag=res_dict['finished']

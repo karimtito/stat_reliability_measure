@@ -50,6 +50,7 @@ class config:
     torch_seed=0
     np_seed=0
     tf_seed=None
+    mh_opt=False
     
 
 parser=argparse.ArgumentParser()
@@ -78,6 +79,7 @@ parser.add_argument('--device',type=str, default=config.device)
 parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_est)
 parser.add_argument('--torch_seed',type=int, default=config.torch_seed)
 parser.add_argument('--np_seed',type=int, default=config.np_seed)
+parser.add_argument('--mh_opt',type=str2bool,default=config.mh_opt)
 args=parser.parse_args()
 
 
@@ -200,7 +202,7 @@ results={'p_t':config.p_t,'method':method_name,'gaussian_latent':str(config.gaus
 'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),'bias':estimates.mean()-config.p_t,'mean abs error':abs_errors.mean(),
 'mean rel error':rel_errors.mean(),'std est':estimates.std(),'freq underest':(estimates<config.p_t).mean()
 ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,'torch_seed':config.torch_seed,
-'np_seed':config.np_seed}
+'np_seed':config.np_seed,"mh_opt":config.mh_opt}
 
 results_df=pd.DataFrame([results])
 results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)

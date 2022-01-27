@@ -127,7 +127,7 @@ if gaussian_latent:
     print("utilisation of gaussian latent space")
     V_batch = lambda X: np.clip(c-X[:,0]/LA.norm(X,axis=1),a_min=0,a_max=np.inf)
     gradV_batch = lambda X: (X[:,0]<c)[:,None]*(X/LA.norm(X,axis=1)[:,None]-e_1_d)
-    mixing_kernel = langevin_kernel
+    mixing_kernel = langevin_kernel #gaussian prior langevin kernel
     X_gen=lambda N: np.random.normal(size=(N,d+2))
 else:
     V_batch = lambda X: np.clip(c-X[:,0],a_min=0, a_max = np.inf)

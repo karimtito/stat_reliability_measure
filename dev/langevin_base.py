@@ -9,7 +9,7 @@ from dev.langevin_utils import TimeStep
 
 """ Basic implementation of Langevin Sequential Monte Carlo """
 def LangevinSMCBase(gen, l_kernel,   V, gradV,rho=1,beta_0=0, min_rate=0.8,alpha =0.1,N=300,T = 1,n_max=300, 
-verbose=False,adapt_func=None, allow_zero_est=False):
+verbose=False,adapt_func=None, allow_zero_est=False,track_calls=False):
     """
       Basic version of a Langevin-based SMC estimator
       Args:
@@ -38,7 +38,7 @@ verbose=False,adapt_func=None, allow_zero_est=False):
  
     #d =gen(1).shape[-1] # dimension of the random vectors
     n = 1 # Number of iterations
-    unfinished_flag=True
+    finished_flag=False
     ## Init
     # step A0: generate & compute potentials
     X = gen(N) # generate N samples
@@ -68,7 +68,7 @@ verbose=False,adapt_func=None, allow_zero_est=False):
         n += 1 # increases iteration number
         if n >=n_max:
             if allow_zero_est:
-                return  (w*(v<=0).astype(int)).sum(),False 
+                break 
             else:
                 raise RuntimeError('The estimator failed. Increase n_max?')
         
@@ -78,6 +78,10 @@ verbose=False,adapt_func=None, allow_zero_est=False):
         v = V(X)
         Count_v+= N
         beta_old = beta
-    
+    if n<=n_max:
+        finished_flag=True
     P_est = (w*(v<=0).astype(int)).sum()        
-    return P_est,True
+    dic_out={"finished":finished_flag} 
+    if track_calls: 
+        dic_out['calls']=Count_v
+    return P_est,dic_out
