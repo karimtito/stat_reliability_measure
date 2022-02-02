@@ -132,7 +132,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False)
         
         h_mean = SX.mean()
         if verbose>=1:
-            print('Iter = ',n, ' tau_j = ', tau_j, "h_mean",h_mean,  " Calls = ", Count_h)
+            print('Iter = ',n, ' tau_j = ', tau_j.item(), "h_mean",h_mean.item(),  " Calls = ", Count_h)
         if track_rejection:
             if verbose>1:
                 print(f'Rejection rate: {rejection_rate}')
@@ -163,7 +163,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False)
 
 def ImportanceSplittingPytBatch(gen,kernel,h,tau,N=2000,K=1000,s=1,decay=0.95,T = 30,n_max = 300, alpha = 0.95,
 verbose=1, track_rejection=False, rejection_ctrl = False, rej_threshold=0.9, gain_rate = 1.0001, 
-prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False):
+prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,allow_unfinished=False):
     """
       Importance splitting estimator
       Args:
@@ -194,7 +194,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False)
     q = -stat.norm.ppf((1-alpha)/2) # gaussian quantile
     d =gen(1).shape[-1] # dimension of the random vectors
     n = 1 # Number of iterations
-
+    finish_flag=False
     ## Init
     # step A0: generate & compute scores
     X = gen(N) # generate N samples
@@ -219,10 +219,13 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False)
         accept_rates_mcmc=[]
     ## While
     
-    while (n<n_max) and (tau_j<tau).item():
+    while (tau_j<=tau).item():              #loose equality
         n += 1 # increase iteration number
         if n >=n_max:
-            raise RuntimeError('The estimator failed. Increase n_max?')
+            if allow_unfinished:
+                break
+            else:
+                raise RuntimeError('The estimator failed. Increase n_max?')
         # step C: Keep K highest scores samples in Y
         Y = X[ind[0:K],:]
         SY = SX[ind[0:K]] # Keep their scores in SY
@@ -287,13 +290,15 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False)
         
         h_mean = SX.mean()
         if verbose>=1:
-            print('Iter = ',n, ' tau_j = ', tau_j, "h_mean",h_mean,  " Calls = ", Count_h)
+            print('Iter = ',n, ' tau_j = ', tau_j.item(), "h_mean",h_mean.item(),  " Calls = ", Count_h)
         if track_rejection:
             if verbose>1:
                 print(f'Rejection rate: {rejection_rate}')
             rejection_rates+=[rejection_rate]
 
     # step E: Last round
+    if (tau_j>=tau).item():
+        finish_flag=True
     K_last = (SX>=tau).sum().item() # count the nb of score above the target threshold
 
     #Estimation
@@ -312,6 +317,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False)
     if track_accept:
         dic_out['accept_rates']=np.array(accept_rates)
         dic_out['accept_rates_mcmc']=np.array(accept_rates_mcmc)
+    dic_out['finish_flag']=finish_flag
 
 
        

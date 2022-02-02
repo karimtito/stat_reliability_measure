@@ -10,9 +10,11 @@ def projected_langevin_kernel(X,gradV,delta_t,beta, projection):
     X_new =projection(X-delta_t*gradV(X)+np.sqrt(2*delta_t/beta)*G_noise)
     return X_new
 
-def langevin_kernel(X,gradV,delta_t,beta):
+def langevin_kernel(X,gradV,delta_t,beta,gaussian=True,sigma=1.):
     G_noise = np.random.normal(size = X.shape)
     X_new =X-delta_t*gradV(X)+np.sqrt(2*delta_t/beta)*G_noise
+    if gaussian:
+        X_new = X_new-sigma*delta_t*X
     return X_new
 
 def TimeStep(V,X,gradV,p=1):

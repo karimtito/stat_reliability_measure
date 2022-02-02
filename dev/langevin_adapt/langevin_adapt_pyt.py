@@ -78,8 +78,9 @@ debug=False):
     if device is None: 
         device= "cuda:0" if torch.cuda.is_available() else "cpu"
     # Internals
-    if mh_opt and track_accept:
+    if track_accept:
         accept_rates=[]
+        accept_rates_mcmc=[]
     #d =gen(1).shape[-1] # dimension of the random vectors
     n = 1 # Number of iterations
     finished_flag=False
@@ -128,11 +129,12 @@ debug=False):
                 break
             else:
                 raise RuntimeError('The estimator failed. Increase n_max?')
-        
-        for t in range(T):
+
+        local_accept_rates=[]
+        for _ in range(T):
             if mh_every!=1:
                 raise NotImplementedError("Metropolis-Hastings for more than one kernel step  is not implemented.")
-            if mh_opt and ((n*T+t)%1==0):
+            if track_accept or mh_opt:
                 cand_X=l_kernel(X,gradV, delta_t,beta)
                 with torch.no_grad():
                     #cand_v=V(cand_X).detach()
@@ -140,10 +142,10 @@ debug=False):
                     Count_v+=N
 
                 
-                if projection is None:
-                    high_diff= (X-cand_X-delta_t*gradV(cand_X)).detach()
-                    low_diff=(cand_X-X-delta_t*gradV(X)).detach()
-                
+               
+                high_diff= (X-cand_X-delta_t*gradV(cand_X)).detach()
+                low_diff=(cand_X-X-delta_t*gradV(X)).detach()
+            
 
                 log_a_high=-beta*(cand_v+(1/(4*delta_t))*torch.norm(high_diff,p=2 ,dim=1)**2)
                 
@@ -154,30 +156,39 @@ debug=False):
                     log_a_high-= 0.5*torch.sum(cand_X**2,dim=1)
                     log_a_low-= 0.5*torch.sum(X**2,dim=1)
                 #alpha=torch.clamp(input=torch.exp(log_a_high-log_a_low),max=1) /!\ clamping is not necessary
-                alpha=torch.exp(log_a_high-log_a_low)
+                alpha_=torch.exp(log_a_high-log_a_low)
                 U=torch.rand(size=(N,),device=device)
-                accept=U<alpha
+                accept=U<alpha_
                 accept_rate=accept.float().mean().item()
                 if track_accept:
+                    if verbose>=3:
+                        print(f"Local accept rate: {accept_rate}")
                     accept_rates.append(accept_rate)
+                    local_accept_rates.append(accept_rate)
                 if adapt_d_t:
                     if accept_rate>target_accept+accept_spread:
                         delta_t*=d_t_gain
                     elif accept_rate<target_accept-accept_spread: 
-                        accept_rate*=d_t_decay
-                X=torch.where(accept.unsqueeze(-1),input=cand_X,other=X)
+                        delta_t*=d_t_decay
+                if mh_opt:
                 
-                v=torch.where(accept, input=cand_v,other=v)
-                if debug:
-                    with torch.no_grad():
-                        v2 = V(X)
-                        Count_v+= N
-                    assert torch.equal(v,v2),"/!\ error in potential computation"
+                    X=torch.where(accept.unsqueeze(-1),input=cand_X,other=X)
+                    
+                    v=torch.where(accept, input=cand_v,other=v)
+                    if debug:
+                        with torch.no_grad():
+                            v2 = V(X)
+                            Count_v+= N
+                        assert torch.equal(v,v2),"/!\ error in potential computation"
+                else:
+                    X=cand_X
+                    v=cand_v
             else:
                 X=l_kernel(X, gradV, delta_t, beta)
             
             Count_v+= N
-
+        if track_accept:
+            accept_rates_mcmc.append(np.array(local_accept_rates).mean())
         v = V(X)
         Count_v+= N
         beta_old = beta
@@ -191,8 +202,9 @@ debug=False):
         finished_flag=True
     P_est = (g_prod*(v<=0).float().mean()).item()
     dic_out = {'p_est':P_est,'X':X,'v':v,'finished':finished_flag}
-    if mh_opt and track_accept:
+    if track_accept:
         dic_out['accept_rates']=np.array(accept_rates)
+        dic_out['accept_rates_mcmc']=np.array(accept_rates_mcmc)
     else:
         dic_out['accept_rates']=None
     if track_beta:
