@@ -12,7 +12,7 @@ from tqdm import tqdm
 import cpuinfo
 import GPUtil
 from dev.torch_utils import project_ball_pyt,projected_langevin_kernel_pyt,langevin_kernel_pyt
-from dev.langevin_adapt_pyt import LangevinSMCSimpAdaptPyt
+from dev.langevin_adapt.langevin_adapt_pyt import LangevinSMCSimpAdaptPyt
 from dev.utils import dichotomic_search, float_to_file_float, str2bool,str2floatList,str2intList
 
 method_name="langevin_adapt_pyt"

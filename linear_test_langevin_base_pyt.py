@@ -12,7 +12,7 @@ from tqdm import tqdm
 import cpuinfo
 import GPUtil
 from dev.torch_utils import project_ball_pyt,projected_langevin_kernel_pyt,langevin_kernel_pyt
-from dev.langevin_base_pyt import LangevinSMCBasePyt
+from dev.langevin_base.langevin_base_pyt import LangevinSMCBasePyt
 from dev.utils import dichotomic_search, float_to_file_float, str2bool
 
 method_name="langevin_base_pyt"
@@ -51,6 +51,7 @@ class config:
     np_seed=0
     tf_seed=None
     mh_opt=False
+    
     
 
 parser=argparse.ArgumentParser()

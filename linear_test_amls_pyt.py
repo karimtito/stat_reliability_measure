@@ -144,8 +144,7 @@ if config.track_cpu:
 gaussian_latent= config.gaussian_latent
 assert type(gaussian_latent)==bool, "The conversion of string to bool for 'gaussian_latent' failed"
 
-epsilon=config.epsilon
-d=config.d
+
 
 if not os.path.exists('./logs'):
     os.mkdir('./logs')
