@@ -202,6 +202,7 @@ debug=False,adapt_d_t_mcmc=False,track_d_t=False):
         v = V(X) # computes their potentials
     Count_v = N # Number of calls to function V or it's  gradient
     delta_t = (alpha*TimeStepPyt(V,X,gradV)).detach()
+
     if verbose>=5:
         print(f'delta_t: {delta_t}')
     Count_v+=2*N
@@ -210,7 +211,7 @@ debug=False,adapt_d_t_mcmc=False,track_d_t=False):
     if track_v_means:
         v_means=[]
     if track_d_t:
-        delta_ts=[]
+        delta_ts=[delta_t]
     while n<n_max and (v<=0).float().mean()<min_rate:
         v_mean = v.mean()
         v_std = v.std()
@@ -243,7 +244,8 @@ debug=False,adapt_d_t_mcmc=False,track_d_t=False):
             else:
                 raise RuntimeError('The estimator failed. Increase n_max?')
             break
-        local_accept_rates=[]
+        if track_accept or adapt_d_t_mcmc:
+            local_accept_rates=[]
         for _ in range(T):
             if mh_every!=1:
                 raise NotImplementedError("Metropolis-Hastings for more than one kernel step  is not implemented.")
@@ -278,6 +280,7 @@ debug=False,adapt_d_t_mcmc=False,track_d_t=False):
                     if verbose>=0.5:
                         print(f"Local accept rate: {accept_rate}")
                     accept_rates.append(accept_rate)
+                if track_accept or adapt_d_t_mcmc:
                     local_accept_rates.append(accept_rate)
                 if adapt_d_t:
                     if accept_rate>target_accept+accept_spread:
@@ -308,7 +311,8 @@ debug=False,adapt_d_t_mcmc=False,track_d_t=False):
                 X=l_kernel(X, gradV, delta_t, beta)
             
             Count_v+= N
-        accept_rate_mcmc=np.array(local_accept_rates).mean()
+        if track_accept or adapt_d_t_mcmc:
+            accept_rate_mcmc=np.array(local_accept_rates).mean()
         if adapt_d_t_mcmc:
             if accept_rate_mcmc>target_accept+accept_spread:
                         delta_t*=d_t_gain
