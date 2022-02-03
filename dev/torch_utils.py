@@ -122,6 +122,17 @@ def compute_V_pyt(model, input_, target_class):
         v=torch.where(condition=mask, input=output,other=torch.zeros_like(output))
     return v 
 
+def compute_h_pyt(model, input_, target_class):
+    """Return potentials for given inputs, model and target classes"""
+    with torch.no_grad():
+        logits = model(input_) 
+        val, ind= torch.topk(logits,k=2)
+        output=val[:,0]-val[:,1]
+        mask=ind[:,0]==target_class
+        other=val[:,0]-logits[:,target_class]
+        v=torch.where(condition=mask, input=output,other=other)
+    return v 
+
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 
 def V_pyt(x_,x_0,model,target_class,epsilon=0.05,gaussian_latent=True,clipping=True, clip_min=0, clip_max=1,reshape=True,input_shape=None):
