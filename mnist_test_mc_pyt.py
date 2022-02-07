@@ -34,16 +34,14 @@ method_name="langevin_base_pyt"
 class config:
     log_dir="./logs/mnist_tests"
     n_rep=10
-    N=40
+    N=int(1e5)
     N_list=[]
+    N_batch=int(1e3)
+    N_b_list=[]
     verbose=0
-    min_rate=0.51
-    T=1
-    T_list=[]
-    rho=90
-    rho_list=[]
-    alpha=0.025
-    alpha_list=[]
+    
+    x_min=0
+    x_max=1
     n_max=2000
     tqdm_opt=True
     d = 1024
@@ -86,18 +84,17 @@ parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--d',type=int,default=config.d)
-parser.add_argument('--min_rate',type=float,default=config.min_rate)
-parser.add_argument('--alpha',type=float,default=config.alpha)
+
 parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
-parser.add_argument('--T',type=int,default=config.T)
+
 parser.add_argument('--save_config',type=str2bool, default=config.save_config)
 parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
 parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
-parser.add_argument('--rho',type=float,default=config.rho)
+
 parser.add_argument('--gaussian_latent',type=str2bool, default=config.gaussian_latent)
 parser.add_argument('--allow_multi_gpu',type=str2bool)
-parser.add_argument('--g_target',type=float,default=config.g_target)
+
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
 parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
 parser.add_argument('--device',type=str, default=config.device)
@@ -117,9 +114,9 @@ parser.add_argument('--train_model',type=str2bool,default=config.train_model)
 parser.add_argument('--noise_dist',type=str, default=config.noise_dist)
 parser.add_argument('--a',type=float, default=config.a)
 parser.add_argument('--N_list',type=str2intList,default=config.N_list)
-parser.add_argument('--T_list',type=str2intList,default=config.T_list)
-parser.add_argument('--rho_list', type=str2floatList,default=config.rho_list)
-parser.add_argument('--alpha_list',type=str2floatList,default=config.alpha_list)
+parser.add_argument('--N_b_list',type=str2intList,default=config.T_list)
+parser.add_argument('--x_min',type=float,default=config.x_min)
+parser.add_argument('--x_max',type=float,default=config.x_max)
 parser.add_argument('--download',type=str2bool, default=config.download)
 parser.add_argument('--model_path',type=str,default=config.model_path)
 args=parser.parse_args()
@@ -148,14 +145,12 @@ if len(config.epsilons)==0:
     log_eps=np.linspace(start=np.log(config.eps_min),stop=np.log(config.eps_max),num=config.eps_num)
     config.epsilons=np.exp(log_eps)
 
-if len(config.T_list)<1:
-    config.T_list=[config.T]
 if len(config.N_list)<1:
     config.N_list=[config.N]
-if len(config.rho_list)<1:
-    config.rho_list=[config.rho]
-if len(config.alpha_list)<1:
-    config.alpha_list=[config.alpha]
+if len(config.N_b_list)<1:
+    config.N_b_list=[config.N_batch]
+
+
 
 if config.track_gpu:
     gpus=GPUtil.getGPUs()
@@ -209,7 +204,9 @@ num_classes=10
 if not os.path.exists("../data/MNIST"):
     config.download=True
 
-
+config.json=vars(args)
+if config.print_config:
+    print(config.json)
 mnist_test = datasets.MNIST("./data", train=False, download=config.download, transform=transforms.ToTensor())
 
 test_loader = DataLoader(mnist_test, batch_size = 100, shuffle=False)
@@ -280,6 +277,14 @@ if config.use_attack:
     #epsilons= np.array([0.0, 0.001, 0.01, 0.03,0.04,0.05,0.07,0.08,0.0825,0.085,0.086,0.087,0.09, 0.1, 0.3, 0.5, 1.0])
     _, advs, success = attack(fmodel, X_correct, label_correct, epsilons=config.epsilons)
 
+if config.lirpa_bounds:
+    from auto_LiRPA import BoundedModule, BoundedTensor
+    from auto_LiRPA.perturbations import *
+    import auto_LiRPA.operators
+    with torch.no_grad():
+        image=x_0.view(1,1,28,28)
+    bounded_model=BoundedModule(model,global_input=torch.zeros_like(input=image),bound_opts={"conv_mode": "patches"})
+            
 
 for i in range(len(config.epsilons)):
     
@@ -295,89 +300,100 @@ for i in range(len(config.epsilons)):
         num_classes=num_classes,noise_dist=config.noise_dis,a=config.a,device=config.device)
             
             
+    def h(x):
+        y = model(x)
+        y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)
+        y_diff, _ = y_diff.max(dim=1)
+        return y_diff #.max(dim=1)
     
-    
+    if config.gaussian_latent:
+        gen=lambda N: torch.randn(size=(N,dim),requires_grad=True).to(device)
+    else:
+        gen=lambda N: epsilon*(2*torch.rand(size=(N,dim), device=device )-1)
     normal_gen=lambda N: torch.randn(size=(N,dim),requires_grad=True).to(device)
-    uniform_gen_eps = lambda N: epsilon*(2*torch.rand(size=(N,dim), device=device )-1)
-    V_ = lambda X: V_pyt(X,x_0=x_0,model=model,epsilon=epsilon, target_class=y_0,gaussian_latent=True)
-    gradV_ = lambda X: gradV_pyt(X,x_0=x_0,model=model, target_class=y_0,epsilon=epsilon, gaussian_latent=True)
     x_0.requires_grad=True
     
-    for T in config.T_list: 
-        for N in config.N_list: 
-            for rho in config.rho_list:
-                for alpha in config.alpha_list:
-                    ests,times,finish_flags = [],[],[]
-                    iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
-                    for _ in iterator:
-                        # Gaussian latent space version
-                        t=time()
-                        p_est,dict_out=smc_pyt.LangevinSMCBasePyt(gen=normal_gen, l_kernel=t_u.langevin_kernel_pyt,V=V_, gradV=gradV_,rho=rho,beta_0=0, min_rate=config.min_rate,
-                            alpha =alpha,N=N,T = T,n_max=config.n_max, verbose=config.verbose,adapt_func=None,allow_zero_est=config.allow_zero_est)
-                        time_comp=time()-t
-                        ests.append(p_est)
-                        times.append(time_comp)
-                        finish_flag=dict_out['finished']
-                        finish_flags.append(finish_flag)
+    for N in config.N_list: 
+        for N_b in config.N_b_list:
+                print(f"Starting experiment with N={N},N_b={N_b}")
+                ests,times,finish_flags = [],[],[]
+                iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
+                for _ in iterator:
+                    # Gaussian latent space version
+                    
+                    t=time()
+                    n_batches=N//N_b 
+                    count_prop=0
+                    for _ in range(n_batches):
+                        X=
+                        pass
+                    if N%N_b!=0:
+                        X=0
+                        pass
+                    time_comp=time()-t
+                    ests.append(p_est)
+                    times.append(time_comp)
+                    finish_flag=dict_out['finished']
+                    finish_flags.append(finish_flag)
 
-                    times=np.array(times)
-                    estimates = np.array(ests)
-                    finish_flags=np.array(finish_flags)
-                    freq_finished=finish_flags.mean()
-                    freq_zero_est=(estimates==0).mean()
-                    #finished=np.array(finish_flag)
-                    if freq_finished<1:
-                        unfinish_est=estimates[~finish_flags]
-                        unfinish_times=times[~finish_flags]
-                        unfinished_mean_est=unfinish_est.mean()
-                        unfinished_mean_time=unfinish_times.mean()
+                times=np.array(times)
+                estimates = np.array(ests)
+                finish_flags=np.array(finish_flags)
+                freq_finished=finish_flags.mean()
+                freq_zero_est=(estimates==0).mean()
+                #finished=np.array(finish_flag)
+                if freq_finished<1:
+                    unfinish_est=estimates[~finish_flags]
+                    unfinish_times=times[~finish_flags]
+                    unfinished_mean_est=unfinish_est.mean()
+                    unfinished_mean_time=unfinish_times.mean()
+                else:
+                    unfinished_mean_est,unfinished_mean_time=None,None
+                loc_time=datetime.today().isoformat().split('.')[0]
+                log_name=method_name+'_eps_'+float_to_file_float(config.epsilons[i])+'_N_'+str(N)+'_T_'+str(T)+'a'+float_to_file_float(alpha)
+                log_name=log_name+'r'+float_to_file_float(rho)+'_'+loc_time
+                log_path=os.path.join(raw_logs_path,log_name)
+                os.mkdir(log_path)
+                np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
+                np.savetxt(fname=os.path.join(log_path,'estimates.txt'),X=estimates)
+
+                
+
+                plt.hist(times, bins=10)
+                plt.savefig(os.path.join(log_path,'times_hist.png'))
+                plt.hist(estimates,bins=10)
+                plt.savefig(os.path.join(log_path,'estimates_hist.png'))
+                
+                
+
+                #with open(os.path.join(log_path,'results.txt'),'w'):
+                results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),
+                'N':N,'epsilon':config.epsilons[i],'n_rep':config.n_rep,
+                'min_rate':config.min_rate,
+                'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
+                'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
+                'cores_number':config.cores_number,'g_target':config.g_target,
+                'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
+                'unfinished_mean_est':unfinished_mean_est
+                ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
+                'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time}
+                results_df=pd.DataFrame([results])
+                results_df.to_csv(os.path.join(log_path,'results.csv'),)
+                if config.aggr_res_path is None:
+                    aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                else: 
+                    aggr_res_path=config.aggr_res_path
+
+                if config.update_agg_res:
+                    if not os.path.exists(aggr_res_path):
+                        print(f'aggregate results csv file not found /n it will be build at {aggr_res_path}')
+                        cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean time','std time','mean est',
+                        'std est','freq underest','g_target']
+                        cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
+                        cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist','datetime']
+                        agg_res_df= pd.DataFrame(columns=cols)
+
                     else:
-                        unfinished_mean_est,unfinished_mean_time=None,None
-                    loc_time=datetime.today().isoformat().split('.')[0]
-                    log_name=method_name+'_eps_'+float_to_file_float(config.epsilons[i])+'_N_'+str(N)+'_T_'+str(T)+'a'+float_to_file_float(alpha)
-                    log_name=log_name+'r'+float_to_file_float(rho)+'_'+loc_time
-                    log_path=os.path.join(raw_logs_path,log_name)
-                    os.mkdir(log_path)
-                    np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
-                    np.savetxt(fname=os.path.join(log_path,'estimates.txt'),X=estimates)
-
-                    
-
-                    plt.hist(times, bins=10)
-                    plt.savefig(os.path.join(log_path,'times_hist.png'))
-                    plt.hist(estimates,bins=10)
-                    plt.savefig(os.path.join(log_path,'estimates_hist.png'))
-                   
-                    
-
-                    #with open(os.path.join(log_path,'results.txt'),'w'):
-                    results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),
-                    'N':N,'rho':rho,'epsilon':config.epsilons[i],'n_rep':config.n_rep,'T':T,'alpha':alpha,
-                    'min_rate':config.min_rate,
-                    'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
-                    'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
-                    'cores_number':config.cores_number,'g_target':config.g_target,
-                    'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
-                    'unfinished_mean_est':unfinished_mean_est
-                    ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
-                    'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time}
-                    results_df=pd.DataFrame([results])
-                    results_df.to_csv(os.path.join(log_path,'results.csv'),)
-                    if config.aggr_res_path is None:
-                        aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
-                    else: 
-                        aggr_res_path=config.aggr_res_path
-
-                    if config.update_agg_res:
-                        if not os.path.exists(aggr_res_path):
-                            print(f'aggregate results csv file not found /n it will be build at {aggr_res_path}')
-                            cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean time','std time','mean est',
-                            'std est','freq underest','g_target']
-                            cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
-                            cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist','datetime']
-                            agg_res_df= pd.DataFrame(columns=cols)
-
-                        else:
-                            agg_res_df=pd.read_csv(aggr_res_path)
-                        agg_res_df = pd.concat([agg_res_df,results_df],ignore_index=True)
-                        agg_res_df.to_csv(aggr_res_path,index=False)
+                        agg_res_df=pd.read_csv(aggr_res_path)
+                    agg_res_df = pd.concat([agg_res_df,results_df],ignore_index=True)
+                    agg_res_df.to_csv(aggr_res_path,index=False)

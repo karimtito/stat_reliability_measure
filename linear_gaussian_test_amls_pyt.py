@@ -13,9 +13,8 @@ import argparse
 from tqdm import tqdm
 import torch
 
-from dev.langevin_utils import langevin_kernel, project_ball, projected_langevin_kernel
-from dev.langevin_base import LangevinSMCBase
-from dev.utils import dichotomic_search, float_to_file_float,str2bool,str2intList,str2floatList
+
+from dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList
 import dev.amls.amls_pyt as amls_pyt
 method_name="amls_pyt"
 
@@ -46,7 +45,7 @@ class config:
     
     d = 1024
     epsilon = 1
-    gaussian_latent =False
+    
     
     tqdm_opt=True
     save_config = True
@@ -55,10 +54,11 @@ class config:
     aggr_res_path = None
 
     track_accept=False
+    track_finish=True
     device = None
 
     log_dir="./logs/linear_gaussian_tests"
-    batch_opt=False
+    batch_opt=True
     allow_multi_gpu=False
     track_gpu=True
     track_cpu=True
@@ -91,8 +91,6 @@ parser.add_argument('--p_range',type=str2floatList,default=config.p_range)
 
 parser.add_argument('--d',type=int,default=config.d)
 parser.add_argument('--epsilon',type=float, default=config.epsilon)
-parser.add_argument('--gaussian_latent',type=str2bool, default=config.gaussian_latent)
-
 parser.add_argument('--tqdm_opt',type=bool,default=config.tqdm_opt)
 parser.add_argument('--save_config', type=bool, default=config.save_config)
 parser.add_argument('--print_config',type=bool , default=config.print_config)
@@ -105,6 +103,7 @@ parser.add_argument('--log_dir',default=config.log_dir)
 parser.add_argument('--allow_multi_gpu',type=str2bool,default=config.allow_multi_gpu)
 parser.add_argument('--batch_opt',type=str2bool,default=config.batch_opt)
 parser.add_argument('--track_accept',type=str2bool,default= config.track_accept)
+parser.add_argument('--track_finish',type=str2bool,default=config.track_finish)
 args=parser.parse_args()
 for k,v in vars(args).items():
     setattr(config, k, v)
@@ -143,8 +142,6 @@ if config.track_cpu:
     config.cpu_name=cpuinfo.get_cpu_info()['brand_raw']
     config.cores_number=os.cpu_count()
 
-gaussian_latent= config.gaussian_latent
-assert type(gaussian_latent)==bool, "The conversion of string to bool for 'gaussian_latent' failed"
 
 epsilon=config.epsilon
 d=config.d
@@ -159,10 +156,7 @@ raw_logs_path=os.path.join(config.log_dir,'raw_logs')
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
-loc_time= float_to_file_float(time())
-log_name=method_name+'_'+loc_time
-log_path=os.path.join(raw_logs_path,log_name)
-os.mkdir(path=log_path)
+
 config.json=vars(args)
 if config.print_config:
     print(config.json)
@@ -171,7 +165,6 @@ if config.print_config:
 #     with open(file=os.path.join(),mode='w') as f:
 #         f.write(config.json)
 
-d=config.d
 epsilon=config.epsilon
 e_1 = torch.Tensor([1]+[0]*(d-1),device=config.device)
 get_c_norm= lambda p:stat.norm.isf(p)
@@ -193,6 +186,10 @@ for p_t in config.p_range:
         for N in config.N_range: 
             for s in config.s_range:
                 for ratio in config.ratio_range: 
+                    loc_time= float_to_file_float(time())
+                    log_name=method_name+f'_N_{N}_T_{T}_s_{float_to_file_float(s)}_r_{float_to_file_float(ratio)}_t_'+loc_time.split('_')[0]
+                    log_path=os.path.join(raw_logs_path,log_name)
+                    os.mkdir(path=log_path)
                     i_run+=1
                     print(f"Starting run {i_run}/{nb_runs}")
 
@@ -201,7 +198,10 @@ for p_t in config.p_range:
                         print(f"K/N:{K/N}")
                     times= []
                     rel_error= []
-                    estimates = [] 
+                    ests = [] 
+                    calls=[]
+                    if config.track_finish:
+                        finish_flags=[]
                     for i in tqdm(range(config.n_rep)):
                         t=time()
                         if config.batch_opt:
@@ -214,56 +214,73 @@ for p_t in config.p_range:
                             amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
                         tau=0 , n_max=config.n_max,clip_s=config.clip_s , 
                         s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
-                        device=config.device)
+                        device=config.device, )
                         t=time()-t
                         
                         est=amls_res[0]
+                        
+                        dict_out=amls_res[1]
                         if config.track_accept:
-                            dict_out=amls_res[1]
+                            accept_logs=os.path.join(log_path,'accept_logs')
+                            if not os.path.exists(accept_logs):
+                                os.mkdir(path=accept_logs)
                             accept_rates=dict_out['accept_rates']
-                            np.savetxt(fname=os.path.join(log_path,f'accept_rates_{i}.txt')
-                            ,X=times)
+                            np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
+                            ,X=accept_rates)
                             x_T=np.arange(len(accept_rates))
                             plt.plot(x_T,accept_rates)
-                            plt.savefig(os.path.join(log_path,f'accept_rates_{i}.png'))
+                            plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
+                            plt.close()
                             accept_rates_mcmc=dict_out['accept_rates_mcmc']
                             x_T=np.arange(len(accept_rates_mcmc))
                             plt.plot(x_T,accept_rates_mcmc)
-                            plt.savefig(os.path.join(log_path,f'accept_rates_mcmc_{i}.png'))
-                            np.savetxt(fname=os.path.join(log_path,f'accept_rates_mcmc_{i}.txt')
-                            ,X=times)
+                            plt.savefig(os.path.join(accept_logs,f'accept_rates_mcmc_{i}.png'))
+                            plt.close()
+                            np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
+                            ,X=accept_rates_mcmc)
+                        if config.track_finish:
+                            finish_flags.append(dict_out['finish_flag'])
                         times.append(t)
-                        estimates.append(est)
+                        ests.append(est)
+                        calls.append(dict_out['Count_h'])
 
 
                     times=np.array(times)
-                    estimates = np.array(estimates)
-                    abs_errors=np.abs(estimates-p_t)
+                    ests = np.array(ests)
+                    abs_errors=np.abs(ests-p_t)
                     rel_errors=abs_errors/p_t
-                    bias=np.mean(estimates)-p_t
+                    bias=np.mean(ests)-p_t
 
                     times=np.array(times)  
                     ests=np.array(ests)
+                    calls=np.array(calls)
                     errs=np.abs(ests-p_t)
+
+                    mean_calls=calls.mean()
+                    std_calls=calls.std()
                     #fin = np.array(finished_flags)
 
 
                     np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
-                    np.savetxt(fname=os.path.join(log_path,'estimates.txt'),X=estimates)
+                    np.savetxt(fname=os.path.join(log_path,'ests.txt'),X=ests)
 
                     plt.hist(times, bins=20)
                     plt.savefig(os.path.join(log_path,'times_hist.png'))
-                    plt.hist(estimates,bins=20)
-                    plt.savefig(os.path.join(log_path,'estimates_hist.png'))
+                    plt.hist(rel_errors,bins=20)
+                    plt.savefig(os.path.join(log_path,'rel_errs_hist.png'))
 
                     #with open(os.path.join(log_path,'results.txt'),'w'):
-                    results={'p_t':p_t,'method':method_name,'gaussian_latent':str(config.gaussian_latent),
-                    'N':config.N,'n_rep':config.n_rep,'T':config.T,'ratio':ratio,'K':K,'s':s
-                    ,'min_rate':config.min_rate,'mean time':times.mean(),'std time':times.std()
-                    ,'mean est':estimates.mean(),'bias':estimates.mean()-p_t,'mean abs error':abs_errors.mean(),
-                    'mean rel error':rel_errors.mean(),'std est':estimates.std(),'freq underest':(estimates<p_t).mean()
+                    results={'p_t':p_t,'method':method_name,
+                    'N':N,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s
+                    ,'min_rate':config.min_rate,'mean est':ests.mean()
+                    ,'mean time':times.mean()
+                    ,'std time':times.std(),
+                    'mean_calls':mean_calls,
+                    'std_calls':std_calls
+                    ,'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
+                    'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean()
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
-                    'batch_opt':config.batch_opt}
+            'batch_opt':config.batch_opt,"d":d}
 
                     results_df=pd.DataFrame([results])
                     results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
@@ -274,6 +291,7 @@ for p_t in config.p_range:
                     if config.update_agg_res:
                         if not os.path.exists(aggr_res_path):
                             cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est',
+                            'mean_calls','std_calls',
                             'bias','mean abs error','mean rel error','std est','freq underest','gpu_name','cpu_name']
                             aggr_res_df= pd.DataFrame(columns=cols)
                         else:
@@ -282,4 +300,3 @@ for p_t in config.p_range:
                         aggr_res_df.to_csv(aggr_res_path,index=False)
 
         
-

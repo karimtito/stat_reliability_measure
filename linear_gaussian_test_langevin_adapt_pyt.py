@@ -1,16 +1,17 @@
 import dev.torch_utils as t_u 
-import dev.langevin_adapt_pyt as smc_pyt
+import dev.langevin_adapt.langevin_adapt_pyt as smc_pyt
 import scipy.stats as stat
 import numpy as np
 from tqdm import tqdm
 from time import time
 import os
+import matplotlib.pyplot as plt
 import torch
 import GPUtil
 import cpuinfo
 import pandas as pd
 import argparse
-from dev.utils import str2bool,str2floatList,str2intList
+from dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
 
 
 method_name="langevin_adapt_pyt"
@@ -29,9 +30,11 @@ class config:
     n_rep=10
     
     save_config=False 
-    d=5
+    d=1024
     verbose=1
     log_dir='./logs/linear_gaussian_tests'
+    aggr_res_path = None
+    update_agg_res=True
     sigma=1
     v1_kernel=True
     torch_seed=0
@@ -49,6 +52,7 @@ class config:
     track_calls=False
     mh_opt=False
     adapt_d_t=False
+    adapt_d_t_mcmc=False
     target_accept=0.574
     accept_spread=0.1
     d_t_decay=0.999
@@ -98,6 +102,8 @@ parser.add_argument('--target_accept',type=float,default=config.target_accept)
 parser.add_argument('--accept_spread',type=float,default=config.accept_spread)
 parser.add_argument('--d_t_decay',type=float,default=config.d_t_decay)
 parser.add_argument('--d_t_gain',type=float,default=config.d_t_gain)
+parser.add_argument('--adapt_d_t_mcmc',type=str2bool,default=config.adapt_d_t_mcmc)
+parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -109,6 +115,14 @@ if len(config.p_range)==0:
 
 if len(config.g_range)==0:
     config.g_range= [config.g_target]
+
+
+if len(config.N_range)==0:
+    config.N_range= [config.N]
+
+
+if len(config.T_range)==0:
+    config.T_range= [config.T]
 
 
 if not config.allow_multi_gpu:
@@ -160,8 +174,11 @@ raw_logs_path=os.path.join(config.log_dir,'raw_logs')
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
-
-
+loc_time= float_to_file_float(time())
+log_name=method_name+'_'+loc_time
+log_path=os.path.join(raw_logs_path,log_name)
+os.mkdir(path=log_path)
+config.json=vars(args)
 
 # if config.aggr_res_path is None:
 #     aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
@@ -177,7 +194,7 @@ nb_runs= np.prod(param_lens)
 mh_str="adjusted" if config.mh_opt else "unadjusted"
 method=method_name+'_'+mh_str
 save_every = 1
-d=5
+
 
 kernel_str='v1_kernel' if config.v1_kernel else 'v2_kernel'
 kernel_function=t_u.langevin_kernel_pyt if config.v1_kernel else t_u.langevin_kernel_pyt2 
@@ -198,7 +215,10 @@ for p_t in config.p_range:
         for T in config.T_range:
             for alpha in config.alpha_range:       
                 for N in config.N_range:
-                    
+                    loc_time= float_to_file_float(time())
+                    log_name=method_name+f'_N_{N}_T_{T}_a_{float_to_file_float(alpha)}_g_{float_to_file_float(g_t)}'+loc_time.split('_')[0]
+                    log_path=os.path.join(raw_logs_path,log_name)
+                    os.mkdir(path=log_path)
                     run_nb+=1
                     print(f'Run {run_nb}/{nb_runs}')
                     times=[]
@@ -216,40 +236,77 @@ for p_t in config.p_range:
                         allow_zero_est=config.allow_zero_est,gaussian =True,
                         target_accept=config.target_accept,accept_spread=config.accept_spread, 
                         adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
-                        d_t_gain=config.d_t_gain
-                        )
+                        d_t_gain=config.d_t_gain)
                         t1=time()-t
                         print(p_est)
                         finish_flag=res_dict['finished']
                         accept_rates=res_dict['accept_rates']
+                        if config.track_accept:
+                            accept_rates=res_dict['accept_rates']
+                            np.savetxt(fname=os.path.join(log_path,f'accept_rates_{i}.txt')
+                            ,X=accept_rates)
+                            x_T=np.arange(len(accept_rates))
+                            plt.plot(x_T,accept_rates)
+                            plt.savefig(os.path.join(log_path,f'accept_rates_{i}.png'))
+                            accept_rates_mcmc=res_dict['accept_rates_mcmc']
+                            x_T=np.arange(len(accept_rates_mcmc))
+                            plt.close()
+                            plt.plot(x_T,accept_rates_mcmc)
+                            plt.savefig(os.path.join(log_path,f'accept_rates_mcmc_{i}.png'))
+                            plt.close()
+                            np.savetxt(fname=os.path.join(log_path,f'accept_rates_mcmc_{i}.txt')
+                            ,X=accept_rates_mcmc,)
                         finished_flags.append(finish_flag)
                         times.append(t1)
                         ests.append(p_est)
+                    times=np.array(times)
+                    ests = np.array(ests)
+                    abs_errors=np.abs(ests-p_t)
+                    rel_errors=abs_errors/p_t
+                    bias=np.mean(ests)-p_t
+
                     times=np.array(times)  
                     ests=np.array(ests)
                     errs=np.abs(ests-p_t)
-                    fin = np.array(finished_flags)
-                    result_g={'p_t':p_t,'mean_est':ests.mean(),'mean_err':errs.mean(),
-                    'mean_time':times.mean(),'std_time':times.std(),'std_est':ests.std(),'T':T,'N':N,
-                    'g_target':g_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
-                    "method":method,"kernel":kernel_str,"finish_rate":fin.mean(),
-                     'gpu_name':config.gpu_name ,'cpu_name':config.cpu_name}
-                    if config.adapt_d_t:
-                        result_g.update({'adapt_d_t':config.adapt_d_t,'target_accept':config.target_accept,
-                        'accept_spread':config.accept_spread,'d_t_accept':config.d_t_decay,
-                        'd_t_gain': config.d_t_gain})
+                    #fin = np.array(finished_flags)
 
-                    results_g=results_g.append(result_g,ignore_index=True)
+
+                    np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
+                    np.savetxt(fname=os.path.join(log_path,'ests.txt'),X=ests)
+
+                    plt.hist(times, bins=20)
+                    plt.savefig(os.path.join(log_path,'times_hist.png'))
+                    plt.hist(rel_errors,bins=20)
+                    plt.savefig(os.path.join(log_path,'rel_errs_hist.png'))
+
+                    #with open(os.path.join(log_path,'results.txt'),'w'):
+                    results={"p_t":p_t,"method":method_name,'T':T,'N':N,
+                    "g_target":g_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
+                    "method":method,"kernel":kernel_str,'adapt_t':config.adapt_d_t,'mean time':times.mean(),'std time':times.std()
+                    ,'mean est':ests.mean(),'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
+                    'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean()
+                    ,'adapt_d_t_mcmc':config.adapt_d_t_mcmc,"adapt_d_t":config.adapt_d_t,
+                    "adapt_d_t_mcmc":config.adapt_d_t_mcmc,"d_t_decay":config.d_t_decay,"d_t_gain":config.d_t_gain,
+                    "target_accept":config.target_accept,"accept_spread":config.accept_spread
+                    ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number
+                    }
+
+                    results_df=pd.DataFrame([results])
+                    results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
+                    if config.aggr_res_path is None:
+                        aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                    else:
+                        aggr_res_path=config.aggr_res_path
+                    if config.update_agg_res:
+                        if not os.path.exists(aggr_res_path):
+                            cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est',
+                            'bias','mean abs error','mean rel error','std est','freq underest','gpu_name','cpu_name']
+                            aggr_res_df= pd.DataFrame(columns=cols)
+                        else:
+                            aggr_res_df=pd.read_csv(aggr_res_path)
+                        aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
+                        aggr_res_df.to_csv(aggr_res_path,index=False)
                     
-                    if run_nb%save_every==0:
-                        results_g.to_csv(results_path,index=False)
+
+
                     
-
-
-                    {'p_t':p_t,'method':method_name,'gaussian_latent':str(config.gaussian_latent),
-                    'N':config.N,'n_rep':config.n_rep,'T':config.T,'ratio':ratio,'K':K,'s':s
-                    ,'min_rate':config.min_rate,'mean time':times.mean(),'std time':times.std()
-                    ,'mean est':estimates.mean(),'bias':estimates.mean()-p_t,'mean abs error':abs_errors.mean(),
-                    'mean rel error':rel_errors.mean(),'std est':estimates.std(),'freq underest':(estimates<p_t).mean()
-                    ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
-                    'batch_opt':config.batch_opt}
