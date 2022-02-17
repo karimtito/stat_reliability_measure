@@ -14,7 +14,9 @@ logs
 *.userosscache
 *.sln.docstates
 
-notebooks
+./notebooks
+./data
+./logs
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
