@@ -446,6 +446,7 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
         
                         times=np.array(times)
                         estimates = np.array(ests)
+                        calls=np.array(calls)
                         if config.track_finish:
                             finish_flags=np.array(finish_flags)
                             freq_finished=finish_flags.mean()
@@ -477,7 +478,7 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
                         #with open(os.path.join(log_path,'results.txt'),'w'):
                         results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),'image_idx':l,
                             'epsilon':epsilon,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
-                        'min_rate':config.min_rate, "N":N,
+                        'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),
                         'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
                         'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
                         'cores_number':config.cores_number,'g_target':config.g_target,
