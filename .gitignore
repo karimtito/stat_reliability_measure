@@ -14,7 +14,7 @@ logs
 *.userosscache
 *.sln.docstates
 
-./notebooks
+./notebooks/
 ./data
 ./logs
 
