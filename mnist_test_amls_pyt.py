@@ -71,8 +71,8 @@ class config:
     tqdm_opt=True
     
     epsilons = []
-    eps_max=1
-    eps_min=0.0001 
+    eps_max=0.3
+    eps_min=0.1 
     eps_num=5
     allow_zero_est=True
     save_config=True
@@ -204,7 +204,7 @@ if config.track_gpu:
     config.gpu_name=gpus[0].name
 
 if config.track_cpu:
-    config.cpu_name=cpuinfo.get_cpu_info()['brand_raw']
+    config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
     config.cores_number=os.cpu_count()
 
 

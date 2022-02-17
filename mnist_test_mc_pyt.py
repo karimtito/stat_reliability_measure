@@ -29,7 +29,7 @@ str2floatList=lambda x: str2list(in_str=x, type_out=float)
 str2intList=lambda x: str2list(in_str=x, type_out=int)
 low_str=lambda x: str(x).lower()
 
-method_name="langevin_base_pyt"
+method_name="vanilla_mc"
 
 class config:
     log_dir="./logs/mnist_tests"
@@ -46,8 +46,8 @@ class config:
     tqdm_opt=True
     d = 1024
     epsilons =[]
-    eps_max=1
-    eps_min=0.0001 
+    eps_max=0.3
+    eps_min=0.1 
     eps_num=5
     allow_zero_est=True
     save_config=True
@@ -159,7 +159,7 @@ if config.track_gpu:
     config.gpu_name=gpus[0].name
 
 if config.track_cpu:
-    config.cpu_name=cpuinfo.get_cpu_info()['brand_raw']
+    config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
     config.cores_number=os.cpu_count()
 
 
@@ -306,11 +306,12 @@ for i in range(len(config.epsilons)):
         y_diff, _ = y_diff.max(dim=1)
         return y_diff #.max(dim=1)
     
-    if config.gaussian_latent:
+    if config.noise_dist.lower()==:
         gen=lambda N: torch.randn(size=(N,dim),requires_grad=True).to(device)
     else:
         gen=lambda N: epsilon*(2*torch.rand(size=(N,dim), device=device )-1)
     normal_gen=lambda N: torch.randn(size=(N,dim),requires_grad=True).to(device)
+    
     x_0.requires_grad=True
     
     for N in config.N_list: 
@@ -350,8 +351,8 @@ for i in range(len(config.epsilons)):
                 else:
                     unfinished_mean_est,unfinished_mean_time=None,None
                 loc_time=datetime.today().isoformat().split('.')[0]
-                log_name=method_name+'_eps_'+float_to_file_float(config.epsilons[i])+'_N_'+str(N)+'_T_'+str(T)+'a'+float_to_file_float(alpha)
-                log_name=log_name+'r'+float_to_file_float(rho)+'_'+loc_time
+                log_name=method_name+'_eps_'+float_to_file_float(config.epsilons[i])+'_N_b_'+str(N_b)
+                log_name=log_name+'_'+loc_time
                 log_path=os.path.join(raw_logs_path,log_name)
                 os.mkdir(log_path)
                 np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)

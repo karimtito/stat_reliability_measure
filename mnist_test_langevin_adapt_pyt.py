@@ -49,8 +49,8 @@ class config:
     tqdm_opt=True
     d = 1024
     epsilons = None
-    eps_max=1
-    eps_min=0.0001 
+    eps_max=0.3
+    eps_min=0.1 
     eps_num=5
     allow_zero_est=True
     save_config=True
@@ -191,7 +191,7 @@ if config.track_gpu:
     config.gpu_name=gpus[0].name
 
 if config.track_cpu:
-    config.cpu_name=cpuinfo.get_cpu_info()['brand_raw']
+    config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
     config.cores_number=os.cpu_count()
 
 
@@ -204,7 +204,7 @@ else:
     device=config.device
 
 d=config.d
-#epsilon=config.epsilon
+
 
 
 if not os.path.exists('./logs'):
@@ -314,7 +314,7 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
         
         
         epsilon = config.epsilons[i]
-        pgd_success= success[i][l] if config.use_attack else None 
+        pgd_success= (success[i][l]).item() if config.use_attack else None 
         p_l,p_u=None,None
         if config.lirpa_bounds:
             from dev.lirpa_utils import get_lirpa_bounds
@@ -348,7 +348,7 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
                             time_comp=time()-t
                             ests.append(p_est)
                             times.append(time_comp)
-                            finish_flag=dict_out['finish']
+                            finish_flag=dict_out['finished']
                             finish_flags.append(finish_flag)
 
                         times=np.array(times)
@@ -383,15 +383,15 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
 
                         #with open(os.path.join(log_path,'results.txt'),'w'):
                         results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),'image_idx':l,
-                        'N':N,'g_target':g_t,'epsilon':config.epsilon,'n_rep':config.n_rep,'T':T,'alpha':alpha,
+                        'N':N,'g_target':g_t,'epsilon':epsilon,'n_rep':config.n_rep,'T':T,'alpha':alpha,
                         'min_rate':config.min_rate,
                         'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
                         'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
                         'cores_number':config.cores_number,'g_target':config.g_target,
                         'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
                         'unfinished_mean_est':unfinished_mean_est
-                        ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l.item(),
-                        'p_u':p_u.item(),'noise_dist':config.noise_dist,'datetime':loc_time}
+                        ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
+                        'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time}
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),)
                         if config.aggr_res_path is None:

@@ -33,7 +33,7 @@ class config:
     save_config=False 
     d=1024
     verbose=1
-    log_dir='./logs/linear_gaussian_tests'
+    log_dir='./logs/gaussian_tests'
     aggr_res_path = None
     update_agg_res=True
     sigma=1
@@ -145,7 +145,8 @@ if config.track_gpu:
     config.gpu_name=gpus[0].name
 
 if config.track_cpu:
-    config.cpu_name=cpuinfo.get_cpu_info()['brand_raw']
+    brand_keys=[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key] 
+    config.cpu_name=cpuinfo.get_cpu_info()[brand_keys[0]]
     config.cores_number=os.cpu_count()
 
 

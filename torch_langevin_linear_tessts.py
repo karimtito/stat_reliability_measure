@@ -94,7 +94,7 @@ if config.track_gpu:
     config.gpu_name=gpus[0].name
 
 if config.track_cpu:
-    config.cpu_name=cpuinfo.get_cpu_info()['brand_raw']
+    config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
     config.cpu_count=os.cpu_count()
 
 d,epsilon=config.d,config.epsilon
