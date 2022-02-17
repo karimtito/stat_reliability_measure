@@ -17,7 +17,7 @@ logs
 ./notebooks/
 ./data
 ./logs
-
+notebooks/*
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
