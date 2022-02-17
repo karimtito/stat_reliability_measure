@@ -13,7 +13,7 @@ logs
 *.user
 *.userosscache
 *.sln.docstates
-
+*.ipynb
 ./notebooks/
 ./data
 ./logs
