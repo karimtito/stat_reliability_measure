@@ -45,14 +45,14 @@ def langevin_kernel_pyt(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sig
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
     
     grad=gradV(X)
+    
     with torch.no_grad():
         G_noise = torch.randn(size = X.shape).to(device)
-        X_new =X-delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise 
-        if gaussian:
-            X_new=X_new-(delta_t/beta)*gauss_sigma*X # U(x)=beta*V(x)+(1/2)x^T*Sigma*x
+        if not gaussian:
+            X_new =X-delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise 
+        else:
+            X_new=(1-delta_t/beta)*X -delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise # U(x)=beta*V(x)+(1/2)x^T*Sigma*x
     return X_new
-
-
 
 def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sigma=1):
     """performs one step of langevin kernel with inverse temperature beta"""
@@ -60,12 +60,18 @@ def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_si
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
     
     grad=gradV(X)
+    
     with torch.no_grad():
         G_noise = torch.randn(size = X.shape).to(device)
-        X_new =X-delta_t*beta*grad+torch.sqrt(2*delta_t)*G_noise 
-        if gaussian:
-            X_new=X_new-delta_t*gauss_sigma*X # U(x)=beta*V(x)+(1/2)x^T*Sigma*x
+        if not gaussian:
+            X_new =X-delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise 
+        else:
+            X_new=torch.sqrt(1-(2*delta_t/beta))*X -delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise # U(x)=beta*V(x)+(1/2)x^T*Sigma*x
     return X_new
+
+
+
+
 
 def multi_unsqueeze(input_,k,dim=-1):
     """"unsqueeze input multiple times"""
