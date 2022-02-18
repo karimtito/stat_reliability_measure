@@ -20,7 +20,7 @@ logs
 notebooks/*
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
-
+notebooks/gaussian.ipynb
 
 # Mono auto generated files
 mono_crash.*
@@ -360,3 +360,6 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+notebooks/gaussian.ipynb
+notebooks/linear_gaussian.ipynb
+notebooks/.ipynb_checkpoints/linear_gaussian-checkpoint.ipynb
