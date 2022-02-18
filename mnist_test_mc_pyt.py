@@ -306,8 +306,8 @@ for i in range(len(config.epsilons)):
         y_diff, _ = y_diff.max(dim=1)
         return y_diff #.max(dim=1)
     
-    if config.noise_dist.lower()==:
-        gen=lambda N: torch.randn(size=(N,dim),requires_grad=True).to(device)
+    if config.noise_dist.lower()=='gaussian':
+        gen=lambda N: epsilon*torch.randn(size=(N,dim),requires_grad=True).to(device)
     else:
         gen=lambda N: epsilon*(2*torch.rand(size=(N,dim), device=device )-1)
     normal_gen=lambda N: torch.randn(size=(N,dim),requires_grad=True).to(device)
@@ -326,22 +326,25 @@ for i in range(len(config.epsilons)):
                     n_batches=N//N_b 
                     count_prop=0
                     for _ in range(n_batches):
-                        X=
-                        pass
+                        X=gen(n_batches)
+                        scores=h(X)
+                        count_prop+=(scores>=0).sum().item()
+                        
                     if N%N_b!=0:
-                        X=0
-                        pass
+                        X=gen(N%N_b)
+                        count_prop+=(h(X)>=0).sum().item()
+                    
+                    p_est=count_prop/N
                     time_comp=time()-t
                     ests.append(p_est)
                     times.append(time_comp)
-                    finish_flag=dict_out['finished']
-                    finish_flags.append(finish_flag)
+
 
                 times=np.array(times)
                 estimates = np.array(ests)
-                finish_flags=np.array(finish_flags)
-                freq_finished=finish_flags.mean()
-                freq_zero_est=(estimates==0).mean()
+                
+                freq_finished=1
+                
                 #finished=np.array(finish_flag)
                 if freq_finished<1:
                     unfinish_est=estimates[~finish_flags]
@@ -370,7 +373,7 @@ for i in range(len(config.epsilons)):
                 #with open(os.path.join(log_path,'results.txt'),'w'):
                 results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),
                 'N':N,'epsilon':config.epsilons[i],'n_rep':config.n_rep,
-                'min_rate':config.min_rate,
+                'min_rate':config.min_rate,'mean_calls':N,'std_calls':0,
                 'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
                 'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
                 'cores_number':config.cores_number,'g_target':config.g_target,

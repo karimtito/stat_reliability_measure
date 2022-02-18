@@ -57,6 +57,8 @@ class config:
     accept_spread=0.1
     d_t_decay=0.999
     d_t_gain=1/d_t_decay
+    v_min_opt=False
+    ess_opt=False
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -104,6 +106,8 @@ parser.add_argument('--d_t_decay',type=float,default=config.d_t_decay)
 parser.add_argument('--d_t_gain',type=float,default=config.d_t_gain)
 parser.add_argument('--adapt_d_t_mcmc',type=str2bool,default=config.adapt_d_t_mcmc)
 parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
+parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
+parser.add_argument('--ess_opt',type=str2bool,default=config.ess_opt)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -194,7 +198,7 @@ nb_runs= np.prod(param_lens)
 mh_str="adjusted" if config.mh_opt else "unadjusted"
 method=method_name+'_'+mh_str
 save_every = 1
-
+adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBetaPyt
 
 kernel_str='v1_kernel' if config.v1_kernel else 'v2_kernel'
 kernel_function=t_u.langevin_kernel_pyt if config.v1_kernel else t_u.langevin_kernel_pyt2 
@@ -223,7 +227,7 @@ for p_t in config.p_range:
                     print(f'Run {run_nb}/{nb_runs}')
                     times=[]
                     ests = []
-                    
+                    calls=[]
                     finished_flags=[]
                     iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
                     print(f"Starting simulations with p_t:{p_t},g_t:{g_t},T:{T},alpha:{alpha},N:{N}")
@@ -232,11 +236,14 @@ for p_t in config.p_range:
                         p_est,res_dict,=smc_pyt.LangevinSMCSimpAdaptPyt(gen=norm_gen,
                         l_kernel=kernel_function,N=N,min_rate=config.min_rate,
                         g_target=g_t,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
+                        adapt_func=adapt_func,
                         verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
                         allow_zero_est=config.allow_zero_est,gaussian =True,
                         target_accept=config.target_accept,accept_spread=config.accept_spread, 
                         adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
-                        d_t_gain=config.d_t_gain)
+                        d_t_gain=config.d_t_gain,
+                        v_min_opt=config.v_min_opt,
+                        v1_kernel=config.v1_kernel)
                         t1=time()-t
                         print(p_est)
                         finish_flag=res_dict['finished']
@@ -259,8 +266,10 @@ for p_t in config.p_range:
                         finished_flags.append(finish_flag)
                         times.append(t1)
                         ests.append(p_est)
+                        calls.append(res_dict['calls'])
                     times=np.array(times)
                     ests = np.array(ests)
+                    calls=np.array(calls)
                     abs_errors=np.abs(ests-p_t)
                     rel_errors=abs_errors/p_t
                     bias=np.mean(ests)-p_t
@@ -282,12 +291,16 @@ for p_t in config.p_range:
                     #with open(os.path.join(log_path,'results.txt'),'w'):
                     results={"p_t":p_t,"method":method_name,'T':T,'N':N,
                     "g_target":g_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
-                    "method":method,"kernel":kernel_str,'adapt_t':config.adapt_d_t,'mean time':times.mean(),'std time':times.std()
+                    "method":method,"kernel":kernel_str,'adapt_t':config.adapt_d_t,
+                    'mean_calls':calls.mean(),'std_calls':calls.std()
+                    ,'mean time':times.mean(),'std time':times.std()
                     ,'mean est':ests.mean(),'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
-                    'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean()
-                    ,'adapt_d_t_mcmc':config.adapt_d_t_mcmc,"adapt_d_t":config.adapt_d_t,
+                    'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean(), 
+                    "v_min_opt":config.v_min_opt
+                    ,'adapt_d_t_mcmc':config.adapt_d_t_mcmc,"adapt_d_t":config.adapt_d_t,""
                     "adapt_d_t_mcmc":config.adapt_d_t_mcmc,"d_t_decay":config.d_t_decay,"d_t_gain":config.d_t_gain,
-                    "target_accept":config.target_accept,"accept_spread":config.accept_spread
+                    "target_accept":config.target_accept,"accept_spread":config.accept_spread, 
+                    "mh_opt":config.mh_opt
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number
                     }
 

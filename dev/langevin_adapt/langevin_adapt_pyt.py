@@ -28,20 +28,45 @@ def dichotomic_search_d(f, a, b, thresh=0, n_max =50):
 
     return high, f(high)
 
-def SimpAdaptBetaPyt(beta_old,v,g_target,search_method=dichotomic_search_d,max_beta=1e6,verbose=0,multi_output=False):
+def SimpAdaptBetaPyt(beta_old,v,g_target,search_method=dichotomic_search_d,max_beta=1e6,verbose=0,multi_output=False,v_min_opt=False,lambda_0=None):
 
-    ess_beta = lambda beta : (-(beta-beta_old)*v).mean() #increasing funtion of the parameter beta
+    """ Simple adaptive mechanism to select next inverse temperature
+
+    Returns:
+        float: new_beta, next inverse temperature
+        float: g, next mean weight
+    """
+    ess_beta = lambda beta : torch.exp(-(beta-beta_old)*(v)).mean() #decreasing funtion of the parameter beta
+    if v_min_opt:
+        v_min=v.min()
+        ess_beta=lambda beta : torch.exp(-(beta-beta_old)*(v-v_min)).mean() 
     assert ((g_target>0) and (g_target<1)),"The target average weigh g_target must be a positive number in (0,1)"
-    log_thresh= math.log(g_target)
-    results= search_method(f=ess_beta,a=beta_old,b=max_beta,  thresh = log_thresh)
-    new_beta, g = results[0],math.exp(results[-1])
+    results= search_method(f=ess_beta,a=beta_old,b=max_beta,thresh = g_target) 
+    new_beta, g = results[0],results[-1] 
+    
     if verbose>0:
-        print(f"g_target: {g_target}, actual g: {g}")
+        print(f"g_target: {g_target}, actual g:{g}")
 
     if multi_output:
+        if v_min_opt:
+            g=torch.exp((-(new_beta-beta_old)*v)).mean() #in case we use v_min_opt we need to output original g
         return (new_beta,g)
     else:
         return new_beta
+
+def ESSAdaptBetaPyt(beta_old, v,lambda_0=1,max_beta=1e6,g_target=None,v_min_opt=None,multi_output=False):
+    """Adaptive inverse temperature selection based on an approximation 
+    of the ESS critirion 
+    v_min_opt and g_target are unused dummy variables for compatibility
+    """
+    delta_beta=(lambda_0/v.std().item())
+    if multi_output:
+        new_beta=min(beta_old+delta_beta,max_beta)
+        g=torch.exp(-(delta_beta)*v).mean()
+        res=(new_beta,g)
+    else:
+        res=min(beta_old+delta_beta,max_beta)
+    return res
 
 
 """Implementation of Langevin Sequential Monte Carlo with adaptative tempering"""
@@ -49,7 +74,8 @@ def LangevinSMCSimpAdaptPyt(gen, l_kernel,   V, gradV,g_target=0.9,min_rate=0.8,
 max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,device=None,mh_opt=False,mh_every=1,track_accept=False
 ,track_beta=False,return_log_p=False,gaussian=False, projection=None,track_calls=True,
 track_v_means=True,adapt_d_t=False,target_accept=0.574,accept_spread=0.1,d_t_decay=0.999,d_t_gain=None,
-debug=False):
+v_min_opt=False,v1_kernel=True,lambda_0=1,
+debug=False,):
     """
       Adaptive Langevin SMC estimator  
       Args:
@@ -97,7 +123,8 @@ debug=False):
     beta_old = 0
     if track_beta:
         betas= [beta_old]
-    beta,g_0=adapt_func(beta_old=beta_old,v=v,g_target=g_target,multi_output=True,max_beta=max_beta) 
+    beta,g_0=adapt_func(beta_old=beta_old,v=v,g_target=g_target,multi_output=True,max_beta=max_beta,v_min_opt=v_min_opt,
+    lambda_0=lambda_0) 
     g_prod=g_0
     print(f"g_0:{g_0}")
     ## For
@@ -117,7 +144,11 @@ debug=False):
         G = torch.exp(-(beta-beta_old)*v) #computes current value fonction
         
         U = torch.rand(size=(N,),device=device)
-        to_renew = (G<U)
+        if v_min_opt:
+            G_v_min= torch.exp(-(beta-beta_old)*(v-v.min()))
+            to_renew=(G_v_min<U) 
+        else:
+            to_renew = (G<U) 
         nb_to_renew=to_renew.int().sum()
         if nb_to_renew>0:
             renew_idx=torch.multinomial(input=G/G.sum(), num_samples=nb_to_renew)
@@ -142,11 +173,17 @@ debug=False):
                     Count_v+=N
 
                 
-               
-                high_diff= (X-cand_X-delta_t*gradV(cand_X)).detach()
-                low_diff=(cand_X-X-delta_t*gradV(X)).detach()
-            
-
+                if not gaussian:
+                    high_diff= (X-cand_X-delta_t*gradV(cand_X)).detach()
+                    low_diff=(cand_X-X-delta_t*gradV(X)).detach()
+                else:
+                    if v1_kernel:
+                        high_diff=(X-(1-(delta_t/beta))*cand_X-delta_t*gradV(cand_X)).detach()
+                        low_diff=(cand_X-(1-(delta_t/beta))*X-delta_t*gradV(X)).detach()
+                    else:
+                        high_diff=(X-np.sqrt(1-(2*delta_t/beta))*cand_X-delta_t*gradV(cand_X)).detach()
+                        low_diff=(cand_X-np.sqrt(1-(2*delta_t/beta))*X-delta_t*gradV(X)).detach()
+                
                 log_a_high=-beta*(cand_v+(1/(4*delta_t))*torch.norm(high_diff,p=2 ,dim=1)**2)
                 
                 
@@ -192,7 +229,7 @@ debug=False):
         v = V(X)
         Count_v+= N
         beta_old = beta
-        beta,g_iter=adapt_func(beta_old=beta_old,v=v,g_target=g_target,multi_output=True,max_beta=max_beta)
+        beta,g_iter=adapt_func(beta_old=beta_old,v=v,g_target=g_target,multi_output=True,max_beta=max_beta,v_min_opt=v_min_opt)
         g_prod*=g_iter
         if verbose>=1.5:
             print(f"g_iter:{g_iter},g_prod:{g_prod}")

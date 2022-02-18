@@ -247,6 +247,7 @@ for p_t in config.p_range:
 
                     times=np.array(times)
                     ests = np.array(ests)
+                
                     abs_errors=np.abs(ests-p_t)
                     rel_errors=abs_errors/p_t
                     bias=np.mean(ests)-p_t

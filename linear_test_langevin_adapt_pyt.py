@@ -1,3 +1,4 @@
+from re import A
 import numpy as np 
 import torch
 from time import time
@@ -11,7 +12,7 @@ from tqdm import tqdm
 #import psutil
 import cpuinfo
 import GPUtil
-from dev.torch_utils import project_ball_pyt,projected_langevin_kernel_pyt,langevin_kernel_pyt
+from dev.torch_utils import langevin_kernel_pyt2, project_ball_pyt,projected_langevin_kernel_pyt,langevin_kernel_pyt
 from dev.langevin_adapt.langevin_adapt_pyt import LangevinSMCSimpAdaptPyt
 from dev.utils import dichotomic_search, float_to_file_float, str2bool,str2floatList,str2intList
 
@@ -44,6 +45,13 @@ class config:
     project_kernel=True
     allow_multi_gpu=False
 
+    adapt_d_t=False
+    target_accept=0.4
+    accept_spread=0.1
+    
+    mh_opt=False
+    track_accept=False
+
     g_target=0.9
     g_range=[]
     track_gpu=True
@@ -56,6 +64,8 @@ class config:
     np_seed=0
     tf_seed=None
     mh_opt=False
+    v_min_opt=False
+    v1_kernel=True
     
 
 parser=argparse.ArgumentParser()
@@ -91,6 +101,8 @@ parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_
 parser.add_argument('--torch_seed',type=int, default=config.torch_seed)
 parser.add_argument('--np_seed',type=int, default=config.np_seed)
 parser.add_argument('--mh_opt',type=str2bool,default=config.mh_opt)
+parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
+parser.add_argument('--v1_kernel',type=str2bool,default=config.v1_kernel)
 args=parser.parse_args()
 
 
@@ -127,6 +139,7 @@ if config.track_gpu:
     if len(gpus)>1:
         print("Multi gpus detected, only the first GPU will be tracked.")
     config.gpu_name=gpus[0].name
+
 
 if config.track_cpu:
     config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
@@ -181,7 +194,7 @@ for p_t in config.p_range:
                             e_1_d=torch.Tensor([1]+[0]*(d+1)).to(device)
                             V_batch = lambda X: torch.clamp(c-X[:,0]/torch.norm(X,axis=1),min=0,max=torch.inf)
                             gradV_batch = lambda X: (X[:,0]<c)[:,None]*(X/torch.norm(X,dim=1)[:,None]-e_1_d)
-                            mixing_kernel = langevin_kernel_pyt
+                            mixing_kernel = langevin_kernel_pyt if config.v1_kernel else langevin_kernel_pyt2
                             X_gen=lambda N: torch.randn(size=(N,d+2),device=device)
                         else:
                             V_batch = lambda X: torch.clamp(c-X[:,0], min=0, max = torch.inf)
@@ -201,19 +214,24 @@ for p_t in config.p_range:
 
                         iterator=tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
                         times,estimates=[],[]
+                        calls=[]
                         for i in iterator:
                             t=time()
-                            Langevin_est,_ = LangevinSMCSimpAdaptPyt(gen=X_gen, l_kernel=mixing_kernel , V=V_batch,
-                             gradV= gradV_batch,
+                            Langevin_est,res_dict = LangevinSMCSimpAdaptPyt(gen=X_gen, l_kernel=mixing_kernel , V=V_batch,
+                            gradV= gradV_batch, 
                             min_rate=config.min_rate, N=N, g_target=g_t,
                             alpha = alpha, n_max=config.n_max, T=T, verbose=config.verbose, 
-                            mh_opt=config.mh_opt,gaussian=config.gaussian_latent)
+                            mh_opt=config.mh_opt,gaussian=config.gaussian_latent,
+                            v_min_opt=config.v_min_opt,
+                            v1_kernel=config.v1_kernel)
                             t=time()-t
                             times.append(t)
                             estimates.append(Langevin_est)
+                            calls.append(res_dict['calls'])
 
                         times=np.array(times)
                         estimates = np.array(estimates)
+                        calls=np.array(calls)
                         abs_errors=np.abs(estimates-p_t)
                         rel_errors=abs_errors/p_t
                         bias=np.mean(estimates)-p_t
@@ -228,6 +246,7 @@ for p_t in config.p_range:
                         #with open(os.path.join(log_path,'results.txt'),'w'):
                         results={'p_t':p_t,'method':method_name,'gaussian_latent':str(config.gaussian_latent),
                         'N':N,'n_rep':config.n_rep,'T':T,'alpha':alpha,'min_rate':config.min_rate,
+                        'mean_calls':calls.mean(),'std_calls':calls.std(),
                         'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),'bias':estimates.mean()-p_t,'mean abs error':abs_errors.mean(),
                         'mean rel error':rel_errors.mean(),'std est':estimates.std(),'freq underest':(estimates<p_t).mean()
                         ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,'torch_seed':config.torch_seed,

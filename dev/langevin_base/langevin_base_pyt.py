@@ -152,7 +152,7 @@ def LangevinSMCBasePyt(gen, l_kernel,   V, gradV,rho=10,beta_0=0, min_rate=0.8,a
 verbose=False,adapt_func=None,allow_zero_est=False,device=None,mh_opt=False,mh_every=1
 ,track_accept=False,track_beta=False,return_log_p=True,track_calls=True,
 gaussian=True,track_v_means=True,adapt_d_t=False,target_accept=0.574,accept_spread=0.1,d_t_decay=0.999,d_t_gain=None,
-debug=False,adapt_d_t_mcmc=False,track_d_t=False):
+debug=False,adapt_d_t_mcmc=False,track_d_t=False,v1_kernel=True):
     """
       Basic version of a Langevin-based SMC estimator 
       it can be Metropolis-adjusted (mh_opt=True) or not (mh_opt=False)
@@ -258,9 +258,17 @@ debug=False,adapt_d_t_mcmc=False,track_d_t=False):
                     Count_v+=N
 
                 
-               
-                high_diff= (X-cand_X-delta_t*gradV(cand_X)).detach()
-                low_diff=(cand_X-X-delta_t*gradV(X)).detach()
+                               
+                if not gaussian:
+                    high_diff= (X-cand_X-delta_t*gradV(cand_X)).detach()
+                    low_diff=(cand_X-X-delta_t*gradV(X)).detach()
+                else:
+                    if v1_kernel:
+                        high_diff=(X-(1-(delta_t/beta))*cand_X-delta_t*gradV(cand_X)).detach()
+                        low_diff=(cand_X-(1-(delta_t/beta))*X-delta_t*gradV(X)).detach()
+                    else:
+                        high_diff=(X-np.sqrt(1-(2*delta_t/beta))*cand_X-delta_t*gradV(cand_X)).detach()
+                        low_diff=(cand_X-np.sqrt(1-(2*delta_t/beta))*X-delta_t*gradV(X)).detach()
             
 
                 log_a_high=-beta*(cand_v+(1/(4*delta_t))*torch.norm(high_diff,p=2 ,dim=1)**2)

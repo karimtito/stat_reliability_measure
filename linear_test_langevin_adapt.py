@@ -165,6 +165,7 @@ if config.verbose>3:
 
 iterator=tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
 times,estimates,finished=[],[],[]
+calls=[]
 for i in iterator:
     t=time()
     Langevin_est,finish_flag = SimpAdaptLangevinSMC(gen=X_gen, V=V_batch, gradV= gradV_batch, N =config.N,
@@ -174,6 +175,7 @@ for i in iterator:
     times.append(t)
     estimates.append(Langevin_est)
     finished.append(finish_flag)
+    calls.append()
 
 times=np.array(times)
 estimates = np.array(estimates)
