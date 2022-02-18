@@ -59,6 +59,8 @@ class config:
     accept_spread=0.1
     d_t_decay=0.999
     d_t_gain=1/d_t_decay
+    v_min_opt=False
+    v1_kernel=True
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -95,7 +97,7 @@ parser.add_argument('--N_range',type=str2intList,default=config.N_range)
 parser.add_argument('--T_range',type=str2intList,default=config.T_range)
 parser.add_argument('--rho_range', type=str2floatList,default=config.rho_range)
 parser.add_argument('--alpha_range',type=str2floatList,default=config.alpha_range)
-parser.add_argument('--v1_kernel',type=str2bool,default=config.v1_kernel)
+
 parser.add_argument('--track_accept',type=str2bool,default=config.track_accept)
 parser.add_argument('--track_calls',type=str2bool,default=config.track_calls)
 parser.add_argument('--mh_opt',type=str2bool,default=config.mh_opt)
@@ -106,6 +108,8 @@ parser.add_argument('--d_t_decay',type=float,default=config.d_t_decay)
 parser.add_argument('--d_t_gain',type=float,default=config.d_t_gain)
 parser.add_argument('--adapt_d_t_mcmc',type=str2bool,default=config.adapt_d_t_mcmc)
 parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
+parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
+parser.add_argument('--v1_kernel',type=str2bool,default=config.v1_kernel)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -227,6 +231,7 @@ for p_t in config.p_range:
                     print(f'Run {run_nb}/{nb_runs}')
                     times=[]
                     ests = []
+                    calls=[]
                     
                     finished_flags=[]
                     iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
@@ -240,7 +245,9 @@ for p_t in config.p_range:
                         allow_zero_est=config.allow_zero_est,gaussian =True,
                         target_accept=config.target_accept,accept_spread=config.accept_spread, 
                         adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
-                        d_t_gain=config.d_t_gain)
+                        d_t_gain=config.d_t_gain,
+                        v_min_opt=config.v_min_opt,
+                        v1_kernel=config.v1_kernel)
                         t1=time()-t
                         print(p_est)
                         finish_flag=res_dict['finished']
@@ -263,8 +270,10 @@ for p_t in config.p_range:
                         finished_flags.append(finish_flag)
                         times.append(t1)
                         ests.append(p_est)
+                        calls.append(res_dict['calls'])
                     times=np.array(times)
                     ests = np.array(ests)
+                    calls=np.array(calls)
                     abs_errors=np.abs(ests-p_t)
                     rel_errors=abs_errors/p_t
                     bias=np.mean(ests)-p_t
@@ -288,6 +297,7 @@ for p_t in config.p_range:
                     "g_target":g_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
                     "method":method,"kernel":kernel_str,'adapt_t':config.adapt_d_t,'mean time':times.mean(),'std time':times.std()
                     ,'mean est':ests.mean(),'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
+                    'mean_calls':calls.mean(),'std_calls':calls.std(),
                     'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean()
                     ,'adapt_d_t_mcmc':config.adapt_d_t_mcmc,"adapt_d_t":config.adapt_d_t,
                     "adapt_d_t_mcmc":config.adapt_d_t_mcmc,"d_t_decay":config.d_t_decay,"d_t_gain":config.d_t_gain,
