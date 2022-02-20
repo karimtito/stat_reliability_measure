@@ -1,5 +1,5 @@
 import tensorflow as tf
-from dev.tf_utils import TimeStepTF
+from stat_reliability_measure.dev.tf_utils import TimeStepTF
 
 
 def LangevinSMCBaseTF(gen, l_kernel,   V, gradV,rho=1,beta_0=0, min_rate=0.8,alpha =0.1,N=300,T = 1,n_max=300,

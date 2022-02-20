@@ -2,7 +2,7 @@
 import numpy as np
 import numpy.linalg as LA
 
-from dev.langevin_utils import TimeStep
+from stat_reliability_measure.dev.langevin_utils import TimeStep
 
 
 

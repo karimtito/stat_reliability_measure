@@ -1,5 +1,5 @@
 import numpy as np 
-from dev.langevin_utils import TimeStep
+from stat_reliability_measure.dev.langevin_utils import TimeStep
 
 def dichotomic_search_d(f, a, b, thresh=0, n_max =50):
     """Implementation of dichotomic search of minimum solution for an decreasing function

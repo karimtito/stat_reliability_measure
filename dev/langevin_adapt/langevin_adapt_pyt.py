@@ -1,7 +1,7 @@
 import torch 
 import math
 import numpy as np
-from dev.torch_utils import TimeStepPyt
+from stat_reliability_measure.dev.torch_utils import TimeStepPyt
 
 def dichotomic_search_d(f, a, b, thresh=0, n_max =50):
     """Implementation of dichotomic search of minimum solution for an decreasing function
