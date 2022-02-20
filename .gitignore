@@ -14,13 +14,12 @@ logs
 *.userosscache
 *.sln.docstates
 *.ipynb
-./notebooks/
 ./data
 ./logs
-notebooks/*
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
-notebooks/gaussian.ipynb
+
 
 # Mono auto generated files
 mono_crash.*
