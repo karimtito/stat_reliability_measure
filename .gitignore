@@ -6,6 +6,7 @@
 
 #project specific 
 logs
+data/ImageNet
 
 # User-specific files
 *.rsuser
