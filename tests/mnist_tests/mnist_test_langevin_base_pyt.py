@@ -13,7 +13,7 @@ import cpuinfo
 from torch import optim
 import argparse
 import os
-import dev.langevin_base.langevin_base_pyt as smc_pyt
+import stat_reliability_measure.dev.langevin_base.langevin_base_pyt as smc_pyt
 from importlib import reload
 from time import time
 from datetime import datetime
@@ -22,7 +22,7 @@ from stat_reliability_measure.dev.torch_utils import V_pyt, gradV_pyt, epoch
 from stat_reliability_measure.dev.torch_arch import CNN_custom#,CNN,dnn2
 from stat_reliability_measure.dev.utils import str2bool,str2list,float_to_file_float
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
-import dev.torch_utils as t_u 
+import stat_reliability_measure.dev.torch_utils as t_u 
 #setting PRNG seeds for reproducibility
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
@@ -210,7 +210,7 @@ if not os.path.exists("../data/MNIST"):
     config.download=True
 
 
-mnist_test = datasets.MNIST("./data", train=False, download=config.download, transform=transforms.ToTensor())
+mnist_test = datasets.MNIST("../../data", train=False, download=config.download, transform=transforms.ToTensor())
 
 test_loader = DataLoader(mnist_test, batch_size = 100, shuffle=False)
 
@@ -220,12 +220,12 @@ test_loader = DataLoader(mnist_test, batch_size = 100, shuffle=False)
 if config.model_path is None:
     model = CNN_custom()
     model=model.to(device)
-    model_path="model_CNN.pt"
+    model_path="../../models/mnist/model_CNN_custom.pt"
 else: 
     raise NotImplementedError("Testing of custom models is not yet implemented.")
 
 if config.train_model:
-    mnist_train = datasets.MNIST("./data", train=True, download=config.download, transform=transforms.ToTensor())
+    mnist_train = datasets.MNIST("../../data", train=True, download=config.download, transform=transforms.ToTensor())
     train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
     opt = optim.SGD(model.parameters(), lr=1e-1)
 

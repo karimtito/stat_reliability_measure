@@ -14,7 +14,7 @@ import cpuinfo
 from torch import optim
 import argparse
 import os
-import dev.langevin_adapt.langevin_adapt_pyt as smc_pyt
+
 from importlib import reload
 from time import time
 from datetime import datetime
@@ -26,7 +26,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #setting PRNG seeds for reproducibility
 
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, dichotomic_search, str2list
-import dev.amls.amls_pyt as amls_pyt
+import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
 str2intList=lambda x: str2list(in_str=x, type_out=int)
@@ -103,11 +103,14 @@ class config:
     lirpa_bounds=False
     download=False
     train_model=False
+    
     noise_dist='uniform'
    
     batch_opt=True
     track_finish=False
     lirpa_cert=False
+
+    load_batch_size=100 
  
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -162,6 +165,8 @@ parser.add_argument('--s',type=float,default=config.s)
 parser.add_argument('--s_list ',type=str2floatList,default=config.s_list )
 parser.add_argument('--track_finish',type=str2bool,default=config.track_finish)
 parser.add_argument('--lirpa_cert',type=str2bool,default=config.lirpa_cert)
+
+parser.add_argument('--load_batch_size',type=int,default=config.load_batch_size)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -225,6 +230,7 @@ d=config.d
 
 
 if not os.path.exists('../../logs'):
+    print('logs not found')
     os.mkdir('../../logs')
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
@@ -270,21 +276,22 @@ else:
 
 
 
-mnist_test = datasets.MNIST("./data", train=False, download=config.download, transform=transform_)
+mnist_test = datasets.MNIST("../../data", train=False, download=config.download, transform=transform_)
 
-test_loader = DataLoader(mnist_test, batch_size = 100, shuffle=False)
+test_loader = DataLoader(mnist_test, batch_size = config.load_batch_size, shuffle=False)
 
 if config.model_path is None:
     #instancing custom CNN model
     model = CNN_custom()
     model=model.to(device)
-    model_path="model_CNN.pt"
+    model_path="../../models/mnist/model_CNN_custom.pt"
+    model_name=model_path.strip('.pt')
     model_shape=(1,28,28)
 else: 
     raise NotImplementedError("Testing of custom models is not yet implemented.")
 
 if config.train_model:
-    mnist_train = datasets.MNIST("./data", train=True, download=config.download, transform=transforms.ToTensor())
+    mnist_train = datasets.MNIST("../../data", train=True, download=config.download, transform=transforms.ToTensor())
     train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
     opt = optim.SGD(model.parameters(), lr=1e-1)
 
@@ -329,7 +336,7 @@ with torch.no_grad():
     correct_idx=y_pred==y
     X_correct, label_correct= X[correct_idx], y[correct_idx]
 
-inf=float('inf')
+#inf=float('inf')
 
 if config.x_min is None or config.x_max is None: 
     if config.x_min is None:
@@ -498,7 +505,7 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
 
                         #with open(os.path.join(log_path,'results.txt'),'w'):
                         results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),'image_idx':l,
-                            'epsilon':epsilon,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
+                            'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
                         'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),
                         'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
                         'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,

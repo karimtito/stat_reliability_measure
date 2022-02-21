@@ -4,7 +4,7 @@ import numpy as np
 from tqdm import tqdm
 from stat_reliability_measure.dev.utils import dichotomic_search,str2bool,str2list
 from scipy.special import betainc
-import dev.langevin_base.langevin_base_pyt as smc_pyt
+import stat_reliability_measure.dev.langevin_base.langevin_base_pyt as smc_pyt
 from importlib import reload
 from time import time
 import cpuinfo

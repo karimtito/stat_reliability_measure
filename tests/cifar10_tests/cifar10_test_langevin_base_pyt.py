@@ -13,7 +13,7 @@ import cpuinfo
 from torch import optim
 import argparse
 import os
-import dev.langevin_base.langevin_base_pyt as smc_pyt
+import stat_reliability_measure.dev.langevin_base.langevin_base_pyt as smc_pyt
 from importlib import reload
 from time import time
 from datetime import datetime
@@ -22,7 +22,7 @@ from stat_reliability_measure.dev.torch_utils import V_pyt, gradV_pyt, epoch
 from stat_reliability_measure.dev.torch_arch import CNN_custom#,CNN,dnn2
 from stat_reliability_measure.dev.utils import str2bool,str2list,float_to_file_float
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
-import dev.torch_utils as t_u 
+import stat_reliability_measure.dev.torch_utils as t_u 
 #setting PRNG seeds for reproducibility
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
@@ -209,6 +209,13 @@ num_classes=10
 if not os.path.exists("../data/"):
     config.download=True
 
+
+
+data_transform=transforms.Compose([
+                          transforms.ToTensor(),
+                          transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+                      ])
+
 cifar10_train = datasets.CIFAR10("../data", train=True, download=config.download, transform=transforms.ToTensor())
 cifar10_test  = datasets.CIFAR10("../data", train=False, download=config.download, transform=transforms.ToTensor())
 train_loader = DataLoader(cifar10_train, batch_size = 100, shuffle=True,)
@@ -220,7 +227,7 @@ test_loader = DataLoader(cifar10_test , batch_size = 100, shuffle=False)
 model_CNN = CNN_custom()
 model_CNN=model_CNN.to(device)
 model_path="model_CNN.pt"
-
+model_name=model_path.strip('.pt')
 
 if config.train_model:
     opt = optim.SGD(model_CNN.parameters(), lr=1e-1)

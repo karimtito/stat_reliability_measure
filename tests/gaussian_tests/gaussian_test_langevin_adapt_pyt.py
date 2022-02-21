@@ -1,5 +1,5 @@
-import dev.torch_utils as t_u 
-import dev.langevin_adapt.langevin_adapt_pyt as smc_pyt
+import stat_reliability_measure.dev.torch_utils as t_u 
+import stat_reliability_measure.dev.langevin_adapt.langevin_adapt_pyt as smc_pyt
 import scipy.stats as stat
 from scipy.special import betainc
 import numpy as np

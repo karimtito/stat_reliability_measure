@@ -20,7 +20,7 @@ from time import time
 from datetime import datetime
 from stat_reliability_measure.dev.torch_utils import project_ball_pyt, projected_langevin_kernel_pyt, multi_unsqueeze, compute_V_grad_pyt, compute_V_pyt
 from stat_reliability_measure.dev.torch_utils import V_pyt, gradV_pyt, epoch
-from stat_reliability_measure.dev.torch_arch import CNN_custom#,CNN,dnn2
+from stat_reliability_measure.dev.torch_arch import CNN_custom,CNN,dnn2
 from stat_reliability_measure.dev.utils import str2bool,str2list,float_to_file_float
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
 import stat_reliability_measure.dev.torch_utils as t_u 
@@ -93,6 +93,10 @@ class config:
     d_t_gain=1/d_t_decay
     input_start=0
     input_stop=None
+    split="val"
+    model_name='resnet18'
+
+    load_batch_size=100
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -146,6 +150,8 @@ parser.add_argument('--d_t_decay',type=float,default=config.d_t_decay)
 parser.add_argument('--d_t_gain',type=float,default=config.d_t_gain)
 parser.add_argument('--adapt_d_t_mcmc',type=str2bool,default=config.adapt_d_t_mcmc)
 
+parser.add_argument('--split',type=str,default=config.split)
+parser.add_argument('--model_name',type=str,default=config.model_name)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -229,45 +235,66 @@ else:
 
 
 #loading data
-from torchvision import datasets, transforms
+from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 dim=784
 num_classes=10
-if not os.path.exists("../data/MNIST"):
-    config.download=True
 
 
-mnist_test = datasets.MNIST("../../data", train=False, download=config.download, transform=transforms.ToTensor())
+assert config.download==False,"Automatic data downloading is not supported (anymore) for ImageNet dataset"
 
-test_loader = DataLoader(mnist_test, batch_size = 100, shuffle=False)
+normalize=transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
 
+
+
+data_transform=transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            #transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ])
+
+imagenet_dataset = datasets.ImageNet("../../data/ImageNet", split=config.split, download=config.download, transform=data_transform)
+
+data_loader = DataLoader(imagenet_dataset, batch_size = config.load_batch_size, shuffle=False)
+
+supported_model_list=['resnet18']
   
-if config.model_path is None:
+if config.model_name  not in  supported_model_list:
     #instancing custom CNN model
-    model = CNN_custom()
-    model=model.to(device)
-    model_path="../../models/mnist/model_CNN_custom.pt"
+    # model = CNN_custom()
+    # model=model.to(device)
+    # config.model_path="model_CNN.pt"
+    # model_path=config.model_path
+    # model_name=model_path.strip('.pt')
+    raise NotImplementedError(f"Only models in {supported_model_list} are supported.")
+    
 else: 
-    raise NotImplementedError("Testing of custom models is not yet implemented.")
+    if config.model_name.lower()=='resnet18':
+        model=models.resnet18(pretrained=True)
 
-if config.train_model:
-    mnist_train = datasets.MNIST("../../data", train=True, download=config.download, transform=transforms.ToTensor())
-    train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
-    opt = optim.SGD(model.parameters(), lr=1e-1)
 
-    print("Train Err", "Train Loss", "Test Err", "Test Loss", sep="\t")
-    for _ in range(10):
-        train_err, train_loss = epoch(train_loader, model, opt, device=config.device)
-        test_err, test_loss = epoch(test_loader, model, device=config.device)
-        print(*("{:.6f}".format(i) for i in (train_err, train_loss, test_err, test_loss)), sep="\t")
-    torch.save(model.state_dict(), model_path)
 
-model.load_state_dict(torch.load(model_path))
-model.eval()
+
+# if config.train_model:
+#     mnist_train = datasets.MNIST("../../data", train=True, download=config.download, transform=transforms.ToTensor())
+#     train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
+#     opt = optim.SGD(model.parameters(), lr=1e-1)
+
+#     print("Train Err", "Train Loss", "Test Err", "Test Loss", sep="\t")
+#     for _ in range(10):
+#         train_err, train_loss = epoch(train_loader, model, opt, device=config.device)
+#         test_err, test_loss = epoch(data_loader, model, device=config.device)
+#         print(*("{:.6f}".format(i) for i in (train_err, train_loss, test_err, test_loss)), sep="\t")
+#     torch.save(model.state_dict(), model_path)
+
+
 
 if config.export_to_onnx:
     batch_size=1
-    x = torch.randn(batch_size, 1, 28, 28, requires_grad=True,device=device)
+    x = torch.randn(batch_size, 3, 224, 224, requires_grad=True,device=device)
     torch_out = model(x)
 
     # Export the model
@@ -281,7 +308,7 @@ if config.export_to_onnx:
                     output_names = ['output'], # the model's output names
                     dynamic_axes={'input' : {0 : 'batch_size'},    # variable length axes
                                     'output' : {0 : 'batch_size'}})
-for X,y in test_loader:
+for X,y in data_loader:
     X,y = X.to(device), y.to(device)
     break
 
@@ -290,11 +317,13 @@ X.requires_grad=True
 
 
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
+
 with torch.no_grad():
     logits=model(X)
     y_pred= torch.argmax(logits,-1)
     correct_idx=y_pred==y
-    print(f'model accuracy: {correct_idx.float().mean().item()}')
+    if config.verbose>0.1:
+        print(f"Model accuracy on batch: {correct_idx.mean()}")
     
     X_correct, label_correct= X[correct_idx], y[correct_idx]
 
@@ -307,13 +336,9 @@ if config.use_attack:
     _, advs, success = attack(fmodel, X_correct[config.input_start:config.input_stop], 
     label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
 
-param_lists=[config.T_list,config.N_list,config.g_list,config.alpha_list]
-param_len=np.array([len(L) for L in param_lists])
-tot_exp=np.prod(param_len)
-exp_nb=0
 for l in np.arange(start=config.input_start,stop=config.input_stop):
     with torch.no_grad():
-        x_0,y_0 = X[correct_idx][l], y[correct_idx][l]
+        x_0,y_0 = X_correct[l], label_correct[correct_idx][l]
     for i in range(len(config.epsilons)):
         
         
@@ -339,16 +364,14 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
             for N in config.N_list: 
                 for g_t in config.g_list:
                     for alpha in config.alpha_list:
-                        exp_nb+=1
                         ests,times,finish_flags = [],[],[]
                         iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
-                        print(f"Starting experiment {exp_nb}/{tot_exp},with N={N},T={T},g_target={g_t},alpha={alpha}")
                         for _ in iterator:
                             # Gaussian latent space version
                             t=time()
                             print(g_t)
                             p_est,dict_out=smc_pyt.LangevinSMCSimpAdaptPyt(gen=normal_gen, l_kernel=t_u.langevin_kernel_pyt,V=V_, gradV=gradV_,
-                            g_target=g_t, min_rate=config.min_rate, track_accept=config.track_accept,
+                            g_target=g_t, min_rate=config.min_rate, track_accept=config.track_accept,mh_opt=config.mh_opt,
                              adapt_d_t=config.adapt_d_t,d_t_decay=config.d_t_decay,target_accept=config.target_accept,
                                 alpha =alpha,N=N,T = T,n_max=config.n_max, verbose=config.verbose,allow_zero_est=config.allow_zero_est)
                             time_comp=time()-t
@@ -417,4 +440,4 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
                             else:
                                 agg_res_df=pd.read_csv(aggr_res_path)
                             agg_res_df = pd.concat([agg_res_df,results_df],ignore_index=True)
-                            agg_res_df.to_csv(aggr_res_path,index=False)
+                            agg_res_df.to_csv(aggr_res_path,index=False)                           

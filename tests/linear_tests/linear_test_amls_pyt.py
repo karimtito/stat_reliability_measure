@@ -13,9 +13,8 @@ from tqdm import tqdm
 import torch
 
 from stat_reliability_measure.dev.langevin_utils import langevin_kernel, project_ball, projected_langevin_kernel
-from stat_reliability_measure.dev.langevin_base import LangevinSMCBase
 from stat_reliability_measure.dev.utils import dichotomic_search, float_to_file_float,str2bool,str2intList,str2floatList
-import dev.amls.amls_pyt as amls_pyt
+import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
 method_name="amls_pyt"
 
 class config:
