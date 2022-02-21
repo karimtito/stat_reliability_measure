@@ -34,6 +34,7 @@ method_name="langevin_adapt_pyt"
 
 class config:
     log_dir="../../logs/mnist_tests"
+    data_dir="../../data/ImageNet"
     n_rep=10
     N=40
     N_list=[]
@@ -152,6 +153,7 @@ parser.add_argument('--adapt_d_t_mcmc',type=str2bool,default=config.adapt_d_t_mc
 
 parser.add_argument('--split',type=str,default=config.split)
 parser.add_argument('--model_name',type=str,default=config.model_name)
+parser.add_argument('--data_dir',type=str,default=config.data_dir)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -256,7 +258,7 @@ data_transform=transforms.Compose([
             normalize,
         ])
 
-imagenet_dataset = datasets.ImageNet("../../data/ImageNet", split=config.split, download=config.download, transform=data_transform)
+imagenet_dataset = datasets.ImageNet(config.data_dir, split=config.split, download=config.download, transform=data_transform)
 
 data_loader = DataLoader(imagenet_dataset, batch_size = config.load_batch_size, shuffle=False)
 
