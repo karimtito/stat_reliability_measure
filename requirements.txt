@@ -1,6 +1,5 @@
 numpy
 pandas
-tensorflow>=2.4
 scipy 
 tqdm
 matplotlib
