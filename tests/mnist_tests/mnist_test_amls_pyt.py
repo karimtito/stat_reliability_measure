@@ -285,7 +285,7 @@ if config.model_path is None:
     model = CNN_custom()
     model=model.to(device)
     model_path="../../models/mnist/model_CNN_custom.pt"
-    model_name=model_path.strip('.pt')
+    model_name=model_path.split('/')[-1].strip('.pt')
     model_shape=(1,28,28)
 else: 
     raise NotImplementedError("Testing of custom models is not yet implemented.")
