@@ -24,8 +24,8 @@ def get_lirpa_bounds(x_0,y_0,model,epsilon,num_classes,noise_dist,a,device):
         print(bounded_model._modules)
         last_layer_name=layer_nodes_names[-1]
         needed_dict={last_layer_name:[input_layer_name]}
-        with torch.no_grad():
-            lb, ub, A_dict = bounded_model.compute_bounds(x=(bounded_image,),return_A=True,return_b=False,needed_A_dict=needed_dict, b_dict=needed_dict, method='CROWN',need_A_only=False)
+        
+        lb, ub, A_dict = bounded_model.compute_bounds(x=(bounded_image,),return_A=True,return_b=False,needed_A_dict=needed_dict, b_dict=needed_dict, method='CROWN',need_A_only=False)
 
         first_to_last_data= A_dict[last_layer_name][input_layer_name]
         lA=first_to_last_data['lA']
@@ -61,3 +61,15 @@ def get_lirpa_bounds(x_0,y_0,model,epsilon,num_classes,noise_dist,a,device):
         p_l=torch.clamp(pre_p_l,min=0,max=1) 
         p_u=torch.clamp(gamma_u.sum()-gamma_u[y_0],min=0,max=1)
         return (p_l,p_u)
+
+
+
+def get_lirpa_cert(x_0,y_0,model,epsilon,num_classes,noise_dist,a,device):
+    image=x_0.view(1,1,28,28)
+    bounded_model=BoundedModule(model,global_input=torch.zeros_like(input=image),bound_opts={"conv_mode": "patches"})
+# Step 2: define perturbation. Here we use a Linf perturbation on input image.
+    
+    norm = np.inf
+    ptb = PerturbationLpNorm(norm = norm, eps = epsilon)
+    # Input tensor is wrapped in a BoundedTensor object.
+    bounded_image = BoundedTensor(image, ptb)
