@@ -1,5 +1,14 @@
 import torch
 import torch.nn as nn
+from stat_reliability_measure.dev.utils import float_to_file_float
+from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4
+from torchvision import transforms,datasets
+from torch.utils.data import DataLoader
+from torch import optim
+import os
+
+
+
 
 def TimeStepPyt(V,X,gradV,p=1,p_p=2):
     V_mean= V(X).mean()
@@ -22,7 +31,47 @@ def projected_langevin_kernel_pyt(X,gradV,delta_t,beta, projection,device=None):
     grad=gradV(X)
     with torch.no_grad():
         X_new =projection(X-delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise)
+
     return X_new
+
+def fgsm(model, X, y, epsilon=0.1):
+    """ Construct FGSM adversarial examples on the examples X"""
+    delta = torch.zeros_like(X, requires_grad=True)
+    loss = nn.CrossEntropyLoss()(model(X + delta), y)
+    loss.backward()
+    return epsilon * delta.grad.detach().sign()
+
+def pgd_linf(model, X, y, epsilon=0.1, alpha=0.01, num_iter=20, randomize=False):
+    """ Construct FGSM adversarial examples on the examples X"""
+    if randomize:
+        delta = torch.rand_like(X, requires_grad=True)
+        delta.data = delta.data * 2 * epsilon - epsilon
+    else:
+        delta = torch.zeros_like(X, requires_grad=True)
+        
+    for t in range(num_iter):
+        loss = nn.CrossEntropyLoss()(model(X + delta), y)
+        loss.backward()
+        delta.data = (delta + alpha*delta.grad.detach().sign()).clamp(-epsilon,epsilon)
+        delta.grad.zero_()
+    return delta.detach()
+
+def epoch_adversarial(loader, model, attack, opt=None,device='cpu', **kwargs):
+    """Adversarial training/evaluation epoch over the dataset"""
+    total_loss, total_err = 0.,0.
+    for X,y in loader:
+        X,y = X.to(device), y.to(device)
+        delta = attack(model, X, y, **kwargs)
+        yp = model(X+delta)
+        loss = nn.CrossEntropyLoss()(yp,y)
+        if opt:
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+        
+        total_err += (yp.max(dim=1)[1] != y).sum().item()
+        total_loss += loss.item() * X.shape[0]
+    return total_err / len(loader.dataset), total_loss / len(loader.dataset)
 
 def epoch(loader, model, opt=None,device='cpu'):
     total_loss, total_err = 0.,0.
@@ -38,6 +87,8 @@ def epoch(loader, model, opt=None,device='cpu'):
         total_err += (yp.max(dim=1)[1] != y).sum().item()
         total_loss += loss.item() * X.shape[0]
     return total_err / len(loader.dataset), total_loss / len(loader.dataset)
+
+
 
 def langevin_kernel_pyt(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sigma=1):
     """performs one step of langevin kernel with inverse temperature beta"""
@@ -171,3 +222,42 @@ def gradV_pyt(x_,x_0,model,target_class,epsilon=0.05,gaussian_latent=True,clippi
     else:
         grad_x=grad_u
     return grad_x
+
+
+def get_model(model_arch, robust_model, robust_eps,nb_epochs,model_dir,data_dir,test_loader, device ,download):
+
+    model_shape=(1,28,28)
+    c_robust_eps=float_to_file_float(robust_eps)
+    model_name="model_"+model_arch if not robust_model else f"{model_arch}_robust_{c_robust_eps}"
+    
+    c_model_path=model_name+'.pt'
+    model_path=os.path.join(model_dir,c_model_path)
+    if model_arch.lower()=='cnn_custom':
+        model=CNN_custom()
+    elif model_arch.lower()=='dnn2':
+        model=dnn2()
+    elif model_arch.lower()=='dnn4':
+        model=dnn4()
+    if not os.path.exists(model_path): 
+        #if the model doesn't exist we retrain a model from scratch
+        model.to(device)
+        print("Model not found: it will be trained from scratch.")
+        mnist_train = datasets.MNIST(data_dir, train=True, download=download, transform=transforms.ToTensor())
+        train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
+        opt = optim.SGD(model.parameters(), lr=1e-1)
+
+        print("Train Err", "Train Loss", "Test Err", "Test Loss", sep="\t")
+        for _ in range(nb_epochs):
+            train_err, train_loss = epoch(train_loader, model, opt, device=device)
+            if robust_model:
+                train_err, train_loss = epoch_adversarial(train_loader, model, opt, device=device)
+            test_err, test_loss = epoch(test_loader, model, device=device)
+            print(*("{:.6f}".format(i) for i in (train_err, train_loss, test_err, test_loss)), sep="\t")
+        torch.save(model.state_dict(), model_path)
+    
+        
+        
+    model.load_state_dict(torch.load(model_path))
+    model.eval()
+    model.to(device)
+    return model, model_shape, model_name
