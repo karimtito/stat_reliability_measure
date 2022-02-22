@@ -281,7 +281,7 @@ else:
 
 
 # if config.train_model:
-#     mnist_train = datasets.MNIST("../../data", train=True, download=config.download, transform=transforms.ToTensor())
+#     mnist_train = datasets.MNIST(config.data_dir, train=True, download=config.download, transform=transforms.ToTensor())
 #     train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
 #     opt = optim.SGD(model.parameters(), lr=1e-1)
 

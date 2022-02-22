@@ -33,6 +33,7 @@ method_name="vanilla_mc"
 
 class config:
     log_dir="../../logs/mnist_tests"
+    data_dir="../../data"
     n_rep=10
     N=int(1e5)
     N_list=[]
@@ -207,7 +208,7 @@ if not os.path.exists("../data/MNIST"):
 config.json=vars(args)
 if config.print_config:
     print(config.json)
-mnist_test = datasets.MNIST("../../data", train=False, download=config.download, transform=transforms.ToTensor())
+mnist_test = datasets.MNIST(config.data_dir, train=False, download=config.download, transform=transforms.ToTensor())
 
 test_loader = DataLoader(mnist_test, batch_size = 100, shuffle=False)
 
@@ -222,7 +223,7 @@ else:
     raise NotImplementedError("Testing of custom models is not yet implemented.")
 
 if config.train_model:
-    mnist_train = datasets.MNIST("../../data", train=True, download=config.download, transform=transforms.ToTensor())
+    mnist_train = datasets.MNIST(config.data_dir, train=True, download=config.download, transform=transforms.ToTensor())
     train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
     opt = optim.SGD(model.parameters(), lr=1e-1)
 

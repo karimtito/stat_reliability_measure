@@ -1,4 +1,3 @@
-from operator import mod
 import torch
 
 import foolbox as fb
@@ -11,16 +10,15 @@ from scipy.special import betainc
 import GPUtil
 import matplotlib.pyplot as plt
 import cpuinfo
-from torch import optim
+
 import argparse
 import os
 import stat_reliability_measure.dev.langevin_adapt.langevin_adapt_pyt as smc_pyt
-from importlib import reload
+
 from time import time
 from datetime import datetime
-from stat_reliability_measure.dev.torch_utils import project_ball_pyt, projected_langevin_kernel_pyt, multi_unsqueeze, compute_V_grad_pyt, compute_V_pyt
-from stat_reliability_measure.dev.torch_utils import V_pyt, gradV_pyt, epoch
-from stat_reliability_measure.dev.torch_arch import CNN_custom#,CNN,dnn2
+
+from stat_reliability_measure.dev.torch_utils import V_pyt, gradV_pyt
 from stat_reliability_measure.dev.utils import str2bool,str2list,float_to_file_float
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
 import stat_reliability_measure.dev.torch_utils as t_u 
@@ -34,6 +32,8 @@ method_name="langevin_adapt_pyt"
 
 class config:
     log_dir="../../logs/mnist_tests"
+    data_dir="../../data"
+    model_dir="../../models/mnist"
     n_rep=10
     N=40
     N_list=[]
@@ -93,9 +93,13 @@ class config:
     d_t_gain=1/d_t_decay
     input_start=0
     input_stop=None
+    model_arch="CNN_custom"
+    v_min_opt=False
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--log_dir',default=config.log_dir)
+parser.add_argument('--log_dir',type=str,default=config.log_dir)
+parser.add_argument('--model_dir',type=str,default=config.model_dir)
+parser.add_argument('--data_dir',type=str,default=config.data_dir)
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
@@ -146,6 +150,8 @@ parser.add_argument('--d_t_decay',type=float,default=config.d_t_decay)
 parser.add_argument('--d_t_gain',type=float,default=config.d_t_gain)
 parser.add_argument('--adapt_d_t_mcmc',type=str2bool,default=config.adapt_d_t_mcmc)
 
+parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
+parser.add_argument('--model_arch',type=str,default=config.model_arch)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -237,58 +243,24 @@ if not os.path.exists("../data/MNIST"):
     config.download=True
 
 
-mnist_test = datasets.MNIST("../../data", train=False, download=config.download, transform=transforms.ToTensor())
+mnist_test = datasets.MNIST(config.data_dir, train=False, download=config.download, transform=transforms.ToTensor())
 
 test_loader = DataLoader(mnist_test, batch_size = 100, shuffle=False)
 
+supported_arch_list=['cnn_custom','dnn2','dnn4']
+
+
+if config.model_arch.lower() in supported_arch_list:
+    model, model_shape,model_name=get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
+    nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
+    download=config.download)
+
+else:
+    raise NotImplementedError(f"Supported architectures are :{supported_arch_list}")
   
-if config.model_path is None:
-    #instancing custom CNN model
-    model = CNN_custom()
-    model=model.to(device)
-    model_path="../../models/mnist/model_CNN_custom.pt"
-else: 
-    raise NotImplementedError("Testing of custom models is not yet implemented.")
-
-if config.train_model:
-    mnist_train = datasets.MNIST("../../data", train=True, download=config.download, transform=transforms.ToTensor())
-    train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
-    opt = optim.SGD(model.parameters(), lr=1e-1)
-
-    print("Train Err", "Train Loss", "Test Err", "Test Loss", sep="\t")
-    for _ in range(10):
-        train_err, train_loss = epoch(train_loader, model, opt, device=config.device)
-        test_err, test_loss = epoch(test_loader, model, device=config.device)
-        print(*("{:.6f}".format(i) for i in (train_err, train_loss, test_err, test_loss)), sep="\t")
-    torch.save(model.state_dict(), model_path)
-
-model.load_state_dict(torch.load(model_path))
-model.eval()
-
-if config.export_to_onnx:
-    batch_size=1
-    x = torch.randn(batch_size, 1, 28, 28, requires_grad=True,device=device)
-    torch_out = model(x)
-
-    # Export the model
-    torch.onnx.export(model,               # model being run
-                    x,                         # model input (or a tuple for multiple inputs)
-                    "model.onnx",   # where to save the model (can be a file or file-like object)
-                    export_params=True,        # store the trained parameter weights inside the model file
-                    opset_version=10,          # the ONNX version to export the model to
-                    do_constant_folding=True,  # whether to execute constant folding for optimization
-                    input_names = ['input'],   # the model's input names
-                    output_names = ['output'], # the model's output names
-                    dynamic_axes={'input' : {0 : 'batch_size'},    # variable length axes
-                                    'output' : {0 : 'batch_size'}})
 for X,y in test_loader:
     X,y = X.to(device), y.to(device)
     break
-
-X.requires_grad=True
-
-
-
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 with torch.no_grad():
     logits=model(X)
@@ -307,11 +279,13 @@ if config.use_attack:
     _, advs, success = attack(fmodel, X_correct[config.input_start:config.input_stop], 
     label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
 
-param_lists=[config.T_list,config.N_list,config.g_list,config.alpha_list]
+param_lists=[config.epsilons,config.T_list,config.N_list,config.g_list,config.alpha_list]
 param_len=np.array([len(L) for L in param_lists])
-tot_exp=np.prod(param_len)
+
+idx_iterator=np.arange(start=config.input_start,stop=config.input_stop)
+tot_exp=np.prod(param_len)*len(idx_iterator)
 exp_nb=0
-for l in np.arange(start=config.input_start,stop=config.input_stop):
+for l in idx_iterator:
     with torch.no_grad():
         x_0,y_0 = X[correct_idx][l], y[correct_idx][l]
     for i in range(len(config.epsilons)):
@@ -389,21 +363,21 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
 
                         #with open(os.path.join(log_path,'results.txt'),'w'):
                         results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),'image_idx':l,
-                        'N':N,'g_target':g_t,'epsilon':epsilon,'n_rep':config.n_rep,'T':T,'alpha':alpha,
+                        'N':N,'g_target':g_t,'epsilon':epsilon,'model_name':model_name,'n_rep':config.n_rep,'T':T,'alpha':alpha,
                         'min_rate':config.min_rate,
                         'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
                         'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
                         'cores_number':config.cores_number,'g_target':config.g_target,
                         'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
-                        'unfinished_mean_est':unfinished_mean_est
-                        ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
+                        'unfinished_mean_est':unfinished_mean_est,
+                        'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
                         'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time}
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),)
                         if config.aggr_res_path is None:
                             aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                         else: 
-                            aggr_res_path=config.aggr_res_path
+                            aggr_res_path=config .aggr_res_path
 
                         if config.update_agg_res:
                             if not os.path.exists(aggr_res_path):

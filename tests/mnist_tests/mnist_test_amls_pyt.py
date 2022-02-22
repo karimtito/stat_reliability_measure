@@ -6,7 +6,7 @@ import pandas as pd
 
 import numpy as np
 from tqdm import tqdm
-from stat_reliability_measure.dev.utils import dichotomic_search
+
 from scipy.special import betainc
 import GPUtil
 import matplotlib.pyplot as plt
@@ -15,12 +15,11 @@ from torch import optim
 import argparse
 import os
 
-from importlib import reload
 from time import time
 from datetime import datetime
-from stat_reliability_measure.dev.torch_utils import project_ball_pyt, projected_langevin_kernel_pyt, multi_unsqueeze, compute_V_grad_pyt, compute_V_pyt
-from stat_reliability_measure.dev.torch_utils import V_pyt, gradV_pyt, epoch
-from stat_reliability_measure.dev.torch_arch import CNN_custom#,CNN,dnn2
+
+from stat_reliability_measure.dev.torch_utils import get_model
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
 
 #setting PRNG seeds for reproducibility
@@ -36,6 +35,7 @@ method_name="amls_pyt"
 
 class config:
     log_dir="../../logs/mnist_tests"
+    model_dir="../../models/mnist"
     n_rep=10
     a=0
     verbose=0
@@ -96,6 +96,7 @@ class config:
     torch_seed=0
     np_seed=0
     tf_seed=None
+    model_arch='CNN_custom'
     model_path=None
     export_to_onnx=False
     use_attack=True
@@ -109,9 +110,14 @@ class config:
     batch_opt=True
     track_finish=False
     lirpa_cert=False
-
+    robust_model=False
+    robust_eps=0.1
     load_batch_size=100 
- 
+    nb_epochs= 10
+    adversarial_every=1
+    data_dir="../../data"
+
+
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
@@ -167,6 +173,10 @@ parser.add_argument('--track_finish',type=str2bool,default=config.track_finish)
 parser.add_argument('--lirpa_cert',type=str2bool,default=config.lirpa_cert)
 
 parser.add_argument('--load_batch_size',type=int,default=config.load_batch_size)
+parser.add_argument('--model_arch',type=str,default = config.model_arch)
+parser.add_argument('--robust_model',type=str2bool, default=config.robust_model)
+parser.add_argument('--nb_epochs',type=int,default=config.nb_epochs)
+parser.add_argument('--adversarial_every',type=int,default=config.adversarial_every)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -273,62 +283,29 @@ if config.x_mean!=0:
 else: 
     transform_ =transforms.ToTensor()
 
-
-
-
-mnist_test = datasets.MNIST("../../data", train=False, download=config.download, transform=transform_)
+mnist_test = datasets.MNIST(config.data_dir, train=False, download=config.download, transform=transform_)
 
 test_loader = DataLoader(mnist_test, batch_size = config.load_batch_size, shuffle=False)
 
-if config.model_path is None:
-    #instancing custom CNN model
-    model = CNN_custom()
-    model=model.to(device)
-    model_path="../../models/mnist/model_CNN_custom.pt"
-    model_name=model_path.split('/')[-1].strip('.pt')
-    model_shape=(1,28,28)
-else: 
-    raise NotImplementedError("Testing of custom models is not yet implemented.")
 
-if config.train_model:
-    mnist_train = datasets.MNIST("../../data", train=True, download=config.download, transform=transforms.ToTensor())
-    train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
-    opt = optim.SGD(model.parameters(), lr=1e-1)
 
-    print("Train Err", "Train Loss", "Test Err", "Test Loss", sep="\t")
-    for _ in range(10):
-        train_err, train_loss = epoch(train_loader, model, opt, device=config.device)
-        test_err, test_loss = epoch(test_loader, model, device=config.device)
-        print(*("{:.6f}".format(i) for i in (train_err, train_loss, test_err, test_loss)), sep="\t")
-    torch.save(model.state_dict(), model_path)
 
-model.load_state_dict(torch.load(model_path))
-model.eval()
+supported_arch_list=['cnn_custom','dnn2','dnn4']
 
-if config.export_to_onnx:
-    batch_size=1
-    x = torch.randn(batch_size, 1, 28, 28, requires_grad=True,device=device)
-    torch_out = model(x)
 
-    # Export the model
-    torch.onnx.export(model,               # model being run
-                    x,                         # model input (or a tuple for multiple inputs)
-                    "model.onnx",   # where to save the model (can be a file or file-like object)
-                    export_params=True,        # store the trained parameter weights inside the model file
-                    opset_version=10,          # the ONNX version to export the model to
-                    do_constant_folding=True,  # whether to execute constant folding for optimization
-                    input_names = ['input'],   # the model's input names
-                    output_names = ['output'], # the model's output names
-                    dynamic_axes={'input' : {0 : 'batch_size'},    # variable length axes
-                                    'output' : {0 : 'batch_size'}})
+if config.model_arch.lower() in supported_arch_list:
+    model, model_shape,model_name=get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
+    nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
+    download=config.download)
+
+else:
+    raise NotImplementedError(f"Supported architectures are :{supported_arch_list}")
+
 for X,y in test_loader:
     X,y = X.to(device), y.to(device)
     break
 
-X.requires_grad=True
-
-
-
+#X.requires_grad=True
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 with torch.no_grad():
     logits=model(X)
@@ -368,11 +345,11 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
         x_0,y_0 = X[correct_idx][l], y[correct_idx][l]
     input_shape=x_0.shape
     x_0.requires_grad=True
-    for i in range(len(config.epsilons)):
+    for idx in range(len(config.epsilons)):
         
         
-        epsilon = config.epsilons[i]
-        pgd_success= (success[i][l]).item() if config.use_attack else None 
+        epsilon = config.epsilons[idx]
+        pgd_success= (success[idx][l]).item() if config.use_attack else None 
         p_l,p_u=None,None
         if config.lirpa_bounds:
             from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
@@ -411,7 +388,7 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
                 for s in config.s_list :
                     for ratio in config.ratio_list: 
                         loc_time=datetime.today().isoformat().split('.')[0]
-                        log_name=method_name+'_e_'+float_to_file_float(config.epsilons[i])+'_N_'+str(N)+'_T_'+str(T)+'_s_'+float_to_file_float(s)
+                        log_name=method_name+'_e_'+float_to_file_float(config.epsilons[idx])+'_N_'+str(N)+'_T_'+str(T)+'_s_'+float_to_file_float(s)
                         log_name=log_name+'_r_'+float_to_file_float(ratio)+'_'+loc_time
                         log_path=os.path.join(raw_logs_path,log_name)
                         i_exp+=1
@@ -419,8 +396,8 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
                                           
 
                         K=int(N*ratio)
-                        if config.verbose>=0.25:
-                            print(f"with idx:{l},eps:{epsilon},T:{T},N:{N},s:{s},K:{K}")
+                        if config.verbose>=0:
+                            print(f"with model: {model_name}, img_idx:{l},eps:{epsilon},T:{T},N:{N},s:{s},K:{K}")
                         if config.verbose>3:
                             print(f"K/N:{K/N}")
                         times= []
