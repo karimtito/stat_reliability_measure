@@ -114,7 +114,7 @@ for p_t in config.p_range:
     if config.verbose>=3:
         print(f'c:{c}')
     e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
-    V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=torch.inf)
+    V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=None)
     gradV= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
     big_gen= lambda N: torch.randn(size=(N,d+2)).to(device)
     norm_and_select= lambda X: (X/torch.norm(X,dim=1)[:,None])[:,:d] 

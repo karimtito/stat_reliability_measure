@@ -192,12 +192,12 @@ for p_t in config.p_range:
                         if config.gaussian_latent:
                             print("using gaussian latent space")
                             e_1_d=torch.Tensor([1]+[0]*(d+1)).to(device)
-                            V_batch = lambda X: torch.clamp(c-X[:,0]/torch.norm(X,axis=1),min=0,max=torch.inf)
+                            V_batch = lambda X: torch.clamp(c-X[:,0]/torch.norm(X,axis=1),min=0,max=None)
                             gradV_batch = lambda X: (X[:,0]<c)[:,None]*(X/torch.norm(X,dim=1)[:,None]-e_1_d)
                             mixing_kernel = langevin_kernel_pyt if config.v1_kernel else langevin_kernel_pyt2
                             X_gen=lambda N: torch.randn(size=(N,d+2),device=device)
                         else:
-                            V_batch = lambda X: torch.clamp(c-X[:,0], min=0, max = torch.inf)
+                            V_batch = lambda X: torch.clamp(c-X[:,0], min=0, max = None)
                             gradV_batch = lambda X: -e_1[None]*(X[:,0]<c)[:,None]
                             prjct_epsilon = lambda X: project_ball_pyt(X, R=epsilon)
                             mixing_kernel = lambda X, gradV, delta_t,beta: projected_langevin_kernel_pyt(X,gradV,delta_t,beta, projection=prjct_epsilon)

@@ -213,7 +213,7 @@ for p_t in config.p_range:
     c=epsilon-h
     print(f'c:{c}',f'P_target:{P_target}')
     e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
-    V = lambda X: torch.clamp(input=torch.norm(X,p=2,dim=-1)*c-X[:,0], min=0, max=torch.inf)
+    V = lambda X: torch.clamp(input=torch.norm(X,p=2,dim=-1)*c-X[:,0], min=0, max=None)
     
     gradV= lambda X: (c*X/torch.norm(X,p=2,dim=-1)[:,None] -e_1[None,:])*(X[:,0]<c*torch.norm(X,p=2,dim=1))[:,None]
  

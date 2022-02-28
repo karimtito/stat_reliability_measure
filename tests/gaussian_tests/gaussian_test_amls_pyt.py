@@ -179,7 +179,7 @@ for p_t in config.p_range:
         print(f"P_target:{P_target}")
     arbitrary_thresh=40 #pretty useless a priori but should not hurt results
     def v_batch_pyt(X,c=c):
-        return torch.clamp(input=torch.norm(X,p=2,dim=-1)*c-X[:,0],min=-arbitrary_thresh, max = torch.inf)
+        return torch.clamp(input=torch.norm(X,p=2,dim=-1)*c-X[:,0],min=-arbitrary_thresh, max = None)
     amls_gen = lambda N: torch.randn(size=(N,d),device=config.device)
     batch_transform = lambda x: x
     normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 

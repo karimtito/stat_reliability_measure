@@ -238,7 +238,7 @@ for p_t in config.p_range:
     c=get_c_norm(p_t)
     print(f'c:{c}')
     e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
-    # V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=torch.inf)
+    # V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=None)
     # gradV= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
     def V(X, L=0):
         return torch.clamp(input=L+c-X[:,0], min=0)

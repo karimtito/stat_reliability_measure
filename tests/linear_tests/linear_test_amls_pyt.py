@@ -180,7 +180,7 @@ for p_t in config.p_range:
     if config.verbose>5:
         print(f"P_target:{P_target}")
     def V_batch_pyt(X,c=c):
-        return torch.clamp(input=c-X[:,0],min=0, max = torch.inf)
+        return torch.clamp(input=c-X[:,0],min=0, max = None)
     amls_gen = lambda N: torch.randn(size=(N,d+2),device=config.device)
     batch_transform = lambda x: (x/torch.norm(x,dim=-1)[:,None])[:d]
     normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 
