@@ -67,7 +67,7 @@ class config:
     s_opt=False
     s=1
     clip_s=True
-    s_min=1e-4
+    s_min=1e-3
     s_max=3
     s_decay=0.95
     s_gain=1.0001
