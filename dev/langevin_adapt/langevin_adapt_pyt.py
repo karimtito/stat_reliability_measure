@@ -300,7 +300,7 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,dev
 track_v_means=True,adapt_d_t=False,target_accept=0.574,accept_spread=0.1,d_t_decay=0.999,d_t_gain=None,
 v_min_opt=False,v1_kernel=True,lambda_0=1,s_opt=False,
 debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
-,clip_s=True,s_min=1e-3,s_max= 3,reject_ctrl=True):
+,clip_s=True,s_min=1e-3,s_max= 3,reject_ctrl=True,reject_thresh=0.1,prog_thresh=0.1):
     """
       Adaptive Langevin SMC estimator  
       Args:
@@ -401,13 +401,15 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
             gaussian=gaussian, verbose=verbose)
         else:
             Y,v_y,nb_calls,dict_out=apply_simp_kernel(Y,v_y=v_y,simp_kernel=normal_kernel,T=T,s=s,
-            V=V,decay=s_decay,clip_s=clip_s,s_min =s_min,s_max=s_max,debug=debug,
+            V=V,decay=s_decay,clip_s=clip_s,s_min =s_min,s_max=s_max,debug=debug,reject_thresh=reject_thresh,
             verbose=verbose, kernel_pass=kernel_pass,track_accept=track_accept,rejection_rate=rejection_rate,
             reject_ctrl=reject_ctrl,beta=beta,device=device,gaussian=gaussian)
             kernel_pass+=dict_out['l_kernel_pass']
             if reject_ctrl:
                 s=dict_out['s']
                 rejection_rate=dict_out['rejection_rate']
+
+            
 
             
         
@@ -437,6 +439,12 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
         beta_old = beta
         beta,g_iter=adapt_func(beta_old=beta_old,v=v,g_target=g_target,multi_output=True,
         max_beta=max_beta,v_min_opt=v_min_opt,lambda_0=lambda_0)
+        if s_opt:
+            if rejection_rate<=reject_thresh and (beta-beta_old)/beta_old<prog_thresh:
+                s = s*s_gain if not clip_s else np.clip(s*s_gain,s_min,s_max)
+                if verbose>1:
+                    print('Strength of kernel increased!')
+                    print(f's={s}')
         if verbose>=2:
             print(f'Beta old {beta_old}, new beta {beta}, delta_beta={beta_old-beta}')
         
