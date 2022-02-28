@@ -224,6 +224,8 @@ if not os.path.exists(raw_logs_path):
 
 
 
+
+
 if config.epsilons is None:
     log_min,log_max=np.log(config.eps_min),np.log(config.eps_max)
     log_line=np.linspace(start=log_min,stop=log_max,num=config.eps_num)
@@ -251,7 +253,7 @@ supported_arch_list=['cnn_custom','dnn2','dnn4']
 
 
 if config.model_arch.lower() in supported_arch_list:
-    model, model_shape,model_name=get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
+    model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
     nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
     download=config.download)
 

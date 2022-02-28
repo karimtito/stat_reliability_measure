@@ -26,6 +26,8 @@ class config:
     s_min=8e-3
     s_max=3
     n_max=2000
+    decay=0.95
+    gain_rate=1.0001
     allow_zero_est=True
     
     N=40
@@ -56,6 +58,9 @@ class config:
     track_accept=False
     track_finish=True
     device = None
+
+    torch_seed=0
+    np_seed=0
 
     log_dir="../../logs/linear_gaussian_tests"
     batch_opt=True
@@ -104,6 +109,10 @@ parser.add_argument('--allow_multi_gpu',type=str2bool,default=config.allow_multi
 parser.add_argument('--batch_opt',type=str2bool,default=config.batch_opt)
 parser.add_argument('--track_accept',type=str2bool,default= config.track_accept)
 parser.add_argument('--track_finish',type=str2bool,default=config.track_finish)
+parser.add_argument('--np_seed',type=int,default=config.np_seed)
+parser.add_argument('--torch_seed',type=int,default=config.torch_seed)
+parser.add_argument('--decay',type=float,default=config.decay)
+parser.add_argument('--gain_rate',type=float,default=config.gain_rate)
 args=parser.parse_args()
 for k,v in vars(args).items():
     setattr(config, k, v)
@@ -281,7 +290,8 @@ for p_t in config.p_range:
                     ,'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
                     'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean()
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
-            'batch_opt':config.batch_opt,"d":d}
+            'batch_opt':config.batch_opt,"d":d, 
+                    "np_seed":config.np_seed,"torch_seed":config.torch_seed}
 
                     results_df=pd.DataFrame([results])
                     results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)

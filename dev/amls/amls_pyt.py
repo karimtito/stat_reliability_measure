@@ -4,7 +4,7 @@ import torch
 
 
 def ImportanceSplittingPyt(gen,kernel,h,tau,N=2000,K=1000,s=1,decay=0.95,T = 30,n_max = 300, alpha = 0.95,
-verbose=1, track_rejection=False, rejection_ctrl = False, rej_threshold=0.9, gain_rate = 1.0001, 
+verbose=1, track_rejection=False, rejection_ctrl = False, reject_thresh=0.9, gain_rate = 1.0001, 
 prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False):
     """
       PyTorch implementationf of Importance splitting estimator 
@@ -80,7 +80,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False)
             #accept=0 
             accept_flag = False
             z0 = Y[i,:]
-            for t in range(T):
+            for _ in range(T):
                 w = kernel(z0,s) # propose a refreshed sample
                 kernel_pass+=1
                 
@@ -99,7 +99,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False)
             Z[k,:] = z0 # a fresh sample
             SZ[k] = sz0 # its score
             
-            if rejection_ctrl and rejection_rate>=rej_threshold:
+            if rejection_ctrl and rejection_rate>=reject_thresh:
                 
                 s = s*decay if not clip_s else np.clip(s*decay,a_min=s_min,a_max=s_max)
                 if verbose>1:
@@ -162,7 +162,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False)
 
 
 def ImportanceSplittingPytBatch(gen,kernel,h,tau,N=2000,K=1000,s=1,decay=0.95,T = 30,n_max = 300, alpha = 0.95,
-verbose=1, track_rejection=False, rejection_ctrl = False, rej_threshold=0.9, gain_rate = 1.0001, 
+verbose=1, track_rejection=False, rejection_ctrl = False, reject_thresh=0.9, gain_rate = 1.0001, 
 prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,allow_unfinished=False):
     """
       Importance splitting estimator
@@ -251,13 +251,13 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
             Z=torch.where(accept_flag,input=W,other=Z)
             
             SZ=torch.where(accept_flag,input=SW,other=SZ)
-            rejection_rate  = (kernel_pass-(N-K))/kernel_pass*rejection_rate+(1./kernel_pass)*(1-accept_flag.float().mean().item())
+            rejection_rate  = (kernel_pass-(N-K))/kernel_pass*rejection_rate+(1./kernel_pass)*(1-accept_flag.float().sum().item())
             if track_accept:
                 l_accept_rates.append(accept_flag.float().mean())
                 accept_rates.append(accept_flag.float().mean())
 
 
-            if rejection_ctrl and rejection_rate>=rej_threshold:
+            if rejection_ctrl and rejection_rate>=reject_thresh:
                 
                 s = s*decay if not clip_s else np.clip(s*decay,a_min=s_min,a_max=s_max)
                 if verbose>1:
@@ -280,7 +280,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
         new_tau = S_sort[K]
         
         if (new_tau-tau_j)/tau_j<prog_thresh:
-            s = s*gain_rate if not clip_s else np.clip(s*decay,s_min,s_max)
+            s = s*gain_rate if not clip_s else np.clip(s*gain_rate,s_min,s_max)
             if verbose>1:
                 print('Strength of kernel increased!')
                 print(f's={s}')

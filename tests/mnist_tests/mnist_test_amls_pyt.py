@@ -418,7 +418,7 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
                                 amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_batch_pyt, 
                             tau=0 , n_max=config.n_max,clip_s=config.clip_s , 
                             s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
-                            device=config.device, )
+                            device=config.device,)
                             t=time()-t
                             
                             est=amls_res[0]

@@ -3,7 +3,7 @@ import numpy as np
 
 
 def ImportanceSplitting(gen,kernel,h,tau,N=2000,K=1000,s=1,decay=0.95,T = 30,n_max = 300, alpha = 0.95,
-verbose=1, track_rejection=False, rejection_ctrl = False, rej_threshold=0.9, gain_rate = 1.0001, 
+verbose=1, track_rejection=False, rejection_ctrl = False, reject_thresh=0.9, gain_rate = 1.0001, 
 prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5):
     """
       Importance splitting estimator
@@ -81,7 +81,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5):
                     rejection_rate=((kernel_pass-1.)/kernel_pass)*rejection_rate+(1/kernel_pass)
             Z[k,:] = z0 # a fresh sample
             SZ[k] = sz0 # its score
-            if rejection_ctrl and rejection_rate>=rej_threshold:
+            if rejection_ctrl and rejection_rate>=reject_thresh:
                 
                 s = s*decay if not clip_s else np.clip(s*decay,a_min=s_min,a_max=s_max)
                 if verbose>1:

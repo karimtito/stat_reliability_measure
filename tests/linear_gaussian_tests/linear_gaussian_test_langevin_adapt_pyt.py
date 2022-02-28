@@ -59,6 +59,22 @@ class config:
     d_t_gain=1/d_t_decay
     v_min_opt=False
     ess_opt=False
+    only_duplicated=False
+    np_seed=0
+    lambda_0=0.5
+    test2=False
+
+    s_opt=False
+    s=1
+    clip_s=True
+    s_min=1e-4
+    s_max=3
+    s_decay=0.95
+    s_gain=1.0001
+
+
+
+
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -108,6 +124,18 @@ parser.add_argument('--adapt_d_t_mcmc',type=str2bool,default=config.adapt_d_t_mc
 parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
 parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
 parser.add_argument('--ess_opt',type=str2bool,default=config.ess_opt)
+parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
+parser.add_argument('--lambda_0',type=float,default=config.lambda_0)
+parser.add_argument('--test2',type=str2bool,default =config.test2)
+
+parser.add_argument('--s_opt',type=str2bool,default=config.s_opt)
+parser.add_argument('--s',type=float,default=config.s)
+parser.add_argument('--clip_s',type=str2bool,default=config.clip_s)
+parser.add_argument('--s_min',type=float,default=config.s_min) 
+parser.add_argument('--s_max',type=float,default= config.s_max)
+parser.add_argument('--s_decay',type=float,default=config.s_decay)
+parser.add_argument('--s_gain',type =float,default= config.s_gain)
+
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -137,6 +165,10 @@ if not config.allow_multi_gpu:
 if config.torch_seed is None:
     config.torch_seed=int(time.time())
 torch.manual_seed(seed=config.torch_seed)
+
+if config.np_seed is None:
+    config.np_seed=int(time.time())
+torch.manual_seed(seed=config.np_seed)
 
 
 
@@ -232,19 +264,42 @@ for p_t in config.p_range:
                     iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
                     print(f"Starting simulations with p_t:{p_t},g_t:{g_t},T:{T},alpha:{alpha},N:{N}")
                     for i in iterator:
-                        t=time()
-                        p_est,res_dict,=smc_pyt.LangevinSMCSimpAdaptPyt(gen=norm_gen,
-                        l_kernel=kernel_function,N=N,min_rate=config.min_rate,
-                        g_target=g_t,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
-                        adapt_func=adapt_func,
-                        verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
-                        allow_zero_est=config.allow_zero_est,gaussian =True,
-                        target_accept=config.target_accept,accept_spread=config.accept_spread, 
-                        adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
-                        d_t_gain=config.d_t_gain,
-                        v_min_opt=config.v_min_opt,
-                        v1_kernel=config.v1_kernel)
-                        t1=time()-t
+                        
+                        if not config.test2:
+                            t=time()
+                            p_est,res_dict,=smc_pyt.LangevinSMCSimpAdaptPyt(gen=norm_gen,
+                            l_kernel=kernel_function,N=N,min_rate=config.min_rate,
+                            g_target=g_t,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
+                            adapt_func=adapt_func,
+                            verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
+                            allow_zero_est=config.allow_zero_est,gaussian =True,
+                            target_accept=config.target_accept,accept_spread=config.accept_spread, 
+                            adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
+                            d_t_gain=config.d_t_gain,
+                            v_min_opt=config.v_min_opt,
+                            v1_kernel=config.v1_kernel, lambda_0= config.lambda_0,
+                            only_duplicated=config.only_duplicated,
+                            )
+                            t1=time()-t
+                        else:
+                            t=time()
+                            p_est,res_dict,=smc_pyt.LangevinSMCSimpAdaptPyt2(gen=norm_gen,
+                            l_kernel=kernel_function,N=N,min_rate=config.min_rate,
+                            g_target=g_t,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
+                            adapt_func=adapt_func,
+                            verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
+                            allow_zero_est=config.allow_zero_est,gaussian =True,
+                            target_accept=config.target_accept,accept_spread=config.accept_spread, 
+                            adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
+                            d_t_gain=config.d_t_gain,
+                            v_min_opt=config.v_min_opt,
+                            v1_kernel=config.v1_kernel, lambda_0= config.lambda_0,
+                            only_duplicated=config.only_duplicated,
+                            s_opt=config.s_opt,
+                            s=config.s,s_decay=config.s_decay,s_gain=config.s_gain,
+                            s_min=config.s_min,s_max=config.s_max)
+                            t1=time()-t
+
                         print(p_est)
                         finish_flag=res_dict['finished']
                         accept_rates=res_dict['accept_rates']
@@ -270,6 +325,7 @@ for p_t in config.p_range:
                     times=np.array(times)
                     ests = np.array(ests)
                     calls=np.array(calls)
+                
                     abs_errors=np.abs(ests-p_t)
                     rel_errors=abs_errors/p_t
                     bias=np.mean(ests)-p_t
@@ -300,8 +356,10 @@ for p_t in config.p_range:
                     ,'adapt_d_t_mcmc':config.adapt_d_t_mcmc,"adapt_d_t":config.adapt_d_t,""
                     "adapt_d_t_mcmc":config.adapt_d_t_mcmc,"d_t_decay":config.d_t_decay,"d_t_gain":config.d_t_gain,
                     "target_accept":config.target_accept,"accept_spread":config.accept_spread, 
-                    "mh_opt":config.mh_opt
-                    ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number
+                    "mh_opt":config.mh_opt,'only_duplicated':config.only_duplicated,
+                    "np_seed":config.np_seed,"torch_seed":config.torch_seed
+                    ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
+                    "d":config.d
                     }
 
                     results_df=pd.DataFrame([results])
