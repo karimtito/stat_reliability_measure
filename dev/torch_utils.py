@@ -279,7 +279,8 @@ download,):
 
 def apply_l_kernel(Y,v_y,l_kernel,T:int,beta,gradV,V,delta_t:float,mh_opt:bool,track_accept:bool,
  gaussian:bool,device,v1_kernel:bool, adapt_d_t:bool,
-target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bool=False,verbose:float =1):
+target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bool=False,verbose:float =1
+,track_delta_t=False):
     """_summary_
 
     Args:
@@ -310,6 +311,8 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
     nb=Y.shape[0]
     nb_calls=0
     local_accept_rates=[]
+    if track_delta_t:
+        delta_ts=[]
     for _ in range(T):
             
         if track_accept or mh_opt:
@@ -356,6 +359,9 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
                     delta_t*=d_t_gain
                 elif accept_rate<target_accept-accept_spread: 
                     delta_t*=d_t_decay
+
+                if track_delta_t:
+                    delta_ts.append(delta_t)
             if mh_opt:
                 with torch.no_grad():
                     Y=torch.where(accept.unsqueeze(-1),input=cand_Y,other=Y)
@@ -384,6 +390,8 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
         dict_out['local_accept_rates']=local_accept_rates
     if adapt_d_t:
         dict_out['delta_t']=delta_t
+        if track_delta_t: 
+            dict_out['delta_ts']=delta_ts
     return Y,v_y,nb_calls,dict_out
 
 
@@ -451,6 +459,8 @@ def apply_simp_kernel(Y,v_y,simp_kernel,T:int,beta:float,s:float, V,
     if reject_ctrl:
         dict_out['s']=s
         dict_out['rejection_rate']=rejection_rate
+
+    
     
     return Y,VY,nb_calls,dict_out
 
