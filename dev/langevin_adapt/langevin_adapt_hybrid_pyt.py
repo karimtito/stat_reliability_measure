@@ -141,7 +141,6 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
     if track_beta:
         betas= [beta_old]
     beta,g_0=adapt_func(beta_old=beta_old,v=v,g_target=g_target,multi_output=True,max_beta=max_beta,v_min_opt=v_min_opt,
-    
     lambda_0=lambda_0) 
     
     if verbose>=2:
