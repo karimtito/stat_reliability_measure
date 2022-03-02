@@ -75,7 +75,7 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,dev
 ,track_beta=False,return_log_p=False,gaussian=False, projection=None,track_calls=True,
 track_v_means=True,adapt_d_t=False,target_accept=0.574,accept_spread=0.1,d_t_decay=0.999,d_t_gain=None,
 v_min_opt=False,v1_kernel=True,lambda_0=1,
-debug=False,only_duplicated=False):
+debug=False,only_duplicated=False,track_delta_t=False):
     """
       Adaptive Langevin SMC estimator  
       Args:
@@ -237,8 +237,10 @@ debug=False,only_duplicated=False):
             
     
 
-        Y,v_y,nb_calls,dict_out=apply_l_kernel(Y=Y ,v_y=v_y,delta_t=delta_t,beta=beta,V=V,gradV=gradV,l_kernel=l_kernel,T=T,mh_opt=mh_opt,
-        gaussian=gaussian)
+        Y,v_y,nb_calls,dict_out=apply_l_kernel(Y=Y ,v_y=v_y,delta_t=delta_t,beta=beta,V=V,gradV=gradV,l_kernel=l_kernel,
+            T=T,mh_opt=mh_opt,device=device,v1_kernel=v1_kernel,adapt_d_t=adapt_d_t, track_accept=track_accept,
+            d_t_decay=d_t_decay,d_t_gain=d_t_gain,debug=False,target_accept=target_accept,accept_spread=accept_spread,
+            gaussian=gaussian, verbose=verbose,track_delta_t=track_delta_t)
         Count_v+=nb_calls
         if only_duplicated:
             with torch.no_grad():
@@ -254,7 +256,7 @@ debug=False,only_duplicated=False):
         
         if track_accept:
             local_accept_rates=dict_out['local_accept_rates']
-            accept_rates.extend()
+            accept_rates.extend(local_accept_rates)
             accept_rates_mcmc.append(np.array(local_accept_rates).mean())
         if adapt_d_t:
             delta_t = dict_out['delta_t']
@@ -289,6 +291,8 @@ debug=False,only_duplicated=False):
         dic_out['calls']=Count_v
     if track_v_means: 
         dic_out['v_means']=np.array(v_means)
+
+   
     return P_est,dic_out
 
 
@@ -297,7 +301,7 @@ debug=False,only_duplicated=False):
 def LangevinSMCSimpAdaptPyt2(gen,  V, gradV,l_kernel,apply_kernel=apply_l_kernel,g_target=0.9,min_rate=0.8,alpha =0.1,N=300,T = 1,n_max=300, 
 max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,device=None,mh_opt=False,mh_every=1,track_accept=False
 ,track_beta=False,return_log_p=False,gaussian=False, projection=None,track_calls=True,
-track_v_means=True,adapt_d_t=False,target_accept=0.574,accept_spread=0.1,d_t_decay=0.999,d_t_gain=None,
+track_v_means=True,adapt_d_t=False,track_delta_t=False,target_accept=0.574,accept_spread=0.1,d_t_decay=0.999,d_t_gain=None,
 v_min_opt=False,v1_kernel=True,lambda_0=1,s_opt=False,
 debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
 ,clip_s=True,s_min=1e-3,s_max= 3,reject_ctrl=True,reject_thresh=0.1,prog_thresh=0.1):
@@ -335,6 +339,7 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
     if track_accept:
         accept_rates=[]
         accept_rates_mcmc=[]
+    
     #d =gen(1).shape[-1] # dimension of the random vectors
     n = 1 # Number of iterations
     finished_flag=False
@@ -347,6 +352,8 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
     v = V(X) # computes their potentials
     Count_v = N # Number of calls to function V or it's  gradient
     delta_t = alpha*TimeStepPyt(V,X,gradV)
+    if track_delta_t:
+        delta_ts=[delta_t]
     Count_v+=2*N
     beta_old = 0
     if track_beta:
@@ -397,8 +404,8 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
         if not s_opt:
             Y,v_y,nb_calls,dict_out=apply_l_kernel(Y=Y ,v_y=v_y,delta_t=delta_t,beta=beta,V=V,gradV=gradV,l_kernel=l_kernel,
             T=T,mh_opt=mh_opt,device=device,v1_kernel=v1_kernel,adapt_d_t=adapt_d_t, track_accept=track_accept,
-            d_t_decay=d_t_decay,d_t_gain=d_t_gain,debug=False,target_accept=0.3,accept_spread=0.05,
-            gaussian=gaussian, verbose=verbose)
+            d_t_decay=d_t_decay,d_t_gain=d_t_gain,debug=False,target_accept=target_accept,accept_spread=accept_spread,
+            gaussian=gaussian, verbose=verbose,track_delta_t=track_delta_t)
         else:
             Y,v_y,nb_calls,dict_out=apply_simp_kernel(Y,v_y=v_y,simp_kernel=normal_kernel,T=T,s=s,
             V=V,decay=s_decay,clip_s=clip_s,s_min =s_min,s_max=s_max,debug=debug,reject_thresh=reject_thresh,
@@ -434,6 +441,8 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
             accept_rates_mcmc.append(np.array(local_accept_rates).mean())
         if adapt_d_t:
             delta_t = dict_out['delta_t']
+            if track_delta_t:
+                delta_ts.extend(dict_out['detla_ts'])
         #v = V(X)
         #Count_v+= N
         beta_old = beta
@@ -473,4 +482,6 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
         dic_out['calls']=Count_v
     if track_v_means: 
         dic_out['v_means']=np.array(v_means)
+    if track_delta_t:
+        dic_out['delta_ts']=delta_ts
     return P_est,dic_out
