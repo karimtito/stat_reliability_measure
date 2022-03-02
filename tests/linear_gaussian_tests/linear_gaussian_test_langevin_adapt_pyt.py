@@ -22,7 +22,7 @@ class config:
     T_range=[1]
     min_rate=0.90
     rho_range=[]
-    alpha_range=[0.1]
+    alpha_range=[0.002]
     g_target=0.9
     g_range=[]
     p_range=[]
