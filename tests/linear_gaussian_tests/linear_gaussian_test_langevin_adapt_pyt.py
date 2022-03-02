@@ -37,7 +37,7 @@ class config:
     update_agg_res=True
     sigma=1
     v1_kernel=True
-    torch_seed=0
+    torch_seed=None
     gpu_name=None
     cpu_name=None
     cores_number=None
@@ -60,7 +60,7 @@ class config:
     v_min_opt=False
     ess_opt=False
     only_duplicated=False
-    np_seed=0
+    np_seed=None
     lambda_0=0.5
     test2=False
 
@@ -71,6 +71,8 @@ class config:
     s_max=3
     s_decay=0.95
     s_gain=1.0001
+
+    track_delta_t=False
 
 
 
@@ -99,7 +101,7 @@ parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
 parser.add_argument('--device',type=str, default=config.device)
 parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_est)
 parser.add_argument('--torch_seed',type=int, default=config.torch_seed)
-#parser.add_argument('--np_seed',type=int, default=config.np_seed)
+parser.add_argument('--np_seed',type=int, default=config.np_seed)
 
 #parser.add_argument('--noise_dist',type=str, default=config.noise_dist)
 parser.add_argument('--sigma', type=float,default=config.sigma)
@@ -135,6 +137,8 @@ parser.add_argument('--s_min',type=float,default=config.s_min)
 parser.add_argument('--s_max',type=float,default= config.s_max)
 parser.add_argument('--s_decay',type=float,default=config.s_decay)
 parser.add_argument('--s_gain',type =float,default= config.s_gain)
+
+parser.add_argument('--track_delta_t',type=str2bool,default=config.track_delta_t)
 
 args=parser.parse_args()
 
@@ -265,59 +269,71 @@ for p_t in config.p_range:
                     print(f"Starting simulations with p_t:{p_t},g_t:{g_t},T:{T},alpha:{alpha},N:{N}")
                     for i in iterator:
                         
-                        if not config.test2:
-                            t=time()
-                            p_est,res_dict,=smc_pyt.LangevinSMCSimpAdaptPyt(gen=norm_gen,
-                            l_kernel=kernel_function,N=N,min_rate=config.min_rate,
-                            g_target=g_t,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
-                            adapt_func=adapt_func,
-                            verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
-                            allow_zero_est=config.allow_zero_est,gaussian =True,
-                            target_accept=config.target_accept,accept_spread=config.accept_spread, 
-                            adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
-                            d_t_gain=config.d_t_gain,
-                            v_min_opt=config.v_min_opt,
-                            v1_kernel=config.v1_kernel, lambda_0= config.lambda_0,
-                            only_duplicated=config.only_duplicated,
-                            )
-                            t1=time()-t
-                        else:
-                            t=time()
-                            p_est,res_dict,=smc_pyt.LangevinSMCSimpAdaptPyt2(gen=norm_gen,
-                            l_kernel=kernel_function,N=N,min_rate=config.min_rate,
-                            g_target=g_t,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
-                            adapt_func=adapt_func,
-                            verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
-                            allow_zero_est=config.allow_zero_est,gaussian =True,
-                            target_accept=config.target_accept,accept_spread=config.accept_spread, 
-                            adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
-                            d_t_gain=config.d_t_gain,
-                            v_min_opt=config.v_min_opt,
-                            v1_kernel=config.v1_kernel, lambda_0= config.lambda_0,
-                            only_duplicated=config.only_duplicated,
-                            s_opt=config.s_opt,
-                            s=config.s,s_decay=config.s_decay,s_gain=config.s_gain,
-                            s_min=config.s_min,s_max=config.s_max)
-                            t1=time()-t
+                        # if not config.test2:
+                        #     t=time()
+                        #     p_est,res_dict,=smc_pyt.LangevinSMCSimpAdaptPyt(gen=norm_gen,
+                        #     l_kernel=kernel_function,N=N,min_rate=config.min_rate,
+                        #     g_target=g_t,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
+                        #     adapt_func=adapt_func,
+                        #     verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
+                        #     allow_zero_est=config.allow_zero_est,gaussian =True,
+                        #     target_accept=config.target_accept,accept_spread=config.accept_spread, 
+                        #     adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
+                        #     d_t_gain=config.d_t_gain,
+                        #     v_min_opt=config.v_min_opt,
+                        #     v1_kernel=config.v1_kernel, lambda_0= config.lambda_0,
+                        #     only_duplicated=config.only_duplicated,
+                        #     )
+                        #     t1=time()-t
+                        # else:
+                        t=time()
+                        p_est,res_dict,=smc_pyt.LangevinSMCSimpAdaptPyt(gen=norm_gen,
+                        l_kernel=kernel_function,N=N,min_rate=config.min_rate,
+                        g_target=g_t,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
+                        adapt_func=adapt_func,
+                        verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
+                        allow_zero_est=config.allow_zero_est,gaussian =True,
+                        target_accept=config.target_accept,accept_spread=config.accept_spread, 
+                        adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
+                        d_t_gain=config.d_t_gain,
+                        v_min_opt=config.v_min_opt,
+                        v1_kernel=config.v1_kernel, lambda_0= config.lambda_0,
+                        only_duplicated=config.only_duplicated,
+                        s_opt=config.s_opt,
+                        s=config.s,s_decay=config.s_decay,s_gain=config.s_gain,
+                        s_min=config.s_min,s_max=config.s_max)
+                        t1=time()-t
 
                         print(p_est)
                         finish_flag=res_dict['finished']
                         accept_rates=res_dict['accept_rates']
                         if config.track_accept:
+
                             accept_rates=res_dict['accept_rates']
                             np.savetxt(fname=os.path.join(log_path,f'accept_rates_{i}.txt')
                             ,X=accept_rates)
                             x_T=np.arange(len(accept_rates))
                             plt.plot(x_T,accept_rates)
                             plt.savefig(os.path.join(log_path,f'accept_rates_{i}.png'))
-                            accept_rates_mcmc=res_dict['accept_rates_mcmc']
-                            x_T=np.arange(len(accept_rates_mcmc))
                             plt.close()
+
+                            accept_rates_mcmc=res_dict['accept_rates_mcmc']
+                            np.savetxt(fname=os.path.join(log_path,f'accept_rates_mcmc_{i}.txt')
+                            ,X=accept_rates_mcmc,)
+                            x_T=np.arange(len(accept_rates_mcmc))
                             plt.plot(x_T,accept_rates_mcmc)
                             plt.savefig(os.path.join(log_path,f'accept_rates_mcmc_{i}.png'))
                             plt.close()
-                            np.savetxt(fname=os.path.join(log_path,f'accept_rates_mcmc_{i}.txt')
-                            ,X=accept_rates_mcmc,)
+                            
+
+                        if config.adapt_d_t and config.track_delta_t:
+                            delta_ts=res_dict['delta_ts']
+                            np.savetxt(fname=os.path.join(log_path,f'delta_ts_{i}.txt')
+                            ,X=delta_ts)
+                            x_T=np.arange(len(delta_ts))
+                            plt.plot(x_T,delta_ts)
+                            plt.savefig(os.path.join(log_path,f'delta_ts_{i}.png'))
+                        
                         finished_flags.append(finish_flag)
                         times.append(t1)
                         ests.append(p_est)
@@ -359,7 +375,7 @@ for p_t in config.p_range:
                     "mh_opt":config.mh_opt,'only_duplicated':config.only_duplicated,
                     "np_seed":config.np_seed,"torch_seed":config.torch_seed
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
-                    "d":config.d
+                    "d":config.d,"s_opt":config.s_opt,"s":config.s,"clip_s":config.clip_s,"s_min":config.s_min,"s_max":config.s_max,
                     }
 
                     results_df=pd.DataFrame([results])
