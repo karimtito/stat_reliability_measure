@@ -167,11 +167,11 @@ if not config.allow_multi_gpu:
 
 
 if config.torch_seed is None:
-    config.torch_seed=int(time.time())
+    config.torch_seed=int(time())
 torch.manual_seed(seed=config.torch_seed)
 
 if config.np_seed is None:
-    config.np_seed=int(time.time())
+    config.np_seed=int(time())
 torch.manual_seed(seed=config.np_seed)
 
 
@@ -258,6 +258,8 @@ for p_t in config.p_range:
                     loc_time= float_to_file_float(time())
                     log_name=method_name+f'_N_{N}_T_{T}_a_{float_to_file_float(alpha)}_g_{float_to_file_float(g_t)}'+loc_time.split('_')[0]
                     log_path=os.path.join(raw_logs_path,log_name)
+                    
+                    
                     os.mkdir(path=log_path)
                     run_nb+=1
                     print(f'Run {run_nb}/{nb_runs}')
@@ -285,7 +287,7 @@ for p_t in config.p_range:
                         #     only_duplicated=config.only_duplicated,
                         #     )
                         #     t1=time()-t
-                        # else:
+                        # else: 
                         t=time()
                         p_est,res_dict,=smc_pyt.LangevinSMCSimpAdaptPyt(gen=norm_gen,
                         l_kernel=kernel_function,N=N,min_rate=config.min_rate,
