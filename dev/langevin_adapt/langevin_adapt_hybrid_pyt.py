@@ -69,7 +69,7 @@ def ESSAdaptBetaPyt(beta_old, v,lambda_0=1,max_beta=1e9,g_target=None,v_min_opt=
         res=min(beta_old+delta_beta,max_beta)
     return res
 
-norm_kernel=lambda X,s: 1/(1+s**2)*(X+s*torch.randn_like(X))
+norm_kernel=lambda X,s: 1/math.sqrt(1+s**2)*(X+s*torch.randn_like(X))
 
 
 """Implementation of Langevin Sequential Monte Carlo with adaptative tempering"""
@@ -84,7 +84,7 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
     """
       Adaptive Langevin SMC estimator  
       Args:
-        gen: generator of iid samples X_i                            [fun]
+         gen: generator of iid samples X_i                            [fun]
         l_kernel: Langevin mixing kernel almost invariant to the Gibbs measure with 
                    a specific temperature. It can be overdamped or underdamped
                    and must take the form l_kernel(h,X)                             
@@ -140,14 +140,14 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
     beta_old = 0
     if track_beta:
         betas= [beta_old]
-    beta,g_0=adapt_func(beta_old=beta_old,v=v,g_target=g_target,multi_output=True,max_beta=max_beta,v_min_opt=v_min_opt,
+    beta,g_0=adapt_func(beta_old=beta_old,v=v,g_target=g_t_0,multi_output=True,max_beta=max_beta,v_min_opt=v_min_opt,
     lambda_0=lambda_0) 
     
-    if verbose>=2:
+    if verbose>=1:
             print(f'Beta old {beta_old}, new beta {beta}, delta_beta={beta_old-beta}')
     
     g_prod=g_0
-    if verbose>=1.5:
+    if verbose>=1:
         print(f"g_0:{g_0}")
     thresh=1e-7
     kernel_pass=0
