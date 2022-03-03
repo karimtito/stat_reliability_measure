@@ -149,7 +149,7 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
     g_prod=g_0
     if verbose>=1:
         print(f"g_0:{g_0}")
-    thresh=1e-7
+    thresh=1e-5
     kernel_pass=0
     rejection_rate=0
     with torch.no_grad():
@@ -268,9 +268,12 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
                     print(f'Rejection rate: {rejection_rate}')
                 #rejection_rates+=[rejection_rate]
 
-            
-    
-    v=V(X,L=0)
+    old_v=v        
+    L_j=0
+    v=V(X,L=L_j)
+    G=torch.exp(-beta*(v-old_v))
+    g_iter=G.mean().item()
+    g_prod*=g_iter
     #g_prod=g_iter*(v)
     #L_j=0 -> we finish by taking beta to +infty
     while (v<=0).float().mean()<min_rate:
