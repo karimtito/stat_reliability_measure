@@ -4,6 +4,7 @@ import scipy.stats as stat
 import numpy as np
 from tqdm import tqdm
 from time import time
+from datetime import datetime
 import os
 import matplotlib.pyplot as plt
 import torch
@@ -30,6 +31,7 @@ class config:
     n_rep=10
     
     save_config=False 
+    print_config=True
     d=1024
     verbose=1
     log_dir='../../logs/linear_gaussian_tests'
@@ -129,7 +131,7 @@ parser.add_argument('--ess_opt',type=str2bool,default=config.ess_opt)
 parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
 parser.add_argument('--lambda_0',type=float,default=config.lambda_0)
 parser.add_argument('--test2',type=str2bool,default =config.test2)
-
+parser.add_argument('--print_config',type=str2bool,default=config.print_config)
 parser.add_argument('--s_opt',type=str2bool,default=config.s_opt)
 parser.add_argument('--s',type=float,default=config.s)
 parser.add_argument('--clip_s',type=str2bool,default=config.clip_s)
@@ -225,7 +227,9 @@ config.json=vars(args)
 # else:
 #     aggr_res_path=config.aggr_res_path
 
-
+config.json=vars(args)
+if config.print_config:
+    print(config.json)
 
 param_ranges = [config.N_range,config.T_range,config.rho_range,config.alpha_range,config.p_range]
 param_lens=np.array([len(l) for l in param_ranges])
