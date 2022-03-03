@@ -451,7 +451,7 @@ def apply_simp_kernel(Y,v_y,simp_kernel,T:int,beta:float,s:float, V,
             s = s*decay if not clip_s else np.clip(s*decay,a_min=s_min,a_max=s_max)
             if verbose>1:            
                 print('Strength of kernel diminished!')
-                print(f's={s}')
+                print(f's={s.item()}')
     
     dict_out={'l_kernel_pass':l_kernel_pass}
     if track_accept:

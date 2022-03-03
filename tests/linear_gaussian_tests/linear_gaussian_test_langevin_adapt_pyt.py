@@ -382,6 +382,7 @@ for p_t in config.p_range:
                     "np_seed":config.np_seed,"torch_seed":config.torch_seed
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
                     "d":config.d,"s_opt":config.s_opt,"s":config.s,"clip_s":config.clip_s,"s_min":config.s_min,"s_max":config.s_max,
+                    "ess_opt":config.ess_opt
                     }
 
                     results_df=pd.DataFrame([results])

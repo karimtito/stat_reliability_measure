@@ -406,6 +406,10 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
             T=T,mh_opt=mh_opt,device=device,v1_kernel=v1_kernel,adapt_d_t=adapt_d_t, track_accept=track_accept,
             d_t_decay=d_t_decay,d_t_gain=d_t_gain,debug=False,target_accept=target_accept,accept_spread=accept_spread,
             gaussian=gaussian, verbose=verbose,track_delta_t=track_delta_t)
+            if adapt_d_t:
+                delta_t = dict_out['delta_t']
+                if track_delta_t:
+                    delta_ts.extend(dict_out['detla_ts'])
         else:
             Y,v_y,nb_calls,dict_out=apply_simp_kernel(Y,v_y=v_y,simp_kernel=normal_kernel,T=T,s=s,
             V=V,decay=s_decay,clip_s=clip_s,s_min =s_min,s_max=s_max,debug=debug,reject_thresh=reject_thresh,
@@ -439,10 +443,7 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
             local_accept_rates=dict_out['local_accept_rates']
             accept_rates.extend(local_accept_rates)
             accept_rates_mcmc.append(np.array(local_accept_rates).mean())
-        if adapt_d_t:
-            delta_t = dict_out['delta_t']
-            if track_delta_t:
-                delta_ts.extend(dict_out['detla_ts'])
+        
         #v = V(X)
         #Count_v+= N
         beta_old = beta
