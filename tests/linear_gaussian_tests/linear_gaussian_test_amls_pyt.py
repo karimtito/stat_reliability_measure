@@ -43,7 +43,7 @@ class config:
     s=1
     s_range= []
 
-    p_t=1e-10
+    p_t=1e-15
     p_range=[]
     
     d = 1024
