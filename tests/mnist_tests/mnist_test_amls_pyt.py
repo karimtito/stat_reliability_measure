@@ -387,7 +387,7 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
             for N in config.N_list: 
                 for s in config.s_list :
                     for ratio in config.ratio_list: 
-                        loc_time=datetime.today().isoformat().split('.')[0]
+                        loc_time= datetime.today().isoformat().split('.')[0]
                         log_name=method_name+'_e_'+float_to_file_float(config.epsilons[idx])+'_N_'+str(N)+'_T_'+str(T)+'_s_'+float_to_file_float(s)
                         log_name=log_name+'_r_'+float_to_file_float(ratio)+'_'+loc_time
                         log_path=os.path.join(raw_logs_path,log_name)

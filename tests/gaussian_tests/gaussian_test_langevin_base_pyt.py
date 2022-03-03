@@ -223,7 +223,7 @@ for p_t in config.p_range:
         for T in config.T_range:
             for alpha in config.alpha_range:       
                 for N in config.N_range:
-                    loc_time= float_to_file_float(time())
+                    loc_time= datetime.today().isoformat().split('.')[0]
                     log_name=method_name+f'_N_{N}_T_{T}_a_{float_to_file_float(alpha)}_r_{float_to_file_float(rho)}'+loc_time
                     log_path=os.path.join(raw_logs_path,log_name)
                     os.mkdir(path=log_path)

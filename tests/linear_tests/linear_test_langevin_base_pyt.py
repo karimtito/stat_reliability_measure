@@ -136,7 +136,7 @@ else:
     aggr_res_path=config.aggr_res_path
 
 
-loc_time= float_to_file_float(time())
+loc_time= datetime.today().isoformat().split('.')[0]
 log_name=method_name+'_'+loc_time
 log_path=os.path.join(raw_logs_path,log_name)
 os.mkdir(path=log_path)

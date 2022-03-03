@@ -118,7 +118,9 @@ args=parser.parse_args()
 for k,v in vars(args).items():
     setattr(config, k, v)
 
-nb_runs=config.n_rep
+
+#nb_runs=config.n_rep
+nb_runs=1
 if len(config.N_range)==0:
     config.N_range=[config.N]
 nb_runs*=len(config.N_range)
@@ -196,7 +198,7 @@ for p_t in config.p_range:
         for N in config.N_range: 
             for s in config.s_range:
                 for ratio in config.ratio_range: 
-                    loc_time= float_to_file_float(time())
+                    loc_time= datetime.today().isoformat().split('.')[0]
                     log_name=method_name+f'_N_{N}_T_{T}_s_{float_to_file_float(s)}_r_{float_to_file_float(ratio)}_t_'+loc_time.split('_')[0]
                     log_path=os.path.join(raw_logs_path,log_name)
                     os.mkdir(path=log_path)
@@ -291,7 +293,7 @@ for p_t in config.p_range:
                     ,'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
                     'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean()
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
-            'batch_opt':config.batch_opt,"d":d, 
+                    'batch_opt':config.batch_opt,"d":d, 
                     "np_seed":config.np_seed,"torch_seed":config.torch_seed}
 
                     results_df=pd.DataFrame([results])

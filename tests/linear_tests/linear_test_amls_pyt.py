@@ -155,7 +155,7 @@ raw_logs_path=os.path.join(config.log_dir,'raw_logs')
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
-loc_time= float_to_file_float(time())
+loc_time= datetime.today().isoformat().split('.')[0]
 log_name=method_name+'_'+loc_time
 log_path=os.path.join(raw_logs_path,log_name)
 os.mkdir(path=log_path)

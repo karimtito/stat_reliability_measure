@@ -189,7 +189,7 @@ for p_t in config.p_range:
         for N in config.N_range: 
             for s in config.s_range:
                 for ratio in config.ratio_range: 
-                    loc_time= float_to_file_float(time())
+                    loc_time= datetime.today().isoformat().split('.')[0]
                     log_name=method_name+f'_N_{N}_T_{T}_s_{float_to_file_float(s)}_r_{float_to_file_float(ratio)}_t_'+loc_time.split('_')[0]
                     log_path=os.path.join(raw_logs_path,log_name)
                     os.mkdir(path=log_path)
