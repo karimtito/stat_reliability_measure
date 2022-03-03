@@ -80,7 +80,7 @@ track_v_means=True,adapt_d_t=False,target_accept=0.574,accept_spread=0.1,d_t_dec
 v_min_opt=False,v1_kernel=True,lambda_0=1, s=1,
 debug=False,only_duplicated=False, L_target=0,
 rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,clip_s=False
-,s_min=1e-3,s_max=5,decay=0.95,g_t_0=0.65):
+,s_min=8e-3,s_max=5,decay=0.95,g_t_0=0.65):
     """
       Adaptive Langevin SMC estimator  
       Args:
@@ -149,7 +149,7 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
     g_prod=g_0
     if verbose>=1.5:
         print(f"g_0:{g_0}")
-    thresh=1e-5
+    thresh=1e-7
     kernel_pass=0
     rejection_rate=0
     with torch.no_grad():
@@ -257,6 +257,8 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
             G=torch.exp(-beta*(v-old_v))
             g_iter=G.mean().item()
             g_prod*=g_iter
+            if verbose>=1.5:
+                print(f"g_iter:{g_iter},g_prod:{g_prod}")
             h_mean = SX.mean()
             if verbose>=1:
                 print('Iter = ',n, ' L_j = ', L_j.item(), "h_mean",h_mean.item(),  " Calls = ", Count_v)
@@ -269,6 +271,7 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
             
     
     v=V(X,L=0)
+    #g_prod=g_iter*(v)
     #L_j=0 -> we finish by taking beta to +infty
     while (v<=0).float().mean()<min_rate:
         n += 1 # increases iteration number
