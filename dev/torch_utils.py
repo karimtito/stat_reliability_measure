@@ -396,7 +396,7 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
 
 
 def normal_kernel(x,s):
-    return (x + s*torch.randn(size = x.shape,device=x.device))/math.sqrt(1+s**2)
+    return (x + s*torch.randn_like(x))/math.sqrt(1+s**2)
 
 def apply_simp_kernel(Y,v_y,simp_kernel,T:int,beta:float,s:float, V,
  gaussian:bool,device, decay:float,clip_s:bool,s_min:float,s_max:float,
