@@ -80,7 +80,7 @@ track_v_means=True,adapt_d_t=False,target_accept=0.574,accept_spread=0.1,d_t_dec
 v_min_opt=False,v1_kernel=True,lambda_0=1, s=1,
 debug=False,only_duplicated=False, L_target=0,
 rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,clip_s=False
-,s_min=8e-3,s_max=5,decay=0.95,g_t_0=0.65):
+,s_min=8e-3,s_max=3,decay=0.95,g_t_0=0.65):
     """
       Adaptive Langevin SMC estimator  
       Args:
