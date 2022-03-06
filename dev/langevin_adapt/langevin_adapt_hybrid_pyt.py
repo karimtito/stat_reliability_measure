@@ -2,7 +2,7 @@ from psutil import AccessDenied
 import torch 
 import math
 import numpy as np
-from stat_reliability_measure.dev.torch_utils import TimeStepPyt
+from stat_reliability_measure.dev.torch_utils import TimeStepPyt,apply_l_kernel,apply_simp_kernel
 
 def dichotomic_search_d(f, a, b, thresh=0, n_max =50):
     """Implementation of dichotomic search of minimum solution for an decreasing function
@@ -129,6 +129,8 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
         SX=score_func(X)
     ind= torch.argsort(input=SX,dim=0,descending=True).squeeze(-1)
     L_j= SX[ind][K] # set the threshold to (K+1)-th score level
+    V_= lambda X: V(X, L=L_j)
+    
     v=torch.clamp(L_j-SX,min=0)
     #v = V(X) # computes their potentials
     Count_v = N # Number of calls to function V or it's  gradient
@@ -181,7 +183,9 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
                 W = simp_kernel(Z,s) # propose a refreshed samples
                 kernel_pass+=(N-K)
                 SW = score_func(W) # compute their scores
+                VW_=V_(W)
                 VW= torch.clamp(L_j-SW,min=0)
+                assert VW==VW_
                 Count_v+= (N-K)
                 #accept_flag= SW>L_j
                 
@@ -212,6 +216,9 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
                 
                 SZ=torch.where(accept_flag,input=SW,other=SZ)
                 VZ=torch.clamp(L_j-SZ,min=0)
+                VZ_=V_(Z)
+                
+                assert VW==VZ_
                 rejection_rate  = (kernel_pass-(N-K))/kernel_pass*rejection_rate+(1./kernel_pass)*((1-accept_flag.float()).sum().item())
                 reject_flag=1-accept_flag.float()
                 if track_reject:
@@ -252,6 +259,7 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
                     print('Strength of kernel increased!')
                     print(f's={s}')
             L_j = S_sort[K] # set the threshold to (K+1)-th
+            V_=lambda X: torch.clamp(L_j-score_func(X),min=0)
             old_v=v
             v=torch.clamp(L_j-SX,min=0)
             G=torch.exp(-beta*(v-old_v))
@@ -317,8 +325,7 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
             Y=X
             v_y=v
         for _ in range(T):
-            if mh_every!=1:
-                raise NotImplementedError("Metropolis-Hastings for more than one kernel step  is not implemented.")
+    
             if track_accept or mh_opt:
                 cand_Y=l_kernel(Y,gradV, delta_t,beta)
                 with torch.no_grad():
@@ -376,9 +383,13 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
                     v_y=cand_v_y
             else:
                 Y=l_kernel(Y, gradV, delta_t, beta)
-                
+
+
             Count_v= Count_v+ nb_to_renew if only_duplicated else Count_v+N
-            
+        
+        
+        if track_accept:
+            accept_rates_mcmc.append(np.array(local_accept_rates).mean())    
         if only_duplicated:
             with torch.no_grad():
                 X[to_renew]=Y
@@ -392,8 +403,7 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
                 Count_v+=N
         del Y
         
-        if track_accept:
-            accept_rates_mcmc.append(np.array(local_accept_rates).mean())
+        
         
         
         beta_old = beta

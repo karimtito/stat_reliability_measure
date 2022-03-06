@@ -401,7 +401,7 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
         else:
             Y=X
             v_y=v
-        if not s_opt:
+        if not s_opt:   
             Y,v_y,nb_calls,dict_out=apply_l_kernel(Y=Y ,v_y=v_y,delta_t=delta_t,beta=beta,V=V,gradV=gradV,l_kernel=l_kernel,
             T=T,mh_opt=mh_opt,device=device,v1_kernel=v1_kernel,adapt_d_t=adapt_d_t, track_accept=track_accept,
             d_t_decay=d_t_decay,d_t_gain=d_t_gain,debug=False,target_accept=target_accept,accept_spread=accept_spread,
@@ -409,7 +409,7 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
             if adapt_d_t:
                 delta_t = dict_out['delta_t']
                 if track_delta_t:
-                    delta_ts.extend(dict_out['detla_ts'])
+                    delta_ts.extend(dict_out['delta_ts'])
         else:
             Y,v_y,nb_calls,dict_out=apply_simp_kernel(Y,v_y=v_y,simp_kernel=normal_kernel,T=T,s=s,
             V=V,decay=s_decay,clip_s=clip_s,s_min =s_min,s_max=s_max,debug=debug,reject_thresh=reject_thresh,

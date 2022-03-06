@@ -6,6 +6,7 @@ from scipy.special import betainc
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
+from datetime import datetime
 import argparse
 from torch.random import seed
 from tqdm import tqdm
@@ -160,7 +161,7 @@ epsilon=config.epsilon
 if not os.path.exists('../../logs'):
     os.mkdir('../../logs')
     os.mkdir(config.log_dir)
-raw_logs_path=os.path.join(config.log_dir,'raw_logs')
+raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
@@ -171,7 +172,7 @@ else:
 
 
 loc_time= datetime.today().isoformat().split('.')[0]
-log_name=method_name+'_'+loc_time
+log_name=method_name+'_'+'_'+loc_time
 log_path=os.path.join(raw_logs_path,log_name)
 os.mkdir(path=log_path)
 config.json=vars(args)

@@ -245,7 +245,7 @@ if not os.path.exists('../../logs'):
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 
-raw_logs_path=os.path.join(config.log_dir,'raw_logs')
+raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
@@ -389,7 +389,7 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
                     for ratio in config.ratio_list: 
                         loc_time= datetime.today().isoformat().split('.')[0]
                         log_name=method_name+'_e_'+float_to_file_float(config.epsilons[idx])+'_N_'+str(N)+'_T_'+str(T)+'_s_'+float_to_file_float(s)
-                        log_name=log_name+'_r_'+float_to_file_float(ratio)+'_'+loc_time
+                        log_name=log_name+'_r_'+float_to_file_float(ratio)+'_'+'_'+loc_time
                         log_path=os.path.join(raw_logs_path,log_name)
                         i_exp+=1
                         print(f"Starting experiment {i_exp}/{nb_exps}")

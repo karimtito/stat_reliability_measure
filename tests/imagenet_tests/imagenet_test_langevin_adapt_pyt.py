@@ -220,7 +220,7 @@ if not os.path.exists('../../logs'):
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 
-raw_logs_path=os.path.join(config.log_dir,'raw_logs')
+raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
@@ -397,7 +397,7 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
                             unfinished_mean_est,unfinished_mean_time=None,None
                         loc_time= datetime.today().isoformat().split('.')[0]
                         log_name=method_name+'_e_'+float_to_file_float(config.epsilons[i])+'_N_'+str(N)+'_T_'+str(T)+'a'+float_to_file_float(alpha)
-                        log_name=log_name+'g'+float_to_file_float(g_t)+'_'+loc_time
+                        log_name=log_name+'g'+float_to_file_float(g_t)+'_'+'_'+loc_time
                         log_path=os.path.join(raw_logs_path,log_name)
                         os.mkdir(log_path)
                         np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)

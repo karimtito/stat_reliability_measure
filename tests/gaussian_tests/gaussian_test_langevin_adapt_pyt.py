@@ -5,6 +5,7 @@ from scipy.special import betainc
 import numpy as np
 from tqdm import tqdm
 from time import time
+from datetime import datetime
 import os
 import matplotlib.pyplot as plt
 import torch
@@ -177,12 +178,12 @@ if os.path.exists(results_path):
 else:
     results_g=pd.DataFrame(columns=['p_t','mean_est','mean_time','mean_err','std_time','std_est','T','N','rho','alpha','n_rep','min_rate','method'])
     results_g.to_csv(results_path,index=False)
-raw_logs_path=os.path.join(config.log_dir,'raw_logs')
+raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
 loc_time= datetime.today().isoformat().split('.')[0]
-log_name=method_name+'_'+loc_time
+log_name=method_name+'_'+'_'+loc_time
 log_path=os.path.join(raw_logs_path,log_name)
 os.mkdir(path=log_path)
 config.json=vars(args)
@@ -224,7 +225,7 @@ for p_t in config.p_range:
             for alpha in config.alpha_range:       
                 for N in config.N_range:
                     loc_time= datetime.today().isoformat().split('.')[0]
-                    log_name=method_name+f'_N_{N}_T_{T}_a_{float_to_file_float(alpha)}_g_{float_to_file_float(g_t)}'+loc_time.split('_')[0]
+                    log_name=method_name+f'_N_{N}_T_{T}_a_{float_to_file_float(alpha)}_g_{float_to_file_float(g_t)}'+'_'+loc_time.split('_')[0]
                     log_path=os.path.join(raw_logs_path,log_name)
                     os.mkdir(path=log_path)
                     run_nb+=1
