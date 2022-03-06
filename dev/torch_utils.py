@@ -359,9 +359,13 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
                     delta_t*=d_t_gain
                 elif accept_rate<target_accept-accept_spread: 
                     delta_t*=d_t_decay
+                if verbose>=2.5:
+                    print(f"New delta_t:{delta_t}")
 
                 if track_delta_t:
-                    delta_ts.append(delta_t)
+                    delta_ts.append(delta_t.item())
+                    if verbose>=2:
+                        print(delta_ts)
             if mh_opt:
                 with torch.no_grad():
                     Y=torch.where(accept.unsqueeze(-1),input=cand_Y,other=Y)
