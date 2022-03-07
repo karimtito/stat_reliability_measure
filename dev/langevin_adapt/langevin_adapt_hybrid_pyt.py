@@ -129,7 +129,7 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
         SX=score_func(X)
     ind= torch.argsort(input=SX,dim=0,descending=True).squeeze(-1)
     L_j= SX[ind][K] # set the threshold to (K+1)-th score level
-    V_= lambda X: V(X, L=L_j)
+    V_= lambda X: torch.clamp(L_j-score_func(X),min=0)
     
     v=torch.clamp(L_j-SX,min=0)
     #v = V(X) # computes their potentials
@@ -151,23 +151,26 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
     g_prod=g_0
     if verbose>=1:
         print(f"g_0:{g_0}")
-    thresh=1e-5
+    thresh=1e-3
     kernel_pass=0
     rejection_rate=0
-    with torch.no_grad():
-        while L_j<L_target-thresh:
+
+    while L_j<L_target-thresh:
+        
+        n += 1 # increases iteration number
+        if n >=n_max:
+            if allow_zero_est:
+                break
+            else:
+                raise RuntimeError('The estimator failed. Increase n_max?')
             
-            n += 1 # increases iteration number
-            if n >=n_max:
-                if allow_zero_est:
-                    break
-                else:
-                    raise RuntimeError('The estimator failed. Increase n_max?')
-                
-            
+        with torch.no_grad():
+
             Y = X[ind[0:K],:]
             SY = SX[ind[0:K]] # Keep their scores in SY
-            VY = torch.clamp(L_j-SY, min=0)
+            #VY = torch.clamp(L_j-SY, min=0)
+            VY=v[ind[0:K]]
+            
             # step D: refresh samples
             #Z = torch.zeros((N-K,d),device=device)
             #SZ = torch.zeros((N-K,1),device=device)
@@ -177,15 +180,16 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
             Z=Y[ind_,:] 
             SZ=SY[ind_]
             VZ=VY[ind_]
-            
-            l_reject_rates=[]
-            for _ in range(T):
+        
+        l_reject_rates=[]
+        for _ in range(T):
+            with torch.no_grad():
                 W = simp_kernel(Z,s) # propose a refreshed samples
                 kernel_pass+=(N-K)
-                SW = score_func(W) # compute their scores
-                VW_=V_(W)
-                VW= torch.clamp(L_j-SW,min=0)
-                assert VW==VW_
+                #SW = score_func(W) # compute their scores
+                #VW_= torch.clamp(L_j-SW,min=0)
+                VW=V_(W)
+                #assert torch.equal(input=VW,other=VW_)
                 Count_v+= (N-K)
                 #accept_flag= SW>L_j
                 
@@ -193,13 +197,13 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
                 
                 
 
-                               
+                                
                 Count_v+= 2*nb_to_renew if only_duplicated else 2*N
                 high_diff=(W-(1/math.sqrt(1+s**2))*Z)
                 low_diff=(Z-(1/math.sqrt(1+s**2))*W)
                 
-                log_a_high=-beta*VW-(s**2/(1+s**2))*torch.norm(high_diff,p=2 ,dim=1)**2
-                log_a_low= -beta*VZ-(s**2/(1+s**2))*torch.norm(low_diff,p=2,dim=1)**2
+                log_a_high=-beta*VW-(s**2/(1+s**2))*torch.sum(high_diff**2,dim=1)
+                log_a_low= -beta*VZ-(s**2/(1+s**2))*torch.sum(low_diff**2,p=2,dim=1)
 
 
                 if gaussian: 
@@ -213,14 +217,13 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
                 if verbose>=2:
                     print(f"Local accept ratio :{accept_flag.float().mean()}")
                 Z=torch.where(accept_flag.unsqueeze(-1),input=W,other=Z)
+                VZ=torch.where(accept_flag,input=VW,other=VZ)
+            
                 
-                SZ=torch.where(accept_flag,input=SW,other=SZ)
-                VZ=torch.clamp(L_j-SZ,min=0)
-                VZ_=V_(Z)
-                
-                assert VW==VZ_
-                rejection_rate  = (kernel_pass-(N-K))/kernel_pass*rejection_rate+(1./kernel_pass)*((1-accept_flag.float()).sum().item())
+                #assert torch.equal(input=VZ,other=VZ_)
                 reject_flag=1-accept_flag.float()
+                rejection_rate  = (kernel_pass-(N-K))/kernel_pass*rejection_rate+(1./kernel_pass)*((1-accept_flag.float()).sum().item())
+                
                 if track_reject:
                     l_reject_rates.append(reject_flag.float().mean().item())
                     reject_rates.append(reject_flag.float().mean().item())
@@ -232,13 +235,14 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
                     if verbose>1:
                         print('Strength of kernel diminished!')
                         print(f's={s}')
-            
-            if track_reject:
-                reject_rate_mcmc=np.array(l_reject_rates).mean()
-                reject_rates_mcmc.append(reject_rate_mcmc)
-
         
-            # step A: update set X and the scores
+        if track_reject:
+            reject_rate_mcmc=np.array(l_reject_rates).mean()
+            reject_rates_mcmc.append(reject_rate_mcmc)
+        SZ=score_func(Z)
+        SY=score_func(Y)
+        with torch.no_grad():
+        # step A: update set X and the scores
             X[:K,:] = Y # copy paste the old samples of Y into X
             SX[:K] = SY
             v[:K] = VY
@@ -249,32 +253,32 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
             ind = torch.argsort(SX,dim=0,descending=True).squeeze(-1) # sort in descending order
             S_sort= SX[ind]
             new_tau = S_sort[K]
-            
-            
+        
+        
 
-            
-            if rejection_rate<=reject_thresh and (new_tau-L_j)/L_j<prog_thresh:
-                s = s*gain_rate if not clip_s else np.clip(s*gain_rate,s_min,s_max)
-                if verbose>1:
-                    print('Strength of kernel increased!')
-                    print(f's={s}')
-            L_j = S_sort[K] # set the threshold to (K+1)-th
-            V_=lambda X: torch.clamp(L_j-score_func(X),min=0)
-            old_v=v
+        
+        if rejection_rate<=reject_thresh and (new_tau-L_j)/L_j<prog_thresh:
+            s = s*gain_rate if not clip_s else np.clip(s*gain_rate,s_min,s_max)
+            if verbose>1:
+                print('Strength of kernel increased!')
+                print(f's={s}')
+        L_j = torch.clamp(S_sort[K], max=0) # set the threshold to (K+1)-th
+        old_v=v
+        with torch.no_grad():
             v=torch.clamp(L_j-SX,min=0)
-            G=torch.exp(-beta*(v-old_v))
-            g_iter=G.mean().item()
-            g_prod*=g_iter
-            if verbose>=1.5:
-                print(f"g_iter:{g_iter},g_prod:{g_prod}")
-            h_mean = SX.mean()
-            if verbose>=1:
-                print('Iter = ',n, ' L_j = ', L_j.item(), "h_mean",h_mean.item(),  " Calls = ", Count_v)
+        G=torch.exp(-beta*(v-old_v))
+        g_iter=G.mean().item()
+        g_prod*=g_iter
+        if verbose>=1.5:
+            print(f"g_iter:{g_iter},g_prod:{g_prod}")
+        h_mean = SX.mean()
+        if verbose>=1:
+            print('Iter = ',n, ' L_j = ', L_j.item(), "h_mean",h_mean.item(),  " Calls = ", Count_v," beta = ",beta)
 
-            if track_reject:
-                if verbose>1:
-                    print(f'Rejection rate: {rejection_rate}')
-                #rejection_rates+=[rejection_rate]
+        if track_reject:
+            if verbose>1:
+                print(f'Rejection rate: {rejection_rate}')
+            #rejection_rates+=[rejection_rate]
 
     old_v=v        
     L_j=0
@@ -282,6 +286,9 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
     G=torch.exp(-beta*(v-old_v))
     g_iter=G.mean().item()
     g_prod*=g_iter
+    if verbose>=1.5:
+        print(f"g_iter:{g_iter},g_prod:{g_prod}")
+
     #g_prod=g_iter*(v)
     #L_j=0 -> we finish by taking beta to +infty
     while (v<=0).float().mean()<min_rate:
@@ -294,7 +301,7 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
         v_mean = v.mean()
         v_std = v.std()
         if verbose:
-            print('Iter = ',n, ' v_mean = ', v_mean.item(), " Calls = ", Count_v, "v_std = ", v_std.item())
+            print('Iter = ',n, ' v_mean = ', v_mean.item(), " Calls = ", Count_v, "v_std = ", v_std.item(),"beta =",beta)
         if track_v_means: 
             v_means.append(v_mean.item())
         
@@ -414,8 +421,6 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
         
         if verbose>=2:
             print(f'Beta old {beta_old}, new beta {beta}, delta_beta={beta_old-beta}')
-           
-        
     if (v<=0).float().mean()<min_rate:
         finished_flag=True
     g_iter_final=(v<=0).float().mean()
