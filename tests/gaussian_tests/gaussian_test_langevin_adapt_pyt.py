@@ -60,8 +60,25 @@ class config:
     accept_spread=0.1
     d_t_decay=0.999
     d_t_gain=1/d_t_decay
-    v_min_opt=False
     v1_kernel=True
+    print_config=True
+    v_min_opt=False
+    ess_opt=False
+    only_duplicated=False
+    np_seed=None
+    lambda_0=0.04
+    test2=False
+
+    s_opt=False
+    s=1
+    clip_s=True
+    s_min=1e-3
+    s_max=3
+    s_decay=0.95
+    s_gain=1.0001
+
+    track_delta_t=False
+
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -111,6 +128,20 @@ parser.add_argument('--adapt_d_t_mcmc',type=str2bool,default=config.adapt_d_t_mc
 parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
 parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
 parser.add_argument('--v1_kernel',type=str2bool,default=config.v1_kernel)
+parser.add_argument('--ess_opt',type=str2bool,default=config.ess_opt)
+parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
+parser.add_argument('--lambda_0',type=float,default=config.lambda_0)
+parser.add_argument('--test2',type=str2bool,default =config.test2)
+parser.add_argument('--print_config',type=str2bool,default=config.print_config)
+parser.add_argument('--s_opt',type=str2bool,default=config.s_opt)
+parser.add_argument('--s',type=float,default=config.s)
+parser.add_argument('--clip_s',type=str2bool,default=config.clip_s)
+parser.add_argument('--s_min',type=float,default=config.s_min) 
+parser.add_argument('--s_max',type=float,default= config.s_max)
+parser.add_argument('--s_decay',type=float,default=config.s_decay)
+parser.add_argument('--s_gain',type =float,default= config.s_gain)
+
+parser.add_argument('--track_delta_t',type=str2bool,default=config.track_delta_t)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -248,7 +279,13 @@ for p_t in config.p_range:
                         adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
                         d_t_gain=config.d_t_gain,
                         v_min_opt=config.v_min_opt,
-                        v1_kernel=config.v1_kernel)
+                        v1_kernel=config.v1_kernel,
+                         lambda_0= config.lambda_0,
+                        only_duplicated=config.only_duplicated,
+                        s_opt=config.s_opt,
+                        s=config.s,s_decay=config.s_decay,s_gain=config.s_gain,
+                        s_min=config.s_min,s_max=config.s_max, 
+                        track_delta_t=config.track_delta_t)
                         t1=time()-t
                         print(p_est)
                         finish_flag=res_dict['finished']
@@ -303,7 +340,8 @@ for p_t in config.p_range:
                     ,'adapt_d_t_mcmc':config.adapt_d_t_mcmc,"adapt_d_t":config.adapt_d_t,
                     "adapt_d_t_mcmc":config.adapt_d_t_mcmc,"d_t_decay":config.d_t_decay,"d_t_gain":config.d_t_gain,
                     "target_accept":config.target_accept,"accept_spread":config.accept_spread
-                    ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number
+                    ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number, 
+                    "v_min_opt":config.v_min_opt
                     }
 
                     results_df=pd.DataFrame([results])
