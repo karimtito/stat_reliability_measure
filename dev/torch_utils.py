@@ -443,7 +443,7 @@ def apply_simp_kernel(Y,v_y,simp_kernel,T:int,beta:float,s:float, V,
         U=torch.rand(size=(b_size,),device=device) 
         accept_flag=U<alpha_
         if verbose>=2.5:
-            print(accept_flag.float().mean())
+            print(accept_flag.float().mean().item())
         Y=torch.where(accept_flag.unsqueeze(-1),input=Z,other=Y)
         VY=torch.where(accept_flag,input=VZ,other=VY)
         rejection_rate  = (kernel_pass-(nb))/kernel_pass*rejection_rate+(1./kernel_pass)*((1-accept_flag.float()).sum().item())
