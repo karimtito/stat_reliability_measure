@@ -63,6 +63,7 @@ class config:
     v_min_opt=False
     ess_opt=False
     only_duplicated=False
+    lambda_0=0.04
     np_seed=0
 
     ratio=0.6
@@ -132,6 +133,7 @@ parser.add_argument('--s',type=float,default=config.s)
 parser.add_argument('--s_range',type=str2floatList,default=config.s_range)
 parser.add_argument('--reject_thresh',type=float,default=config.reject_thresh)
 parser.add_argument('--g_t_0',type=float,default= config.g_t_0)
+parser.add_argument('--lambda_0',type=float,default=config.lambda_0)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -287,7 +289,7 @@ for p_t in config.p_range:
                                 clip_s=config.clip_s , s=s,K=K,
                                 s_min= config.s_min, s_max =config.s_max,
                                 reject_thresh=config.reject_thresh, 
-                                g_t_0=config.g_t_0
+                                g_t_0=config.g_t_0, lambda_0= config.lambda_0
                                 )
                                 t1=time()-t
                                 print(p_est)
@@ -351,7 +353,7 @@ for p_t in config.p_range:
                             ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
                             "d":config.d,"s":s,"clip_s":config.clip_s,"s_min":config.s_min,"s_max":config.s_max,
                             "K":K,"ratio":ratio,"reject_thresh":config.reject_thresh, 
-                            "g_t_0":config.g_t_0
+                            "g_t_0":config.g_t_0,"lambda_0":config.lambda_0
                             }
 
                             results_df=pd.DataFrame([results])
