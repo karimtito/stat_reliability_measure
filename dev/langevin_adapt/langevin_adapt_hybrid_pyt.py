@@ -80,7 +80,7 @@ track_v_means=True,adapt_d_t=False,target_accept=0.574,accept_spread=0.1,d_t_dec
 v_min_opt=False,v1_kernel=True,lambda_0=1, s=1,
 debug=False,only_duplicated=False, L_target=0,
 rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,clip_s=False
-,s_min=8e-3,s_max=3,decay=0.95,g_t_0=0.65):
+,s_min=8e-3,s_max=3,decay=0.95,g_t_0=0.65,s_opt=True):
     """
       Adaptive Langevin SMC estimator  
       Args:
@@ -180,65 +180,83 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
             Z=Y[ind_,:] 
             SZ=SY[ind_]
             VZ=VY[ind_]
-        
-        l_reject_rates=[]
-        for _ in range(T):
-            with torch.no_grad():
-                W = simp_kernel(Z,s) # propose a refreshed samples
-                kernel_pass+=(N-K)
-                #SW = score_func(W) # compute their scores
-                #VW_= torch.clamp(L_j-SW,min=0)
-                VW=V_(W)
-                #assert torch.equal(input=VW,other=VW_)
-                Count_v+= (N-K)
-                #accept_flag= SW>L_j
+        # if not kernel_test:
+        #     l_reject_rates=[]
+        #     for _ in range(T):
+        #         with torch.no_grad():
+        #             W = simp_kernel(Z,s) # propose a refreshed samples
+        #             kernel_pass+=(N-K)
+        #             #SW = score_func(W) # compute their scores
+        #             #VW_= torch.clamp(L_j-SW,min=0)
+        #             VW=V_(W)
+        #             #assert torch.equal(input=VW,other=VW_)
+        #             Count_v+= (N-K)
+        #             #accept_flag= SW>L_j
+                    
+                        
+                    
+                    
+
+                                    
+        #             Count_v+= 2*nb_to_renew if only_duplicated else 2*N
+        #             high_diff=(W-(1/math.sqrt(1+s**2))*Z)
+        #             low_diff=(Z-(1/math.sqrt(1+s**2))*W)
+                    
+        #             log_a_high=-beta*VW-(s**2/(1+s**2))*torch.sum(high_diff**2,dim=1)
+        #             log_a_low= -beta*VZ-(s**2/(1+s**2))*torch.sum(low_diff**2,dim=1)
+
+
+        #             if gaussian: 
+        #                 log_a_high-= 0.5*torch.sum(W**2,dim=1)
+        #                 log_a_low-= 0.5*torch.sum(Z**2,dim=1)
+        #             #alpha=torch.clamp(input=torch.eYp(log_a_high-log_a_low),max=1) /!\ clamping is not necessary
+        #             alpha_=torch.exp(log_a_high-log_a_low)
+        #             b_size= N-K
+        #             U=torch.rand(size=(b_size,),device=device) 
+        #             accept_flag=U<alpha_
+        #             if verbose>=2:
+        #                 print(f"Local accept ratio :{accept_flag.float().mean().item()}")
+        #             Z=torch.where(accept_flag.unsqueeze(-1),input=W,other=Z)
+        #             VZ=torch.where(accept_flag,input=VW,other=VZ)
                 
                     
-                
-                
-
-                                
-                Count_v+= 2*nb_to_renew if only_duplicated else 2*N
-                high_diff=(W-(1/math.sqrt(1+s**2))*Z)
-                low_diff=(Z-(1/math.sqrt(1+s**2))*W)
-                
-                log_a_high=-beta*VW-(s**2/(1+s**2))*torch.sum(high_diff**2,dim=1)
-                log_a_low= -beta*VZ-(s**2/(1+s**2))*torch.sum(low_diff**2,p=2,dim=1)
-
-
-                if gaussian: 
-                    log_a_high-= 0.5*torch.sum(W**2,dim=1)
-                    log_a_low-= 0.5*torch.sum(Z**2,dim=1)
-                #alpha=torch.clamp(input=torch.eYp(log_a_high-log_a_low),max=1) /!\ clamping is not necessary
-                alpha_=torch.exp(log_a_high-log_a_low)
-                b_size= N-K
-                U=torch.rand(size=(b_size,),device=device) 
-                accept_flag=U<alpha_
-                if verbose>=2:
-                    print(f"Local accept ratio :{accept_flag.float().mean()}")
-                Z=torch.where(accept_flag.unsqueeze(-1),input=W,other=Z)
-                VZ=torch.where(accept_flag,input=VW,other=VZ)
-            
-                
-                #assert torch.equal(input=VZ,other=VZ_)
-                reject_flag=1-accept_flag.float()
-                rejection_rate  = (kernel_pass-(N-K))/kernel_pass*rejection_rate+(1./kernel_pass)*((1-accept_flag.float()).sum().item())
-                
-                if track_reject:
-                    l_reject_rates.append(reject_flag.float().mean().item())
-                    reject_rates.append(reject_flag.float().mean().item())
-
-
-                if rejection_ctrl and rejection_rate>=reject_thresh:
+        #             #assert torch.equal(input=VZ,other=VZ_)
+        #             reject_flag=1-accept_flag.float()
+        #             rejection_rate  = (kernel_pass-(N-K))/kernel_pass*rejection_rate+(1./kernel_pass)*((1-accept_flag.float()).sum().item())
                     
-                    s = s*decay if not clip_s else np.clip(s*decay,a_min=s_min,a_max=s_max)
-                    if verbose>1:
-                        print('Strength of kernel diminished!')
-                        print(f's={s}')
-        
+        #             if track_reject:
+        #                 l_reject_rates.append(reject_flag.float().mean().item())
+        #                 reject_rates.append(reject_flag.float().mean().item())
+
+
+        #             if rejection_ctrl and rejection_rate>=reject_thresh:
+                        
+        #                 s = s*decay if not clip_s else np.clip(s*decay,a_min=s_min,a_max=s_max)
+        #                 if verbose>1:
+        #                     print('Strength of kernel diminished!')
+        #                     print(f's={s}')
+        if s_opt:
+            Z,VZ,nb_calls,dict_out=apply_simp_kernel(Y=Z,v_y=VZ,simp_kernel=simp_kernel,T=T,beta=beta,
+            s=s,V=V_,gaussian=gaussian,device=device,decay=decay,clip_s=clip_s,s_min=s_min,s_max=s_max,
+            debug=debug,verbose=verbose,rejection_rate=rejection_rate,kernel_pass=kernel_pass,track_accept=track_accept,
+            reject_ctrl=rejection_ctrl,reject_thresh=reject_thresh)
+        else:
+            raise NotImplementedError("Langevin option for level-progression is not implemented yet.")
+
+        Count_v+=nb_calls
+
         if track_reject:
+            l_reject_rates=dict_out['local_accept_rates']
+            reject_rates.extend(l_reject_rates)
             reject_rate_mcmc=np.array(l_reject_rates).mean()
             reject_rates_mcmc.append(reject_rate_mcmc)
+            
+        kernel_pass=dict_out['l_kernel_pass']
+        if rejection_ctrl:
+            s=dict_out['s']
+            rejection_rate=dict_out['rejection_rate']
+        
+             
         SZ=score_func(Z)
         SY=score_func(Y)
         with torch.no_grad():
@@ -282,7 +300,7 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
 
     old_v=v        
     L_j=0
-    v=V(X,L=L_j)
+    v=V_(X)
     G=torch.exp(-beta*(v-old_v))
     g_iter=G.mean().item()
     g_prod*=g_iter
@@ -342,7 +360,7 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
 
                 
                 if not gaussian:
-                    high_diff= (Y-cand_Y-delta_t*gradV(cand_Y)).detach()
+                    high_diff=(Y-cand_Y-delta_t*gradV(cand_Y)).detach()
                     low_diff=(cand_Y-Y-delta_t*gradV(Y)).detach()
                 else:
                     if v1_kernel:
