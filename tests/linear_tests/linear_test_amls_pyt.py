@@ -137,7 +137,7 @@ if config.track_gpu:
         print("Multi gpus detected, only the first GPU will be tracked.")
     config.gpu_name=gpus[0].name
 
-if config.track_cpu:
+if config.track_cpu: 
     config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
     config.cores_number=os.cpu_count()
 
@@ -150,8 +150,7 @@ if not os.path.exists('../../logs'):
     os.mkdir('../../logs')
     os.mkdir(config.log_dir)
 elif not os.path.exists(config.log_dir):
-    os.mkdir(config.log_dir
-    )
+    os.mkdir(config.log_dir)
 raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
