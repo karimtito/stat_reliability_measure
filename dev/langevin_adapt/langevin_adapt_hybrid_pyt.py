@@ -1,4 +1,3 @@
-from psutil import AccessDenied
 import torch 
 import math
 import numpy as np
@@ -80,7 +79,7 @@ track_v_means=True,adapt_d_t=False,target_accept=0.574,accept_spread=0.1,d_t_dec
 v_min_opt=False,v1_kernel=True,lambda_0=1, s=1,
 debug=False,only_duplicated=False, L_target=0,
 rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,clip_s=False
-,s_min=8e-3,s_max=3,decay=0.95,g_t_0=0.65,s_opt=True):
+,s_min=8e-3,s_max=3,decay=0.95,g_t_0=0.65,s_opt=True,track_delta_t=False):
     """
       Adaptive Langevin SMC estimator  
       Args:
@@ -107,6 +106,8 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
     
     if adapt_d_t and d_t_gain is None:
         d_t_gain= 1/d_t_decay
+        if track_delta_t:
+            delta_ts=[]
     if device is None: 
         device= "cuda:0" if torch.cuda.is_available() else "cpu"
     # Internals
@@ -166,20 +167,23 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
             
         with torch.no_grad():
 
-            Y = X[ind[0:K],:]
-            SY = SX[ind[0:K]] # Keep their scores in SY
-            #VY = torch.clamp(L_j-SY, min=0)
-            VY=v[ind[0:K]]
+            y = X[ind[0:K],:]
+            Sy = SX[ind[0:K]] # Keep their scores in SY
+            worst_score=Sy[-1]
+            print(f"worst score:{worst_score}")
             
-            # step D: refresh samples
+            #VY = torch.clamp(L_j-SY, min=0)
+            Vy=v[ind[0:K]]
+            
+           
             #Z = torch.zeros((N-K,d),device=device)
             #SZ = torch.zeros((N-K,1),device=device)
-
+            #resample randomly from K best particles
             ind_=torch.multinomial(input=torch.ones(size=(K,)),num_samples=N-K,replacement=True).squeeze(-1)
-
-            Z=Y[ind_,:] 
-            SZ=SY[ind_]
-            VZ=VY[ind_]
+             # step D: refresh samples
+            Z=y[ind_,:] 
+            SZ=Sy[ind_]
+            VZ=Vy[ind_]
         # if not kernel_test:
         #     l_reject_rates=[]
         #     for _ in range(T):
@@ -240,38 +244,50 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
             s=s,V=V_,gaussian=gaussian,device=device,decay=decay,clip_s=clip_s,s_min=s_min,s_max=s_max,
             debug=debug,verbose=verbose,rejection_rate=rejection_rate,kernel_pass=kernel_pass,track_accept=track_accept,
             reject_ctrl=rejection_ctrl,reject_thresh=reject_thresh)
+            kernel_pass=dict_out['l_kernel_pass']
+            if rejection_ctrl:
+                s=dict_out['s']
+                rejection_rate=dict_out['rejection_rate']
         else:
-            raise NotImplementedError("Langevin option for level-progression is not implemented yet.")
+            Z,VZ,nb_calls,dict_out=apply_l_kernel(Y=Z ,v_y=VZ,delta_t=delta_t,beta=beta,V=V,gradV=gradV,l_kernel=l_kernel,
+            T=T,mh_opt=mh_opt,device=device,v1_kernel=v1_kernel,adapt_d_t=adapt_d_t, track_accept=track_accept,
+            d_t_decay=d_t_decay,d_t_gain=d_t_gain,debug=False,target_accept=target_accept,accept_spread=accept_spread,
+            gaussian=gaussian, verbose=verbose,track_delta_t=track_delta_t)
+            if adapt_d_t:
+                delta_t = dict_out['delta_t']
+                if track_delta_t:
+                    delta_ts.extend(dict_out['delta_ts'])
+            #raise NotImplementedError("Langevin option for level-progression is not implemented yet.")
 
         Count_v+=nb_calls
 
         if track_reject:
             l_reject_rates=dict_out['local_accept_rates']
             reject_rates.extend(l_reject_rates)
-            reject_rate_mcmc=np.array(l_reject_rates).mean()
-            reject_rates_mcmc.append(reject_rate_mcmc)
+            reject_rates_mcmc.append(np.array(l_reject_rates).mean())
             
-        kernel_pass=dict_out['l_kernel_pass']
-        if rejection_ctrl:
-            s=dict_out['s']
-            rejection_rate=dict_out['rejection_rate']
+        
+        
         
              
         SZ=score_func(Z)
-        SY=score_func(Y)
+        VZ=torch.clamp(L_j-SZ,min=0)
+        #SY=score_func(Y)
         with torch.no_grad():
         # step A: update set X and the scores
-            X[:K,:] = Y # copy paste the old samples of Y into X
-            SX[:K] = SY
-            v[:K] = VY
+            X[:K,:] = y # copy paste the old samples of Y into X
+            SX[:K] = Sy
+            v[:K] = Vy
             X[K:N,:] = Z # copy paste the new samples of Z into X
             SX[K:N] = SZ
             v[K:N] = VZ
             # step B: Find new threshold
+            
             ind = torch.argsort(SX,dim=0,descending=True).squeeze(-1) # sort in descending order
             S_sort= SX[ind]
             new_tau = S_sort[K]
-        
+        print(f"new_tau={new_tau}")
+        assert new_tau>L_j
         
 
         
