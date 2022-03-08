@@ -140,6 +140,7 @@ parser.add_argument('--s_max',type=float,default= config.s_max)
 parser.add_argument('--s_decay',type=float,default=config.s_decay)
 parser.add_argument('--s_gain',type =float,default= config.s_gain)
 
+
 parser.add_argument('--track_delta_t',type=str2bool,default=config.track_delta_t)
 args=parser.parse_args()
 
@@ -223,7 +224,7 @@ config.json=vars(args)
 # else:
 #     aggr_res_path=config.aggr_res_path
 
-
+adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBetaPyt
 
 param_ranges = [config.N_range,config.T_range,config.rho_range,config.alpha_range,config.p_range]
 param_lens=np.array([len(l) for l in param_ranges])
@@ -278,7 +279,7 @@ for p_t in config.p_range:
                         adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
                         d_t_gain=config.d_t_gain,
                         v_min_opt=config.v_min_opt,
-                        v1_kernel=config.v1_kernel, ess_opt=config.ess_opt,
+                        v1_kernel=config.v1_kernel,
                          lambda_0= config.lambda_0,
                         only_duplicated=config.only_duplicated,
                         s_opt=config.s_opt,
