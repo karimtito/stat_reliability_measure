@@ -270,7 +270,7 @@ for p_t in config.p_range:
                     print(f"Starting simulations with p_t:{p_t},g_t:{g_t},T:{T},alpha:{alpha},N:{N}")
                     for i in iterator:
                         t=time()
-                        p_est,res_dict,=smc_pyt.LangevinSMCSimpAdaptPyt(gen=norm_gen,
+                        p_est,res_dict,=smc_pyt.LangevinSMCSimpAdaptPyt(gen=norm_gen,adapt_func=adapt_func,
                         l_kernel=kernel_function,N=N,min_rate=config.min_rate,
                         g_target=g_t,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
                         verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
