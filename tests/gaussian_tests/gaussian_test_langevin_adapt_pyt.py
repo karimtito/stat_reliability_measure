@@ -15,7 +15,6 @@ import pandas as pd
 import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
 
-
 method_name="langevin_adapt_pyt"
 
 #gaussian_linear
@@ -279,13 +278,13 @@ for p_t in config.p_range:
                         adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
                         d_t_gain=config.d_t_gain,
                         v_min_opt=config.v_min_opt,
-                        v1_kernel=config.v1_kernel,
+                        v1_kernel=config.v1_kernel, ess_opt=config.ess_opt,
                          lambda_0= config.lambda_0,
                         only_duplicated=config.only_duplicated,
                         s_opt=config.s_opt,
                         s=config.s,s_decay=config.s_decay,s_gain=config.s_gain,
                         s_min=config.s_min,s_max=config.s_max, 
-                        track_delta_t=config.track_delta_t)
+                        track_delta_t=config.track_delta_t,)
                         t1=time()-t
                         print(p_est)
                         finish_flag=res_dict['finished']
