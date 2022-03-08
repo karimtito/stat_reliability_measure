@@ -341,7 +341,9 @@ for p_t in config.p_range:
                     "adapt_d_t_mcmc":config.adapt_d_t_mcmc,"d_t_decay":config.d_t_decay,"d_t_gain":config.d_t_gain,
                     "target_accept":config.target_accept,"accept_spread":config.accept_spread
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number, 
-                    "v_min_opt":config.v_min_opt
+                    "v_min_opt":config.v_min_opt,"ess_opt":config.ess_opt, 
+                    "s_opt":config.s_opt,"s_min":config.s_min,"s_max":config.s_max,"decay":config.s_decay,
+                    "gain_rate":config.s_gain
                     }
 
                     results_df=pd.DataFrame([results])
