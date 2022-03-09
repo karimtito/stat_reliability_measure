@@ -169,8 +169,9 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
 
             y = X[ind[0:K],:]
             Sy = SX[ind[0:K]] # Keep their scores in SY
-            worst_score=Sy[-1]
-            print(f"worst score:{worst_score}")
+            if verbose>=1.5:
+                worst_score=Sy[-1]
+                print(f"worst score:{worst_score}")
             
             #VY = torch.clamp(L_j-SY, min=0)
             Vy=v[ind[0:K]]
@@ -286,8 +287,9 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
             ind = torch.argsort(SX,dim=0,descending=True).squeeze(-1) # sort in descending order
             S_sort= SX[ind]
             new_tau = S_sort[K]
-        print(f"new_tau={new_tau}")
-        assert new_tau>L_j
+        if verbose>=1.5:
+            print(f"new_tau={new_tau}")
+        assert new_tau>L_j,"L_j sequence should be increasing!"
         
 
         
