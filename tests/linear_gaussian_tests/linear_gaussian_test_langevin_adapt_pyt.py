@@ -59,6 +59,8 @@ class config:
     accept_spread=0.1
     d_t_decay=0.999
     d_t_gain=1/d_t_decay
+    d_t_min=1e-5
+    d_t_max=1e-1
     v_min_opt=False
     ess_opt=False
     only_duplicated=False
@@ -124,6 +126,8 @@ parser.add_argument('--target_accept',type=float,default=config.target_accept)
 parser.add_argument('--accept_spread',type=float,default=config.accept_spread)
 parser.add_argument('--d_t_decay',type=float,default=config.d_t_decay)
 parser.add_argument('--d_t_gain',type=float,default=config.d_t_gain)
+parser.add_argument('--d_t_min',type=float,default=config.d_t_min)
+parser.add_argument('--d_t_max',type=float,default=config.d_t_max)
 parser.add_argument('--adapt_d_t_mcmc',type=str2bool,default=config.adapt_d_t_mcmc)
 parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
 parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
@@ -301,7 +305,7 @@ for p_t in config.p_range:
                         allow_zero_est=config.allow_zero_est,gaussian =True,
                         target_accept=config.target_accept,accept_spread=config.accept_spread, 
                         adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
-                        d_t_gain=config.d_t_gain,
+                        d_t_gain=config.d_t_gain,d_t_min=config.d_t_min,d_t_max=config.d_t_max,
                         v_min_opt=config.v_min_opt,
                         v1_kernel=config.v1_kernel, lambda_0= config.lambda_0,
                         only_duplicated=config.only_duplicated,
@@ -383,7 +387,8 @@ for p_t in config.p_range:
                     "np_seed":config.np_seed,"torch_seed":config.torch_seed
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
                     "d":config.d,"s_opt":config.s_opt,"s":config.s,"clip_s":config.clip_s,"s_min":config.s_min,"s_max":config.s_max,
-                    "ess_opt":config.ess_opt
+                    "ess_opt":config.ess_opt, 
+                    "d_t_min":config.d_t_min,"d_t_max":config.d_t_max
                     }
 
                     results_df=pd.DataFrame([results])

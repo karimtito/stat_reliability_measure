@@ -60,8 +60,6 @@ class config:
     accept_spread=0.1
     d_t_decay=0.999
     d_t_gain=1/d_t_decay
-    d_t_min=1e-5
-    d_t_max=1e-1
     v_min_opt=False
     ess_opt=False
     only_duplicated=False
@@ -84,7 +82,7 @@ class config:
     reject_thresh=0.9
     kernel_test=False
     s_opt=True
-
+    
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
@@ -257,11 +255,15 @@ for p_t in config.p_range:
     # V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=None)
     # gradV= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
     def V(X, L=0):
-        return torch.clamp(input=L+c-X[:,0], min=0)
+        res= torch.clamp(input=L+torch.norm(X,p=2,dim=-1)*c-X[:,0], min=0, max=None)
+        return res
     def gradV(X, L=0):
-        return -torch.transpose(e_1[:,None]*(X[:,0]<L+c),dim0=1,dim1=0)
+        res=(c*X/torch.norm(X,p=2,dim=-1)[:,None] -e_1[None,:])*(X[:,0]<L+c*torch.norm(X,p=2,dim=1))[:,None]
+        return res
+
     
-    score_func=lambda X: X[:,0]-c
+    
+    score_func=lambda X: torch.norm(X,p=2,dim=-1)*X[:,0]-c
     norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
     normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2)
     for g_t in config.g_range:
@@ -294,12 +296,12 @@ for p_t in config.p_range:
                                 allow_zero_est=config.allow_zero_est,gaussian =True,
                                 target_accept=config.target_accept,accept_spread=config.accept_spread, 
                                 adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
-                                d_t_min=config.d_t_min,d_t_max=config.d_t_max,
                                 d_t_gain=config.d_t_gain,v_min_opt=config.v_min_opt, v1_kernel=config.v1_kernel,
                                 only_duplicated=config.only_duplicated,
                                 clip_s=config.clip_s , s=s,K=K,
                                 s_min= config.s_min, s_max =config.s_max,
-                                reject_thresh=config.reject_thresh, s_opt=config.s_opt,
+                                reject_thresh=config.reject_thresh, 
+                                s_opt=config.s_opt,
                                 g_t_0=config.g_t_0, lambda_0= config.lambda_0,
                                 gain_rate=config.s_gain,decay=config.s_decay
                                 )

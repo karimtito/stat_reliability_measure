@@ -302,7 +302,7 @@ def LangevinSMCSimpAdaptPyt(gen,  V, gradV,l_kernel,apply_kernel=apply_l_kernel,
 max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,device=None,mh_opt=False,mh_every=1,track_accept=False
 ,track_beta=False,return_log_p=False,gaussian=False, projection=None,track_calls=True,
 track_v_means=True,adapt_d_t=False,track_delta_t=False,target_accept=0.574,accept_spread=0.1,d_t_decay=0.999,d_t_gain=None,
-v_min_opt=False,v1_kernel=True,lambda_0=1,s_opt=False,
+d_t_min=1e-5,d_t_max=1e-2,v_min_opt=False,v1_kernel=True,lambda_0=1,s_opt=False,
 debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
 ,clip_s=True,s_min=1e-3,s_max= 3,reject_ctrl=True,reject_thresh=0.1,prog_thresh=0.1):
     """
@@ -405,7 +405,8 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
             Y,v_y,nb_calls,dict_out=apply_l_kernel(Y=Y ,v_y=v_y,delta_t=delta_t,beta=beta,V=V,gradV=gradV,l_kernel=l_kernel,
             T=T,mh_opt=mh_opt,device=device,v1_kernel=v1_kernel,adapt_d_t=adapt_d_t, track_accept=track_accept,
             d_t_decay=d_t_decay,d_t_gain=d_t_gain,debug=False,target_accept=target_accept,accept_spread=accept_spread,
-            gaussian=gaussian, verbose=verbose,track_delta_t=track_delta_t)
+            gaussian=gaussian, verbose=verbose,track_delta_t=track_delta_t,
+            d_t_min=d_t_min,d_t_max=d_t_max)
             if adapt_d_t:
                 delta_t = dict_out['delta_t']
                 if track_delta_t:

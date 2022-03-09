@@ -280,7 +280,7 @@ download,):
 def apply_l_kernel(Y,v_y,l_kernel,T:int,beta,gradV,V,delta_t:float,mh_opt:bool,track_accept:bool,
  gaussian:bool,device,v1_kernel:bool, adapt_d_t:bool,
 target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bool=False,verbose:float =1
-,track_delta_t=False):
+,track_delta_t=False,d_t_min=None,d_t_max=None):
     """_summary_
 
     Args:
@@ -357,8 +357,14 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
             if adapt_d_t:
                 if accept_rate>target_accept+accept_spread:
                     delta_t*=d_t_gain
+                    
+
                 elif accept_rate<target_accept-accept_spread: 
                     delta_t*=d_t_decay
+                if d_t_min is not None:
+                    delta_t=max(delta_t,d_t_min)
+                if d_t_max is not None:
+                    delta_t=min(delta_t,d_t_max)
                 if verbose>=2.5:
                     print(f"New delta_t:{delta_t}")
 
