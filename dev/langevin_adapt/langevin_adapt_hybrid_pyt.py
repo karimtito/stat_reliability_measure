@@ -436,9 +436,11 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
 
             Count_v= Count_v+ nb_to_renew if only_duplicated else Count_v+N
         
-        Y,v_y,nb_calls,dict_out=apply_l_kernel(Y=Y ,v_y=v_y,delta_t=delta_t,beta=beta,V=V,gradV=gradV,l_kernel=l_kernel,
+        Y,v_y,nb_calls,dict_out=apply_l_kernel(Y=Y ,v_y=v_y,delta_t=delta_t,beta=beta,V=V,gradV=gradV,
+            l_kernel=l_kernel,
             T=T,mh_opt=mh_opt,device=device,v1_kernel=v1_kernel,adapt_d_t=adapt_d_t, track_accept=track_accept,
-            d_t_decay=d_t_decay,d_t_gain=d_t_gain,debug=False,target_accept=target_accept,accept_spread=accept_spread,
+            d_t_decay=d_t_decay,d_t_gain=d_t_gain,debug=False,target_accept=target_accept,
+            accept_spread=accept_spread,
             gaussian=gaussian, verbose=verbose,track_delta_t=track_delta_t,
             d_t_min=d_t_min,d_t_max=d_t_max)
         if adapt_d_t:
