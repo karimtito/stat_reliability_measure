@@ -263,12 +263,14 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
 
         Count_v+=nb_calls
 
-        if track_reject:
-            l_reject_rates=dict_out['local_accept_rates']
-            reject_rates.extend(l_reject_rates)
-            reject_rates_mcmc.append(np.array(l_reject_rates).mean())
-            
-        
+        if track_accept:
+            local_accept_rates=dict_out['local_accept_rates']
+            accept_rates.extend(local_accept_rates)
+            accept_rate_mcmc=np.array(local_accept_rates).mean()
+            if verbose>=2:
+                print(accept_rate_mcmc)
+            accept_rates_mcmc.append(accept_rate_mcmc)
+
         
         
              
@@ -293,12 +295,12 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
         assert new_tau>L_j,"L_j sequence should be increasing!"
         
 
-        
-        if rejection_rate<=reject_thresh and (new_tau-L_j)/L_j<prog_thresh:
-            s = s*gain_rate if not clip_s else np.clip(s*gain_rate,s_min,s_max)
-            if verbose>1:
-                print('Strength of kernel increased!')
-                print(f's={s}')
+        if s_opt:
+            if rejection_rate<=reject_thresh and (new_tau-L_j)/L_j<prog_thresh:
+                s = s*gain_rate if not clip_s else np.clip(s*gain_rate,s_min,s_max)
+                if verbose>1:
+                    print('Strength of kernel increased!')
+                    print(f's={s}')
         L_j = torch.clamp(S_sort[K], max=0) # set the threshold to (K+1)-th
         old_v=v
         with torch.no_grad():
