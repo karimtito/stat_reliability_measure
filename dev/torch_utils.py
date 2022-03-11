@@ -111,6 +111,21 @@ def langevin_kernel_pyt(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sig
             X_new=(1-delta_t/beta)*X -delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise # U(x)=beta*V(x)+(1/2)x^T*Sigma*x
     return X_new
 
+def langevin_kernel_pyt3(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sigma=1):
+    """performs one step of langevin kernel with inverse temperature beta"""
+    if device is None:
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
+    
+    grad=gradV(X)
+    
+    with torch.no_grad():
+        G_noise = torch.randn(size = X.shape).to(device)
+        if not gaussian:
+            X_new =X-beta*delta_t*grad+torch.sqrt(2*delta_t)*G_noise 
+        else:
+            X_new=(1-delta_t)*X -beta*delta_t*grad+torch.sqrt(2*delta_t)*G_noise # U(x)=beta*V(x)+(1/2)x^T*Sigma*x
+    return X_new
+
 def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sigma=1):
     """performs one step of langevin kernel with inverse temperature beta"""
     if device is None:
@@ -335,16 +350,25 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
                     high_diff=(Y-math.sqrt(1-(2*delta_t/beta))*cand_Y-delta_t*gradV(cand_Y)).detach()
                     low_diff=(cand_Y-math.sqrt(1-(2*delta_t/beta))*Y-delta_t*gradV(Y)).detach()
             nb_calls+= 2*nb
-            log_a_high=-beta*(cand_v_y+(1/(4*delta_t))*torch.norm(high_diff,p=2 ,dim=1)**2)
+            log_a_high=-beta*(cand_v_y)
+            log_a_low= -beta*v_y
+            if verbose>=5:
+                print(f"intermediate 1 log_diff:{log_a_high-log_a_low}")
+            log_a_high+= -(beta/(4*delta_t))*torch.norm(high_diff,p=2 ,dim=1)**2
+            log_a_low+= -(beta/(4*delta_t))*torch.norm(low_diff,p=2,dim=1)**2
             
-            
-            
-            log_a_low= -beta*(v_y+(1/(4*delta_t))*torch.norm(low_diff,p=2,dim=1)**2)
+            if verbose>=5: 
+                print(f"intermediate 2 log_diff:{log_a_high-log_a_low}")
             if gaussian: 
-                log_a_high-= 0.5*torch.sum(cand_Y**2,dim=1)
+                log_a_high-=0.5*torch.sum(cand_Y**2,dim=1)
                 log_a_low-= 0.5*torch.sum(Y**2,dim=1)
+
+            if verbose>=5: 
+                print(f"intermediate 3 log_diff:{log_a_high-log_a_low}")
             #alpha=torch.clamp(input=torch.eYp(log_a_high-log_a_low),max=1) /!\ clamping is not necessary
             alpha_=torch.exp(log_a_high-log_a_low)
+            if verbose>=5: 
+                print(f"alpha_={alpha_}")
             b_size= nb
             U=torch.rand(size=(b_size,),device=device) 
             accept=U<alpha_
@@ -362,11 +386,11 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
                 elif accept_rate<target_accept-accept_spread: 
                     delta_t*=d_t_decay
                 if d_t_min is not None:
-                    delta_t=max(delta_t,d_t_min)
+                    delta_t=torch.clamp(delta_t,min=d_t_min)
                 if d_t_max is not None:
-                    delta_t=min(delta_t,d_t_max)
+                    delta_t=torch.clamp(delta_t,max=d_t_max)
                 if verbose>=2.5:
-                    print(f"New delta_t:{delta_t}")
+                    print(f"New delta_t:{delta_t.item()}")
 
                 if track_delta_t:
                     delta_ts.append(delta_t.item())
@@ -455,7 +479,10 @@ def apply_simp_kernel(Y,v_y,simp_kernel,T:int,beta:float,s:float, V,
         rejection_rate  = (kernel_pass-(nb))/kernel_pass*rejection_rate+(1./kernel_pass)*((1-accept_flag.float()).sum().item())
         
         if track_accept:
-            l_accept_rates.append(accept_flag.float().mean().item())
+            l_accept_rate=accept_flag.float().mean().item()
+            if verbose>=3:
+                print(f"local accept_rate:{l_accept_rate}")
+            l_accept_rates.append(l_accept_rate)
         if reject_ctrl and rejection_rate>=reject_thresh:
             
             s = s*decay if not clip_s else np.clip(s*decay,a_min=s_min,a_max=s_max)
