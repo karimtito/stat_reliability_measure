@@ -31,7 +31,7 @@ class config:
     p_range=[]
     p_t=1e-15
     n_rep=10
-    
+    debug=False
     save_config=False 
     d=1024
     verbose=1
@@ -59,7 +59,7 @@ class config:
     target_accept=0.574
     accept_spread=0.1
     d_t_decay=0.999
-    d_t_gain=1/d_t_decay
+    d_t_gain=None
     d_t_min=1e-5
     d_t_max=1e-1
     v_min_opt=False
@@ -91,7 +91,6 @@ parser.add_argument('--n_rep',type=int,default=config.n_rep)
 #parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--d',type=int,default=config.d)
-
 parser.add_argument('--min_rate',type=float,default=config.min_rate)
 #parser.add_argument('--alpha',type=float,default=config.alpha)
 parser.add_argument('--n_max',type=int,default=config.n_max)
@@ -102,14 +101,12 @@ parser.add_argument('--save_config',type=str2bool, default=config.save_config)
 #parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
 #parser.add_argument('--rho',type=float,default=config.rho)
 parser.add_argument('--allow_multi_gpu',type=str2bool)
-
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
 parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
 parser.add_argument('--device',type=str, default=config.device)
 parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_est)
 parser.add_argument('--torch_seed',type=int, default=config.torch_seed)
 #parser.add_argument('--np_seed',type=int, default=config.np_seed)
-
 #parser.add_argument('--noise_dist',type=str, default=config.noise_dist)
 parser.add_argument('--sigma', type=float,default=config.sigma)
 parser.add_argument('--p_t',type=float,default=config.p_t)
@@ -146,6 +143,7 @@ parser.add_argument('--g_t_0',type=float,default= config.g_t_0)
 parser.add_argument('--lambda_0',type=float,default=config.lambda_0)
 parser.add_argument('--kernel_test',type=str2bool,default=config.kernel_test)
 parser.add_argument('--s_opt',type=str2bool, default=config.s_opt)
+parser.add_argument('--debug',type=str2bool,default=config.debug)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -228,6 +226,10 @@ if not os.path.exists(raw_logs_path):
 loc_time= datetime.today().isoformat().split('.')[0]
 log_name=method_name+'_'+'_'+loc_time
 log_path=os.path.join(raw_logs_path,log_name)
+if config.d_t_gain is None:
+    config.d_t_gain=1/config.d_t_decay
+
+    
 os.mkdir(path=log_path)
 config.json=vars(args)
 
@@ -235,6 +237,7 @@ config.json=vars(args)
 #     aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
 # else:
 #     aggr_res_path=config.aggr_res_path
+
 
 
 
@@ -303,7 +306,8 @@ for p_t in config.p_range:
                                 s_min= config.s_min, s_max =config.s_max,
                                 reject_thresh=config.reject_thresh, s_opt=config.s_opt,
                                 g_t_0=config.g_t_0, lambda_0= config.lambda_0,
-                                gain_rate=config.s_gain,decay=config.s_decay
+                                gain_rate=config.s_gain,decay=config.s_decay, 
+                                debug=config.debug
                                 )
                                 t1=time()-t
                                 print(p_est)
