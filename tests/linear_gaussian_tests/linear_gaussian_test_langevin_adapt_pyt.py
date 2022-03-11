@@ -58,7 +58,7 @@ class config:
     target_accept=0.574
     accept_spread=0.1
     d_t_decay=0.999
-    d_t_gain=1/d_t_decay
+    d_t_gain=None
     d_t_min=1e-5
     d_t_max=1e-1
     v_min_opt=False
@@ -231,6 +231,8 @@ config.json=vars(args)
 # else:
 #     aggr_res_path=config.aggr_res_path
 
+if config.d_t_gain is None:
+    config.d_t_gain=1/config.d_t_decay
 config.json=vars(args)
 if config.print_config:
     print(config.json)
