@@ -194,7 +194,7 @@ else:
 
     aggr_res_path=config.aggr_res_path
 
-
+exp_res=[]
 
 param_ranges = [config.N_range,config.T_range,config.rho_range,config.alpha_range,config.p_range]
 param_lens=np.array([len(l) for l in param_ranges])
@@ -299,7 +299,7 @@ for p_t in config.p_range:
                     "target_accept":config.target_accept,"accept_spread":config.accept_spread
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number
                     }
-
+                    exp_res.append(results)
                     results_df=pd.DataFrame([results])
                     results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
                     if config.aggr_res_path is None:
@@ -315,4 +315,5 @@ for p_t in config.p_range:
                             aggr_res_df=pd.read_csv(aggr_res_path)
                         aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
                         aggr_res_df.to_csv(aggr_res_path,index=False)
-                    
+exp_df=pd.DataFrame(exp_res)
+exp_df.to_csv(os.path.join(log_path,'exp_results.csv'),index=False)        

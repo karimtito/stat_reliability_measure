@@ -1,8 +1,6 @@
 import torch
-
 import foolbox as fb
 import pandas as pd
-
 import numpy as np
 from tqdm import tqdm
 from stat_reliability_measure.dev.utils import dichotomic_search
@@ -33,6 +31,7 @@ method_name="langevin_base_pyt"
 
 class config:
     log_dir="../../logs/cifar10_tests"
+    model_dir="../../models/cifar10"
     n_rep=10
     N=40
     N_list=[]
@@ -216,12 +215,20 @@ data_transform=transforms.Compose([
                           transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
                       ])
 
-cifar10_train = datasets.CIFAR10("../data", train=True, download=config.download, transform=transforms.ToTensor())
-cifar10_test  = datasets.CIFAR10("../data", train=False, download=config.download, transform=transforms.ToTensor())
+cifar10_train = datasets.CIFAR10("../data", train=True, download=config.download, transform=data_transform)
+cifar10_test  = datasets.CIFAR10("../data", train=False, download=config.download, transform=data_transform)
 train_loader = DataLoader(cifar10_train, batch_size = 100, shuffle=True,)
 test_loader = DataLoader(cifar10_test , batch_size = 100, shuffle=False)
 
-  
+#instancing model to test
+supported_arch_list=['lenet']
+
+
+if config.model_arch.lower() in supported_arch_list:
+    model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
+    nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
+    download=config.download)
+
 
 #instancing custom CNN model
 model_CNN = CNN_custom()

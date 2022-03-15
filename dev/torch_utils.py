@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from stat_reliability_measure.dev.utils import float_to_file_float
-from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4
+from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet
 from torchvision import transforms,datasets
 from torch.utils.data import DataLoader
 from torch import optim
@@ -251,12 +251,33 @@ def gradV_pyt(x_,x_0,model,target_class,epsilon=0.05,gaussian_latent=True,clippi
     return grad_x
 
 
-def get_model(model_arch, robust_model, robust_eps,nb_epochs,model_dir,data_dir,test_loader, device ,
-download,):
+supported_datasets=['mnist','cifar10']
+datasets_idx={'mnist':0,'cifar10':1}
+datasets_in_shape=[(1,28,28),(3,32,32)]
 
-    model_shape=(1,28,28)
-    c_robust_eps=float_to_file_float(robust_eps)
-    model_name="model_"+model_arch if not robust_model else f"{model_arch}_robust_{c_robust_eps}"
+def get_loader(train,data_dir,download,dataset='mnist',batch_size=100): 
+    assert dataset in supported_datasets,f"support datasets are in {supported_datasets}"
+    if dataset=='mnist':
+        mnist_dataset = datasets.MNIST(data_dir, train=train, download=download, transform=transforms.ToTensor())
+        data_loader = DataLoader(mnist_dataset, batch_size = batch_size, shuffle=train,)
+    elif dataset=='cifar10':
+        data_transform=transforms.Compose([
+                          transforms.ToTensor(),
+                          transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+                      ])
+        cifar10_dataset = datasets.CIFAR10("../data", train=train, download=download, transform=data_transform)
+        data_loader = DataLoader(cifar10_dataset , batch_size = 100, shuffle=train)    
+    
+                    
+    return data_loader
+
+def get_model(model_arch, robust_model, robust_eps,nb_epochs,model_dir,data_dir,test_loader, device ,
+download,model_shape=(1,28,28),force_train=False,dataset='mnist',batch_size=100):
+
+    model_shape=datasets_in_shape[datasets_idx[dataset]]
+    if robust_model:
+        c_robust_eps=float_to_file_float(robust_eps)
+    model_name="model_"+model_arch +'_' + dataset if not robust_model else f"{model_arch}_robust_{c_robust_eps}"
     
     c_model_path=model_name+'.pt'
     model_path=os.path.join(model_dir,c_model_path)
@@ -266,14 +287,15 @@ download,):
         model=dnn2()
     elif model_arch.lower()=='dnn4':
         model=dnn4()
+    elif model_arch.lowwer()=='lenet':
+        model=LeNet()
     else:
         raise RuntimeError("Model architecture not supported.")
-    if not os.path.exists(model_path): 
+    if not os.path.exists(model_path) or force_train: 
         #if the model doesn't exist we retrain a model from scratch
         model.to(device)
         print("Model not found: it will be trained from scratch.")
-        mnist_train = datasets.MNIST(data_dir, train=True, download=download, transform=transforms.ToTensor())
-        train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
+        train_loader=get_loader(train=True, data_dir=data_dir, download=download,dataset=dataset,batch_size=batch_size)
         opt = optim.SGD(model.parameters(), lr=1e-1)
 
         print("Train Err", "Train Loss", "Test Err", "Test Loss", sep="\t")

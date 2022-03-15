@@ -225,12 +225,12 @@ if not os.path.exists(raw_logs_path):
 
 loc_time= datetime.today().isoformat().split('.')[0]
 log_name=method_name+'_'+'_'+loc_time
-log_path=os.path.join(raw_logs_path,log_name)
+exp_log_path=os.path.join(raw_logs_path,log_name)
 if config.d_t_gain is None:
     config.d_t_gain=1/config.d_t_decay
 
     
-os.mkdir(path=log_path)
+os.mkdir(path=exp_log_path)
 config.json=vars(args)
 
 # if config.aggr_res_path is None:
@@ -254,6 +254,8 @@ kernel_str='v1_kernel' if config.v1_kernel else 'v2_kernel'
 kernel_function=t_u.langevin_kernel_pyt if config.v1_kernel else t_u.langevin_kernel_pyt2 
 get_c_norm= lambda p:stat.norm.isf(p)
 run_nb=0
+
+exp_res=[]
 #iterator= tqdm(range(config.n_rep))
 for p_t in config.p_range:
     c=get_c_norm(p_t)
@@ -277,7 +279,7 @@ for p_t in config.p_range:
                         for s in config.s_range:
                             loc_time= datetime.today().isoformat().split('.')[0]
                             log_name=method_name+f'_N_{N}_T_{T}_a_{float_to_file_float(alpha)}_g_{float_to_file_float(g_t)}'+'_'+loc_time.split('_')[0]
-                            log_path=os.path.join(raw_logs_path,log_name)
+                            log_path=os.path.join(exp_log_path,log_name)
                             os.mkdir(path=log_path)
                             run_nb+=1
                             print(f'Run {run_nb}/{nb_runs}')
@@ -374,7 +376,7 @@ for p_t in config.p_range:
                             "g_t_0":config.g_t_0,"lambda_0":config.lambda_0,"s_opt":config.s_opt,
                             "gain_rate":config.s_gain,"decay":config.s_decay
                             }
-
+                            exp_res.append(results)
                             results_df=pd.DataFrame([results])
                             results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
                             if config.aggr_res_path is None:
@@ -391,6 +393,8 @@ for p_t in config.p_range:
                                 aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
                                 aggr_res_df.to_csv(aggr_res_path,index=False)
                         
+exp_df=pd.DataFrame(exp_res)
+exp_df.to_csv(os.path.join(log_path,'exp_results.csv'),index=False)
 
 
                     

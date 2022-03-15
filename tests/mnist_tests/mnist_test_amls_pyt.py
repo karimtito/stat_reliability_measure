@@ -32,6 +32,7 @@ str2intList=lambda x: str2list(in_str=x, type_out=int)
 low_str=lambda x: str(x).lower()
 
 method_name="amls_pyt"
+dataset="mnist"
 
 class config:
     log_dir="../../logs/mnist_tests"
@@ -116,6 +117,7 @@ class config:
     nb_epochs= 10
     adversarial_every=1
     data_dir="../../data"
+    p_ref_compute=False
 
 
 parser=argparse.ArgumentParser()
@@ -333,13 +335,13 @@ if config.use_attack:
     label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
 
 
-indices=np.arange(start=config.input_start,stop=config.input_stop)
+inp_indices=np.arange(start=config.input_start,stop=config.input_stop)
 i_exp=0
-param_lists= [ indices,config.T_list,config.N_list,config.s_list ,config.ratio_list,config.epsilons]
+param_lists= [ inp_indices,config.T_list,config.N_list,config.s_list ,config.ratio_list,config.epsilons]
 lenghts=np.array([len(L) for L in param_lists])
 nb_exps= np.prod(lenghts)
 
-for l in np.arange(start=config.input_start,stop=config.input_stop):
+for l in inp_indices:
     with torch.no_grad():
     
         x_0,y_0 = X[correct_idx][l], y[correct_idx][l]

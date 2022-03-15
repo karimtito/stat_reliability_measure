@@ -172,6 +172,7 @@ if config.torch_seed is None:
     config.torch_seed=int(time.time())
 torch.manual_seed(seed=config.torch_seed)
 
+exp_res=[]
 
 
 if config.track_gpu:
@@ -345,7 +346,7 @@ for p_t in config.p_range:
                     "s_opt":config.s_opt,"s_min":config.s_min,"s_max":config.s_max,"decay":config.s_decay,
                     "gain_rate":config.s_gain
                     }
-
+                    exp_res.append(results)
                     results_df=pd.DataFrame([results])
                     results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
                     if config.aggr_res_path is None:
@@ -361,7 +362,5 @@ for p_t in config.p_range:
                             aggr_res_df=pd.read_csv(aggr_res_path)
                         aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
                         aggr_res_df.to_csv(aggr_res_path,index=False)
-                    
-
-
-                    
+exp_df=pd.DataFrame(exp_res)
+exp_df.to_csv(os.path.join(log_path,'exp_results.csv'),index=False)

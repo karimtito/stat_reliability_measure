@@ -20,7 +20,7 @@ from time import time
 from datetime import datetime
 from stat_reliability_measure.dev.torch_utils import project_ball_pyt, projected_langevin_kernel_pyt, multi_unsqueeze, compute_V_grad_pyt, compute_V_pyt
 from stat_reliability_measure.dev.torch_utils import V_pyt, gradV_pyt, epoch
-from stat_reliability_measure.dev.torch_arch import CNN_custom,CNN,dnn2
+
 from stat_reliability_measure.dev.utils import str2bool,str2list,float_to_file_float
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
 import stat_reliability_measure.dev.torch_utils as t_u 
@@ -277,9 +277,6 @@ else:
     if config.model_name.lower()=='resnet18':
         model=models.resnet18(pretrained=True)
 
-
-
-
 # if config.train_model:
 #     mnist_train = datasets.MNIST(config.data_dir, train=True, download=config.download, transform=transforms.ToTensor())
 #     train_loader = DataLoader(mnist_train, batch_size = 100, shuffle=True,)
@@ -337,7 +334,7 @@ if config.use_attack:
     #epsilons= np.array([0.0, 0.001, 0.01, 0.03,0.04,0.05,0.07,0.08,0.0825,0.085,0.086,0.087,0.09, 0.1, 0.3, 0.5, 1.0])
     _, advs, success = attack(fmodel, X_correct[config.input_start:config.input_stop], 
     label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
-
+exp_res=[]
 for l in np.arange(start=config.input_start,stop=config.input_stop):
     with torch.no_grad():
         x_0,y_0 = X_correct[l], label_correct[correct_idx][l]
@@ -443,3 +440,5 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
                                 agg_res_df=pd.read_csv(aggr_res_path)
                             agg_res_df = pd.concat([agg_res_df,results_df],ignore_index=True)
                             agg_res_df.to_csv(aggr_res_path,index=False)                           
+exp_df=pd.DataFrame(exp_res)
+exp_df.to_csv(os.path.join(log_path,'exp_results.csv'),index=False)

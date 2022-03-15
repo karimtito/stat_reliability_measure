@@ -195,7 +195,7 @@ else:
 
     aggr_res_path=config.aggr_res_path
 
-
+exp_log_path
 
 param_ranges = [config.N_range,config.T_range,config.rho_range,config.alpha_range,config.p_range]
 param_lens=np.array([len(l) for l in param_ranges])
@@ -209,6 +209,7 @@ kernel_str='v1_kernel' if config.v1_kernel else 'v2_kernel'
 kernel_function=t_u.langevin_kernel_pyt if config.v1_kernel else t_u.langevin_kernel_pyt2 
 get_c_norm= lambda p:stat.norm.isf(p)
 run_nb=0
+exp_res=[]
 iterator= tqdm(range(config.n_rep))
 for p_t in config.p_range:
     c=get_c_norm(p_t)
@@ -317,4 +318,5 @@ for p_t in config.p_range:
                             aggr_res_df=pd.read_csv(aggr_res_path)
                         aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
                         aggr_res_df.to_csv(aggr_res_path,index=False)
-                    
+exp_df=pd.DataFrame(exp_res)
+exp_df.to_csv(os.path.join(log_path,'exp_results.csv'),index=False)

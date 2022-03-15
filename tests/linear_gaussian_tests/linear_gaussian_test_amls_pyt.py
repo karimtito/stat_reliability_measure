@@ -168,7 +168,11 @@ raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
+loc_time= datetime.today().isoformat().split('.')[0]
 
+exp_log_path=method_name+'_t_'+loc_time.split('_')[0]
+os.mkdir(exp_log_path)
+exp_res = []
 config.json=vars(args)
 if config.print_config:
     print(config.json)
@@ -200,7 +204,7 @@ for p_t in config.p_range:
                 for ratio in config.ratio_range: 
                     loc_time= datetime.today().isoformat().split('.')[0]
                     log_name=method_name+f'_N_{N}_T_{T}_s_{float_to_file_float(s)}_r_{float_to_file_float(ratio)}_t_'+'_'+loc_time.split('_')[0]
-                    log_path=os.path.join(raw_logs_path,log_name)
+                    log_path=os.path.join(exp_log_path,log_name)
                     os.mkdir(path=log_path)
                     i_run+=1
                     print(f"Starting run {i_run}/{nb_runs}")
@@ -295,7 +299,7 @@ for p_t in config.p_range:
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
                     'batch_opt':config.batch_opt,"d":d, 
                     "np_seed":config.np_seed,"torch_seed":config.torch_seed}
-
+                    exp_res.append(results)
                     results_df=pd.DataFrame([results])
                     results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
                     if config.aggr_res_path is None:
@@ -313,4 +317,5 @@ for p_t in config.p_range:
                         aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
                         aggr_res_df.to_csv(aggr_res_path,index=False)
 
-        
+exp_df=pd.DataFrame(exp_res)
+exp_df.to_csv(os.path.join(exp_log_path,'exp_results.csv'),index=False)

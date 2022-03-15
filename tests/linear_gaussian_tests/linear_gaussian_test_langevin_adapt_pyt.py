@@ -222,8 +222,8 @@ if not os.path.exists(raw_logs_path):
 
 loc_time= datetime.today().isoformat().split('.')[0]
 log_name=method_name+'_'+'_'+loc_time
-log_path=os.path.join(raw_logs_path,log_name)
-os.mkdir(path=log_path)
+exp_log_path=os.path.join(raw_logs_path,log_name)
+os.mkdir(path=exp_log_path)
 config.json=vars(args)
 
 # if config.aggr_res_path is None:
@@ -251,6 +251,7 @@ kernel_function=t_u.langevin_kernel_pyt if config.v1_kernel else t_u.langevin_ke
 get_c_norm= lambda p:stat.norm.isf(p)
 run_nb=0
 iterator= tqdm(range(config.n_rep))
+exp_res=[]
 for p_t in config.p_range:
     c=get_c_norm(p_t)
     print(f'c:{c}')
@@ -392,7 +393,7 @@ for p_t in config.p_range:
                     "ess_opt":config.ess_opt, 
                     "d_t_min":config.d_t_min,"d_t_max":config.d_t_max
                     }
-
+                    exp_res.append(results)
                     results_df=pd.DataFrame([results])
                     results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
                     if config.aggr_res_path is None:
@@ -409,6 +410,7 @@ for p_t in config.p_range:
                         aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
                         aggr_res_df.to_csv(aggr_res_path,index=False)
                     
-
+exp_df=pd.DataFrame(exp_res)
+exp_df.to_csv(os.path.join(log_path,'exp_results.csv'),index=False)
 
                     

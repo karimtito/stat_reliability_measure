@@ -158,6 +158,10 @@ if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
 
+loc_time= datetime.today().isoformat().split('.')[0]
+log_name=method_name+'_'+'_'+loc_time
+exp_log_path=os.path.join(raw_logs_path,log_name)
+os.mkdir(path=exp_log_path)
 config.json=vars(args)
 if config.print_config:
     print(config.json)
@@ -168,7 +172,7 @@ if config.print_config:
 
 epsilon=config.epsilon
 e_1 = torch.Tensor([1]+[0]*(d-1),device=config.device)
-
+exp_res=[]
 p_target_f=lambda h: 0.5*betainc(0.5*(d-1),0.5,(2*epsilon*h-h**2)/(epsilon**2))
 i_run=0
 for p_t in config.p_range:
@@ -191,7 +195,7 @@ for p_t in config.p_range:
                 for ratio in config.ratio_range: 
                     loc_time= datetime.today().isoformat().split('.')[0]
                     log_name=method_name+f'_N_{N}_T_{T}_s_{float_to_file_float(s)}_r_{float_to_file_float(ratio)}_t_'+'_'+loc_time.split('_')[0]
-                    log_path=os.path.join(raw_logs_path,log_name)
+                    log_path=os.path.join(exp_log_path,log_name)
                     os.mkdir(path=log_path)
                     i_run+=1
                     print(f"Starting run {i_run}/{nb_runs}")
@@ -284,7 +288,7 @@ for p_t in config.p_range:
                     'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean()
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
             'batch_opt':config.batch_opt,"d":d}
-
+                    exp_res.append(results)
                     results_df=pd.DataFrame([results])
                     results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
                     if config.aggr_res_path is None:
@@ -302,4 +306,5 @@ for p_t in config.p_range:
                         aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
                         aggr_res_df.to_csv(aggr_res_path,index=False)
 
-        
+exp_df=pd.DataFrame(exp_res)
+exp_df.to_csv(os.path.join(exp_log_path,'exp_results.csv'),index=False)
