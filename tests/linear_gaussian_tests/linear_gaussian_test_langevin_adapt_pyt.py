@@ -371,8 +371,10 @@ for p_t in config.p_range:
 
                     plt.hist(times, bins=20)
                     plt.savefig(os.path.join(log_path,'times_hist.png'))
+                    plt.close()
                     plt.hist(rel_errors,bins=20)
                     plt.savefig(os.path.join(log_path,'rel_errs_hist.png'))
+                    plt.close()
 
                     #with open(os.path.join(log_path,'results.txt'),'w'):
                     results={"p_t":p_t,"method":method_name,'T':T,'N':N,
@@ -409,8 +411,5 @@ for p_t in config.p_range:
                             aggr_res_df=pd.read_csv(aggr_res_path)
                         aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
                         aggr_res_df.to_csv(aggr_res_path,index=False)
-                    
 exp_df=pd.DataFrame(exp_res)
-exp_df.to_csv(os.path.join(log_path,'exp_results.csv'),index=False)
-
-                    
+exp_df.to_csv(os.path.join(log_path,'exp_results.csv'),index=False)                    

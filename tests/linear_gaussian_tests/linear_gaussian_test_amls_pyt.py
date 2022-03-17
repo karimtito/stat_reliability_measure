@@ -170,7 +170,7 @@ if not os.path.exists(raw_logs_path):
 
 loc_time= datetime.today().isoformat().split('.')[0]
 
-exp_log_path=method_name+'_t_'+loc_time.split('_')[0]
+exp_log_path=os.path.join(config.log_dir,method_name+'_t_'+loc_time.split('_')[0])
 os.mkdir(exp_log_path)
 exp_res = []
 config.json=vars(args)
@@ -207,7 +207,7 @@ for p_t in config.p_range:
                     log_path=os.path.join(exp_log_path,log_name)
                     os.mkdir(path=log_path)
                     i_run+=1
-                    print(f"Starting run {i_run}/{nb_runs}")
+                    print(f"Starting run {i_run}/{nb_runs}, with p_t= {p_t},N={N},T={T},s={s}")
 
                     K=int(N*ratio)
                     if config.verbose>3:
@@ -283,8 +283,10 @@ for p_t in config.p_range:
 
                     plt.hist(times, bins=20)
                     plt.savefig(os.path.join(log_path,'times_hist.png'))
+                    plt.close()
                     plt.hist(rel_errors,bins=20)
                     plt.savefig(os.path.join(log_path,'rel_errs_hist.png'))
+                    plt.close()
 
                     #with open(os.path.join(log_path,'results.txt'),'w'):
                     results={'p_t':p_t,'method':method_name,

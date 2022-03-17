@@ -195,7 +195,7 @@ else:
 
     aggr_res_path=config.aggr_res_path
 
-exp_log_path
+#exp_log_path
 
 param_ranges = [config.N_range,config.T_range,config.rho_range,config.alpha_range,config.p_range]
 param_lens=np.array([len(l) for l in param_ranges])

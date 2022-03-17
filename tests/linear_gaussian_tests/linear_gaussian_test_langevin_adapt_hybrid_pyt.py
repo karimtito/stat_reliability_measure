@@ -353,8 +353,10 @@ for p_t in config.p_range:
 
                             plt.hist(times, bins=20)
                             plt.savefig(os.path.join(log_path,'times_hist.png'))
+                            plt.close()
                             plt.hist(rel_errors,bins=20)
                             plt.savefig(os.path.join(log_path,'rel_errs_hist.png'))
+                            plt.close()
 
                             #with open(os.path.join(log_path,'results.txt'),'w'):
                             results={"p_t":p_t,"method":method_name,'T':T,'N':N,
