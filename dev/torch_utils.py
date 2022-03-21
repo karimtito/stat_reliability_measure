@@ -134,11 +134,12 @@ def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_si
     grad=gradV(X)
     
     with torch.no_grad():
-        G_noise = torch.randn(size = X.shape).to(device)
+        G_noise = torch.randn(size = X.shape,device=device)
         if not gaussian:
-            X_new =X-delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise 
+            X_new =X-beta*delta_t*grad+torch.sqrt(2*delta_t)*G_noise 
         else:
-            X_new=torch.sqrt(1-(2*delta_t/beta))*X -delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise # U(x)=beta*V(x)+(1/2)x^T*Sigma*x
+            rho_ = 1-delta_t
+            X_new=rho_*X -beta*delta_t*grad+math.sqrt(1-rho_**2)*G_noise # U(x)=beta*V(x)+(1/2)x^T*Sigma*x
     return X_new
 
 
@@ -358,32 +359,40 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
                 #cand_v=V(cand_Y).detach()
                 cand_v_y = V(cand_Y)
                 nb_calls+=nb
-
-            
-            if not gaussian:
-                high_diff= (Y-cand_Y-delta_t*gradV(cand_Y)).detach()
-                low_diff=(cand_Y-Y-delta_t*gradV(Y)).detach()
-            else:
-                if v1_kernel:
-                    high_diff=(Y-(1-(delta_t/beta))*cand_Y-delta_t*gradV(cand_Y)).detach()
-                    low_diff=(cand_Y-(1-(delta_t/beta))*Y-delta_t*gradV(Y)).detach()
-                else:
-                    #using Orstein-Uhlenbeck version 
-                    high_diff=(Y-math.sqrt(1-(2*delta_t/beta))*cand_Y-delta_t*gradV(cand_Y)).detach()
-                    low_diff=(cand_Y-math.sqrt(1-(2*delta_t/beta))*Y-delta_t*gradV(Y)).detach()
-            nb_calls+= 2*nb
             log_a_high=-beta*(cand_v_y)
             log_a_low= -beta*v_y
             if verbose>=5:
                 print(f"intermediate 1 log_diff:{log_a_high-log_a_low}")
-            log_a_high+= -(beta/(4*delta_t))*torch.norm(high_diff,p=2 ,dim=1)**2
-            log_a_low+= -(beta/(4*delta_t))*torch.norm(low_diff,p=2,dim=1)**2
+            if v1_kernel:
+                high_diff= (Y-cand_Y-delta_t*gradV(cand_Y)).detach()
+                low_diff=(cand_Y-Y-delta_t*gradV(Y)).detach()
+                if gaussian:
+                    high_diff-=(delta_t/beta)*cand_Y
+                    low_diff-=(delta_t/beta)*Y
+                log_a_high-=(beta/(4*delta_t))*torch.norm(high_diff,p=2 ,dim=1)**2
+                log_a_low-=(beta/(4*delta_t))*torch.norm(low_diff,p=2,dim=1)**2
+                if verbose>=5: 
+                    print(f"Intermediate 2 log_diff:{log_a_high-log_a_low}")
+
+            #using 'Orstein-Uhlenbeck' version    
+            else:
+                high_diff= (Y-cand_Y-beta*delta_t*gradV(cand_Y)).detach()
+                low_diff=(cand_Y-Y-beta*delta_t*gradV(Y)).detach()
+                if gaussian:
+                    high_diff-=delta_t*cand_Y
+                    low_diff-=delta_t*Y
+                log_a_high-=(1/(delta_t*(2*delta_t)))*torch.norm(high_diff,p=2 ,dim=1)**2
+                log_a_low-=(1/(delta_t*(2*delta_t)))*torch.norm(low_diff,p=2 ,dim=1)**2
+                if verbose>=5: 
+                    print(f"Intermediate 2 log_diff:{log_a_high-log_a_low}")
+            nb_calls+= 2*nb
             
-            if verbose>=5: 
-                print(f"intermediate 2 log_diff:{log_a_high-log_a_low}")
+            
+            
+            
             if gaussian: 
                 log_a_high-=0.5*torch.sum(cand_Y**2,dim=1)
-                log_a_low-= 0.5*torch.sum(Y**2,dim=1)
+                log_a_low-=0.5*torch.sum(Y**2,dim=1)
 
             if verbose>=5: 
                 print(f"intermediate 3 log_diff:{log_a_high-log_a_low}")
