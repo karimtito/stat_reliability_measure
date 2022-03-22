@@ -19,10 +19,13 @@ method_name="langevin_adapt_pyt"
 
 #gaussian_linear
 class config:
-    N_range=[100]
-    T_range=[1]
+    N=100
+    N_range=[]
+    T=1
+    T_range=[]
     min_rate=0.90
     rho_range=[]
+    alpha=0.002
     alpha_range=[0.002]
     g_target=0.9
     g_range=[]
@@ -85,29 +88,26 @@ class config:
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
-#parser.add_argument('--N',type=int,default=config.N)
+parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--d',type=int,default=config.d)
 
 parser.add_argument('--min_rate',type=float,default=config.min_rate)
-#parser.add_argument('--alpha',type=float,default=config.alpha)
+parser.add_argument('--alpha',type=float,default=config.alpha)
 parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
-#parser.add_argument('--T',type=int,default=config.T)
+parser.add_argument('--T',type=int,default=config.T)
 parser.add_argument('--save_config',type=str2bool, default=config.save_config)
 #parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
 #parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
 #parser.add_argument('--rho',type=float,default=config.rho)
 parser.add_argument('--allow_multi_gpu',type=str2bool)
-
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
 parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
 parser.add_argument('--device',type=str, default=config.device)
 parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_est)
 parser.add_argument('--torch_seed',type=int, default=config.torch_seed)
 parser.add_argument('--np_seed',type=int, default=config.np_seed)
-
-#parser.add_argument('--noise_dist',type=str, default=config.noise_dist)
 parser.add_argument('--sigma', type=float,default=config.sigma)
 parser.add_argument('--p_t',type=float,default=config.p_t)
 parser.add_argument('--p_range',type=str2floatList,default=config.p_range)
@@ -143,7 +143,6 @@ parser.add_argument('--s_min',type=float,default=config.s_min)
 parser.add_argument('--s_max',type=float,default= config.s_max)
 parser.add_argument('--s_decay',type=float,default=config.s_decay)
 parser.add_argument('--s_gain',type =float,default= config.s_gain)
-
 parser.add_argument('--track_delta_t',type=str2bool,default=config.track_delta_t)
 
 args=parser.parse_args()
