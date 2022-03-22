@@ -24,6 +24,7 @@ class config:
     T_range=[1]
     min_rate=0.90
     rho_range=[]
+    alpha=0.002
     alpha_range=[0.002]
     g_target=0.9
     g_t_0=0.65
@@ -92,7 +93,7 @@ parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--d',type=int,default=config.d)
 parser.add_argument('--min_rate',type=float,default=config.min_rate)
-#parser.add_argument('--alpha',type=float,default=config.alpha)
+parser.add_argument('--alpha',type=float,default=config.alpha)
 parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
 #parser.add_argument('--T',type=int,default=config.T)
