@@ -404,8 +404,10 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
 
                         plt.hist(times, bins=10)
                         plt.savefig(os.path.join(log_path,'times_hist.png'))
+                        plt.close()
                         plt.hist(estimates,bins=10)
                         plt.savefig(os.path.join(log_path,'estimates_hist.png'))
+                        plt.close()
                     
                         
 
@@ -435,7 +437,6 @@ for l in np.arange(start=config.input_start,stop=config.input_stop):
                                 cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
                                 cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist','datetime']
                                 agg_res_df= pd.DataFrame(columns=cols)
-
                             else:
                                 agg_res_df=pd.read_csv(aggr_res_path)
                             agg_res_df = pd.concat([agg_res_df,results_df],ignore_index=True)
