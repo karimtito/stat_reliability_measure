@@ -267,7 +267,7 @@ for p_t in config.p_range:
                 for N in config.N_range:
                     loc_time= datetime.today().isoformat().split('.')[0]
                     log_name=method_name+f'_N_{N}_T_{T}_a_{float_to_file_float(alpha)}_g_{float_to_file_float(g_t)}'+'_'+loc_time.split('_')[0]
-                    log_path=os.path.join(raw_logs_path,log_name)
+                    log_path=os.path.join(exp_log_path,log_name)
                     
                     
                     os.mkdir(path=log_path)
@@ -346,6 +346,7 @@ for p_t in config.p_range:
                             x_T=np.arange(len(delta_ts))
                             plt.plot(x_T,delta_ts)
                             plt.savefig(os.path.join(log_path,f'delta_ts_{i}.png'))
+                            plt.close()
                         
                         finished_flags.append(finish_flag)
                         times.append(t1)
@@ -371,6 +372,7 @@ for p_t in config.p_range:
                     plt.hist(times, bins=20)
                     plt.savefig(os.path.join(log_path,'times_hist.png'))
                     plt.close()
+                    
                     plt.hist(rel_errors,bins=20)
                     plt.savefig(os.path.join(log_path,'rel_errs_hist.png'))
                     plt.close()
@@ -392,8 +394,7 @@ for p_t in config.p_range:
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
                     "d":config.d,"s_opt":config.s_opt,"s":config.s,"clip_s":config.clip_s,"s_min":config.s_min,"s_max":config.s_max,
                     "ess_opt":config.ess_opt, 
-                    "d_t_min":config.d_t_min,"d_t_max":config.d_t_max
-                    }
+                    "d_t_min":config.d_t_min,"d_t_max":config.d_t_max}
                     exp_res.append(results)
                     results_df=pd.DataFrame([results])
                     results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
@@ -411,4 +412,4 @@ for p_t in config.p_range:
                         aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
                         aggr_res_df.to_csv(aggr_res_path,index=False)
 exp_df=pd.DataFrame(exp_res)
-exp_df.to_csv(os.path.join(log_path,'exp_results.csv'),index=False)                    
+exp_df.to_csv(os.path.join(exp_log_path,'exp_results.csv'),index=False)                    

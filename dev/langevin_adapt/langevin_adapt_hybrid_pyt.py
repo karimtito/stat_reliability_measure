@@ -75,8 +75,7 @@ norm_kernel=lambda X,s: 1/math.sqrt(1+s**2)*(X+s*torch.randn_like(X))
 def LangevinSMCAdaptHybridPyt(gen, l_kernel,score_func,  V, gradV,simp_kernel=norm_kernel,g_target=0.9,min_rate=0.8,alpha =0.1,N=300,K=250,T = 1,n_max=300, 
 max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,device=None,mh_opt=False,mh_every=1,track_accept=False
 ,track_beta=False,return_log_p=False,gaussian=False, projection=None,track_calls=True,
-track_v_means=True,adapt_d_t=False,target_accept=0.574,accept_spread=0.1,d_t_decay=0.999,d_t_gain=None,
-d_t_max=None, d_t_min=None,
+track_v_means=True,adapt_d_t=False,target_accept=0.574,accept_spread=0.1,d_t_decay=0.999,d_t_gain=None,d_t_max=None, d_t_min=None,
 v_min_opt=False,v1_kernel=True,lambda_0=1, s=1,
 debug=False,only_duplicated=False, L_target=0,
 rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,clip_s=False
@@ -439,11 +438,9 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
             Count_v= Count_v+ nb_to_renew if only_duplicated else Count_v+N
         
         Y,v_y,nb_calls,dict_out=apply_l_kernel(Y=Y ,v_y=v_y,delta_t=delta_t,beta=beta,V=V,gradV=gradV,
-            l_kernel=l_kernel,
-            T=T,mh_opt=mh_opt,device=device,v1_kernel=v1_kernel,adapt_d_t=adapt_d_t, track_accept=track_accept,
+            l_kernel=l_kernel,T=T,mh_opt=mh_opt,device=device,v1_kernel=v1_kernel,adapt_d_t=adapt_d_t, track_accept=track_accept,
             d_t_decay=d_t_decay,d_t_gain=d_t_gain,debug=False,target_accept=target_accept,
-            accept_spread=accept_spread,
-            gaussian=gaussian, verbose=verbose,track_delta_t=track_delta_t,
+            accept_spread=accept_spread,gaussian=gaussian, verbose=verbose,track_delta_t=track_delta_t,
             d_t_min=d_t_min,d_t_max=d_t_max)
         if adapt_d_t:
             delta_t = dict_out['delta_t']
