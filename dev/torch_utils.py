@@ -1,3 +1,4 @@
+from random import gauss
 import torch
 import torch.nn as nn
 from stat_reliability_measure.dev.utils import float_to_file_float
@@ -97,7 +98,7 @@ def score_function(X,y_0,model):
 
 
 def langevin_kernel_pyt(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sigma=1):
-    """performs one step of langevin kernel with inverse temperature beta"""
+    """performs one step of overdamped langevin kernel with inverse temperature beta"""
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
     
@@ -112,7 +113,7 @@ def langevin_kernel_pyt(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sig
     return X_new
 
 def langevin_kernel_pyt3(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sigma=1):
-    """performs one step of langevin kernel with inverse temperature beta"""
+    """performs one step of overdamped langevin kernel with inverse temperature beta"""
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
     
@@ -127,7 +128,7 @@ def langevin_kernel_pyt3(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_si
     return X_new
 
 def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sigma=1):
-    """performs one step of langevin kernel with inverse temperature beta"""
+    """performs one step of overdamped langevin kernel with inverse temperature beta"""
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
     
@@ -141,6 +142,39 @@ def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_si
             rho_ = 1-delta_t
             X_new=rho_*X -beta*delta_t*grad+math.sqrt(1-rho_**2)*G_noise # U(x)=beta*V(x)+(1/2)x^T*Sigma*x
     return X_new
+
+
+def verlet_kernel1(X, gradV, delta_t, beta,L,p_0=None,lambda_=0, gaussian=True):
+    """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
+
+    """
+    q_t = X
+    # if no initial momentum is given we draw it randomly from gaussian distribution
+    if p_0 is None:                        
+        p_0 = torch.randn_like(X)
+    else:
+        p_t = p_0
+    
+
+    for _ in range(L):
+        #I. Verlet scheme
+        #computing half-point momentum
+        #p_t.data = p_t-0.5*dt*gradV(X).detach() / norms(gradV(X).detach())
+        p_t.data = p_t-0.5*delta_t*beta*gradV(q_t).detach()
+        if gaussian:
+            p_t.data -= 0.5*delta_t*q_t.data
+        #updating position
+        q_t.data = (q_t + delta_t*p_t.data)
+        #updating momentum again
+        p_t.data = p_t -0.5*delta_t*beta*gradV(q_t).detach()
+        if gaussian:
+            p_t.data -= 0.5*delta_t*q_t.data
+        #II. Optional smoothing of momentum memory
+        p_t.data = math.exp(-lambda_*delta_t)*p_t
+
+
+        
+    return q_t.detach(),p_t
 
 
 
@@ -367,8 +401,8 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
                 high_diff= (Y-cand_Y-delta_t*gradV(cand_Y)).detach()
                 low_diff=(cand_Y-Y-delta_t*gradV(Y)).detach()
                 if gaussian:
-                    high_diff-=(delta_t/beta)*cand_Y
-                    low_diff-=(delta_t/beta)*Y
+                    high_diff+=(delta_t/beta)*cand_Y
+                    low_diff+=(delta_t/beta)*Y
                 log_a_high-=(beta/(4*delta_t))*torch.norm(high_diff,p=2 ,dim=1)**2
                 log_a_low-=(beta/(4*delta_t))*torch.norm(low_diff,p=2,dim=1)**2
                 if verbose>=5: 
@@ -379,8 +413,8 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
                 high_diff= (Y-cand_Y-beta*delta_t*gradV(cand_Y)).detach()
                 low_diff=(cand_Y-Y-beta*delta_t*gradV(Y)).detach()
                 if gaussian:
-                    high_diff-=delta_t*cand_Y
-                    low_diff-=delta_t*Y
+                    high_diff+=delta_t*cand_Y.detach()
+                    low_diff+=delta_t*Y.detach()
                 log_a_high-=(1/(delta_t*(2*delta_t)))*torch.norm(high_diff,p=2 ,dim=1)**2
                 log_a_low-=(1/(delta_t*(2*delta_t)))*torch.norm(low_diff,p=2 ,dim=1)**2
                 if verbose>=5: 
@@ -488,11 +522,12 @@ def apply_simp_kernel(Y,v_y,simp_kernel,T:int,beta:float,s:float, V,
 
                         
         nb_calls+= 2*nb
-        high_diff=(Z-(1/math.sqrt(1+s**2))*Y)
-        low_diff=(Y-(1/math.sqrt(1+s**2))*Z)
+        # The gaussian kernel used here is reversible thus Q(x|y)=Q(y|x)
+        #high_diff=(Z-(1/math.sqrt(1+s**2))*Y)
+        #low_diff=(Y-(1/math.sqrt(1+s**2))*Z)
         
-        log_a_high=-beta*VZ-(s**2/(1+s**2))*torch.norm(high_diff,p=2 ,dim=1)**2
-        log_a_low= -beta*VY-(s**2/(1+s**2))*torch.norm(low_diff,p=2,dim=1)**2
+        log_a_high=-beta*VZ#-(s**2/(1+s**2))*torch.norm(high_diff,p=2 ,dim=1)**2
+        log_a_low= -beta*VY#-(s**2/(1+s**2))*torch.norm(low_diff,p=2,dim=1)**2
 
 
         if gaussian: 
@@ -527,9 +562,6 @@ def apply_simp_kernel(Y,v_y,simp_kernel,T:int,beta:float,s:float, V,
     if reject_ctrl:
         dict_out['s']=s
         dict_out['rejection_rate']=rejection_rate
-
-    
-    
     return Y,VY,nb_calls,dict_out
 
         
@@ -553,3 +585,129 @@ def apply_simp_kernel(Y,v_y,simp_kernel,T:int,beta:float,s:float, V,
 #     mask=multi_unsqueeze(mask,k=a_priori_grad.ndim- mask.ndim)
 #     grad=torch.where(condition=mask, input=a_priori_grad,other=torch.zeros_like(a_priori_grad))
 #     return v,grad
+
+
+def Hamiltonian(X,p,V,beta,gaussian=True):
+    with torch.no_grad():
+        U = beta*V(X) +torch.sum(X**2,dim=1) if gaussian else beta*V(X)
+    H = U + torch.sum(p**2,dim=1)
+    return H
+
+
+
+
+
+def apply_v_kernel(Y,v_y,v_kernel,T:int,beta,gradV,V,delta_t:float,mh_opt:bool,track_accept:bool,
+ gaussian:bool,device, adapt_d_t:bool,
+target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bool=False,verbose:float =1
+,track_delta_t=False,d_t_min=None,d_t_max=None,lambda_=0,L=1,gamma=0,track_H=False):
+    """_summary_
+
+    Args:
+        Y (_type_): _description_
+        v_y (_type_): _description_
+        l_kernel (_type_): _description_
+        T (int): _description_
+        beta (_type_): _description_
+        gradV (_type_): _description_
+        V (function): _description_
+        delta_t (float): _description_
+        mh_opt (bool): _description_
+        track_accept (bool): _description_
+        gaussian (bool): _description_
+        device (_type_): _description_
+        v1_kernel (bool): _description_
+        adapt_d_t (bool): _description_
+        target_accept (float): _description_
+        accept_spread (float): _description_
+        d_t_decay (float): _description_
+        d_t_gain (float): _description_
+        debug (bool, optional): _description_. Defaults to False.
+        verbose (float, optional): _description_. Defaults to 1.
+        L (int, optional): number of Hamiltonian dynamics iteration 
+        Track_H (bool, optional): tracking Halmitonian values
+    Returns:
+        _type_: _description_
+    """
+    nb=Y.shape[0]
+    nb_calls=0
+    local_accept_rates=[]
+    if track_delta_t:
+        delta_ts=[]
+    p_0 = torch.randn_like(Y)
+    H=Hamiltonian(X=Y, p=p_0,V=V,beta=beta,gaussian=gaussian)
+    if track_H:
+        H_s=[H]
+    nb_calls+=nb
+    for _ in range(T):
+            
+        if track_accept or mh_opt:
+            cand_Y,cand_p=v_kernel(Y,gradV,p_0 =p_0, delta_t=delta_t,beta=beta,lambda_=lambda_,L=L)
+            nb_calls+=L*nb
+            cand_H=Hamiltonian(X=cand_Y,p=cand_p,V=V,beta=beta,gaussian =gaussian)
+            nb_calls+=nb
+            alpha_=torch.exp(-cand_H+H)
+            if verbose>=5: 
+                print(f"alpha_={alpha_}")
+            b_size= nb
+            U=torch.rand(size=(b_size,),device=device) 
+            accept=U<alpha_
+            accept_rate=accept.float().mean().item()
+            if track_accept:
+                if verbose>=3:
+                    print(f"Local accept rate: {accept_rate}")
+                #accept_rates.append(accept_rate)
+                local_accept_rates.append(accept_rate)
+            if adapt_d_t:
+                if accept_rate>target_accept+accept_spread:
+                    delta_t*=d_t_gain
+                    
+
+                elif accept_rate<target_accept-accept_spread: 
+                    delta_t*=d_t_decay
+                if d_t_min is not None:
+                    delta_t=torch.clamp(delta_t,min=d_t_min)
+                if d_t_max is not None:
+                    delta_t=torch.clamp(delta_t,max=d_t_max)
+                if verbose>=2.5:
+                    print(f"New delta_t:{delta_t.item()}")
+
+                if track_delta_t:
+                    delta_ts.append(delta_t.item())
+                    if verbose>=2:
+                        print(delta_ts)
+            if mh_opt:
+                with torch.no_grad():
+                    Y=torch.where(accept.unsqueeze(-1),input=cand_Y,other=Y)
+                    
+                    H=torch.where(accept, input=cand_H,other=H)
+
+                    p_0=torch.where(accept.unsqueeze(-1),input=cand_p,other=p_0)
+                    nb_calls+=nb
+                    if debug:
+                        
+                        v2 = V(Y)
+                        #nb_calls+= N
+                        assert torch.equal(v_y,v2),"/!\ error in potential computation"
+            else:
+                Y=cand_Y
+                H=cand_H
+        else:
+            Y,p_0=v_kernel(Y, gradV, delta_t, beta)
+            
+            
+        nb_calls= nb_calls+nb
+
+    
+    with torch.no_grad():
+        v_y=V(Y)
+    nb_calls+=nb
+
+    dict_out={}
+    if track_accept:
+        dict_out['local_accept_rates']=local_accept_rates
+    if adapt_d_t:
+        dict_out['delta_t']=delta_t
+        if track_delta_t: 
+            dict_out['delta_ts']=delta_ts
+    return Y,v_y,nb_calls,dict_out
