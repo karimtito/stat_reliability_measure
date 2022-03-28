@@ -167,6 +167,10 @@ if len(config.N_range)==0:
 if len(config.T_range)==0:
     config.T_range= [config.T]
 
+if len(config.alpha_range)==0:
+    config.alpha_range= [config.alpha]
+
+
 
 if not config.allow_multi_gpu:
     os.environ["CUDA_VISIBLE_DEVICES"]="0"
