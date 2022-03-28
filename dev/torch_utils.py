@@ -636,8 +636,9 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
         delta_ts=[]
     p_0 = torch.randn_like(Y)
     H=Hamiltonian(X=Y, p=p_0,V=V,beta=beta,gaussian=gaussian)
+    H_s=[]
     if track_H:
-        H_s=[H]
+        H_s=[H.cpu().mean().item()]
     nb_calls+=nb
     for _ in range(T):
             
@@ -681,6 +682,7 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
                     Y=torch.where(accept.unsqueeze(-1),input=cand_Y,other=Y)
                     
                     H=torch.where(accept, input=cand_H,other=H)
+                    H_s.append(H.cpu().mean().item())
 
                     p_0=torch.where(accept.unsqueeze(-1),input=cand_p,other=p_0)
                     nb_calls+=nb
@@ -692,6 +694,7 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
             else:
                 Y=cand_Y
                 H=cand_H
+                H_s.append(H.cpu().mean().item())
         else:
             Y,p_0=v_kernel(Y, gradV, delta_t, beta)
             
@@ -710,4 +713,8 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
         dict_out['delta_t']=delta_t
         if track_delta_t: 
             dict_out['delta_ts']=delta_ts
+    if track_H:
+        H_s=np.array(H_s)
+        dict_out['H_stds']=H_s.std()
+        dict_out['H_means']=H_s.mean()
     return Y,v_y,nb_calls,dict_out

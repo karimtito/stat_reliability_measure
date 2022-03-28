@@ -217,7 +217,7 @@ L=1,track_H=False):
             accept_rates.extend(local_accept_rates)
             accept_rates_mcmc.append(np.array(local_accept_rates).mean())
         if track_H: 
-            H_stds.append(dict_out['H_std'])
+            H_stds.append(dict_out['H_stds'])
             H_means.append(dict_out['H_means'])
         
         #v = V(X)

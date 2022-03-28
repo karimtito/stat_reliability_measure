@@ -26,7 +26,7 @@ class config:
     min_rate=0.90
     rho_range=[]
     alpha=0.002
-    alpha_range=[0.002]
+    alpha_range=[]
     g_target=0.9
     g_range=[]
     p_range=[]
@@ -326,11 +326,14 @@ for p_t in config.p_range:
                             H_stds=res_dict['H_stds']
                             np.savetxt(fname=os.path.join(log_path,f'H_stds_{i}.txt'),
                             X=H_stds)
-                            plt.plot(np.arange(config.n_rep),H_stds)
+                            x_T=np.arange(len(H_stds))
+                            plt.plot(x_T,H_stds)
                             plt.savefig(os.path.join(log_path,f'H_stds_{i}.png'))
                             plt.close()
+
                             H_means=res_dict['H_means']
-                            plt.plot(np.arange(config.n_rep),H_means)
+                            x_T=np.arange(len(H_means))
+                            plt.plot(x_T,H_means)
                             plt.savefig(os.path.join(log_path,f'H_means_{i}.png'))
                             plt.close()
                             np.savetxt(fname=os.path.join(log_path,f'H_means_{i}.txt'),
