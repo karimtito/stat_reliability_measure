@@ -5,4 +5,4 @@ tqdm
 matplotlib
 GPUtil
 py-cpuinfo #psutil
-torch>=1.9
+torch>=1.8

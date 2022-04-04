@@ -304,7 +304,8 @@ max_beta=1e6, verbose=False,adapt_func=SimpAdaptBetaPyt,allow_zero_est=False,dev
 track_v_means=True,adapt_d_t=False,track_delta_t=False,target_accept=0.574,accept_spread=0.1,d_t_decay=0.999,d_t_gain=None,
 d_t_min=1e-5,d_t_max=1e-2,v_min_opt=False,v1_kernel=True,lambda_0=1,s_opt=False,
 debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
-,clip_s=True,s_min=1e-3,s_max= 3,reject_ctrl=True,reject_thresh=0.1,prog_thresh=0.1):
+,clip_s=True,s_min=1e-3,s_max= 3,reject_ctrl=True,reject_thresh=0.1,prog_thresh=0.1,
+mult_last=True):
     """
       Adaptive Langevin SMC estimator  
       Args:
@@ -364,6 +365,10 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
     print(f"g_0:{g_0}")
     ## For
     while (v<=0).float().mean()<min_rate:
+
+
+
+
         v_mean = v.mean()
         v_std = v.std()
         if verbose:
@@ -465,7 +470,7 @@ debug=False,only_duplicated=False,s =1,s_decay=0.95,s_gain=1.0001
            
     reach_rate=  (v<=0).float().mean().item() 
     finished_flag=reach_rate<min_rate
-    P_est = (g_prod*reach_rate).item()
+    P_est = (g_prod*reach_rate).item() if mult_last else g_prod.item()
     dic_out = {'p_est':P_est,'X':X,'v':v,'finished':finished_flag}
     if track_accept:
         dic_out['accept_rates']=np.array(accept_rates)

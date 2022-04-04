@@ -80,7 +80,7 @@ class config:
     s_gain=1.0001
 
     track_delta_t=False
-
+    mult_last=True
 
 
 
@@ -144,7 +144,7 @@ parser.add_argument('--s_max',type=float,default= config.s_max)
 parser.add_argument('--s_decay',type=float,default=config.s_decay)
 parser.add_argument('--s_gain',type =float,default= config.s_gain)
 parser.add_argument('--track_delta_t',type=str2bool,default=config.track_delta_t)
-
+parser.add_argument('--mult_last',type=str2bool,default=config.mult_last)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -314,7 +314,8 @@ for p_t in config.p_range:
                         s_opt=config.s_opt,
                         s=config.s,s_decay=config.s_decay,s_gain=config.s_gain,
                         s_min=config.s_min,s_max=config.s_max, 
-                        track_delta_t=config.track_delta_t)
+                        track_delta_t=config.track_delta_t,
+                        mult_last=config.mult_last)
                         t1=time()-t
 
                         print(p_est)
@@ -373,6 +374,10 @@ for p_t in config.p_range:
                     plt.savefig(os.path.join(log_path,'times_hist.png'))
                     plt.close()
                     
+                    plt.hist(times, bins=20)
+                    plt.savefig(os.path.join(log_path,'times_hist.png'))
+                    plt.close()
+
                     plt.hist(rel_errors,bins=20)
                     plt.savefig(os.path.join(log_path,'rel_errs_hist.png'))
                     plt.close()
