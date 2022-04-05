@@ -151,7 +151,7 @@ def verlet_kernel1(X, gradV, delta_t, beta,L,p_0=None,lambda_=0, gaussian=True):
     q_t = X
     # if no initial momentum is given we draw it randomly from gaussian distribution
     if p_0 is None:                        
-        p_0 = torch.randn_like(X)
+        p_t = torch.randn_like(X)
     else:
         p_t = p_0
     
@@ -500,9 +500,11 @@ def normal_kernel(x,s):
 def apply_simp_kernel(Y,v_y,simp_kernel,T:int,beta:float,s:float, V,
  gaussian:bool,device, decay:float,clip_s:bool,s_min:float,s_max:float,
  debug:bool=False,verbose:float =1,rejection_rate:float=0
-,kernel_pass=0, track_accept:bool=False,reject_ctrl:bool=True,reject_thresh:float=0.9):
+,kernel_pass=0, track_accept:bool=False,reject_ctrl:bool=True,reject_thresh:float=0.9,
+save_Ys=False):
    
     nb=Y.shape[0]
+    Ys=[Y]
     VY=v_y 
     nb_calls=0
     l_accept_rates=[]
@@ -541,6 +543,7 @@ def apply_simp_kernel(Y,v_y,simp_kernel,T:int,beta:float,s:float, V,
         if verbose>=2.5:
             print(accept_flag.float().mean().item())
         Y=torch.where(accept_flag.unsqueeze(-1),input=Z,other=Y)
+        Ys.append(Y)
         VY=torch.where(accept_flag,input=VZ,other=VY)
         rejection_rate  = (kernel_pass-(nb))/kernel_pass*rejection_rate+(1./kernel_pass)*((1-accept_flag.float()).sum().item())
         
