@@ -81,6 +81,7 @@ class config:
 
     track_delta_t=False
     L=1
+    L_range=[]
     track_H=False
 
 
@@ -146,6 +147,7 @@ parser.add_argument('--s_decay',type=float,default=config.s_decay)
 parser.add_argument('--s_gain',type =float,default= config.s_gain)
 parser.add_argument('--track_delta_t',type=str2bool,default=config.track_delta_t)
 parser.add_argument('--L',type=int,default=config.L)
+parser.add_argument('--L_range',type=str2intList,default=config.L_range)
 parser.add_argument('--track_H',type=str2bool,default=config.track_H)
 args=parser.parse_args()
 
@@ -166,6 +168,9 @@ if len(config.N_range)==0:
 
 if len(config.T_range)==0:
     config.T_range= [config.T]
+
+if len(config.L_range)==0:
+    config.L_range= [config.L]
 
 if len(config.alpha_range)==0:
     config.alpha_range= [config.alpha]
@@ -266,172 +271,173 @@ for p_t in config.p_range:
     gradV= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
     
     norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
-
+    
     for g_t in config.g_range:
         for T in config.T_range:
-            for alpha in config.alpha_range:       
-                for N in config.N_range:
-                    loc_time= datetime.today().isoformat().split('.')[0]
-                    log_name=method_name+f'_N_{N}_T_{T}_a_{float_to_file_float(alpha)}_g_{float_to_file_float(g_t)}'+'_'+loc_time.split('_')[0]
-                    log_path=os.path.join(exp_log_path,log_name)
-                    
-                    
-                    os.mkdir(path=log_path)
-                    run_nb+=1
-                    print(f'Run {run_nb}/{nb_runs}')
-                    times=[]
-                    ests = []
-                    calls=[]
-                    finished_flags=[]
-                    iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
-                    print(f"Starting simulations with p_t:{p_t},g_t:{g_t},T:{T},alpha:{alpha},N:{N}")
-                    for i in iterator:
+            for L in config.L_range:
+                for alpha in config.alpha_range:       
+                    for N in config.N_range:
+                        loc_time= datetime.today().isoformat().split('.')[0]
+                        log_name=method_name+f'_N_{N}_T_{T}_a_{float_to_file_float(alpha)}_g_{float_to_file_float(g_t)}'+'_'+loc_time.split('_')[0]
+                        log_path=os.path.join(exp_log_path,log_name)
                         
-                        # if not config.test2:
-                        #     t=time()
-                        #     p_est,res_dict,=smc_pyt.LangevinSMCSimpAdaptPyt(gen=norm_gen,
-                        #     l_kernel=kernel_function,N=N,min_rate=config.min_rate,
-                        #     g_target=g_t,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
-                        #     adapt_func=adapt_func,
-                        #     verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
-                        #     allow_zero_est=config.allow_zero_est,gaussian =True,
-                        #     target_accept=config.target_accept,accept_spread=config.accept_spread, 
-                        #     adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
-                        #     d_t_gain=config.d_t_gain,
-                        #     v_min_opt=config.v_min_opt,
-                        #     v1_kernel=config.v1_kernel, lambda_0= config.lambda_0,
-                        #     only_duplicated=config.only_duplicated,
-                        #     )
-                        #     t1=time()-t
-                        # else: 
-                        t=time()
-                        p_est,res_dict,=smc_pyt.HSMCAdaptPyt(gen=norm_gen,
-                        v_kernel=kernel_function,N=N,min_rate=config.min_rate,
-                        g_target=g_t,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
-                        adapt_func=adapt_func,
-                        verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
-                        allow_zero_est=config.allow_zero_est,gaussian =True,
-                        target_accept=config.target_accept,accept_spread=config.accept_spread, 
-                        adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
-                        d_t_gain=config.d_t_gain,d_t_min=config.d_t_min,d_t_max=config.d_t_max,
-                        v_min_opt=config.v_min_opt,
-                        v1_kernel=config.v1_kernel, lambda_0= config.lambda_0,
-                        only_duplicated=config.only_duplicated,
-                        s_opt=config.s_opt,
-                        s=config.s,s_decay=config.s_decay,s_gain=config.s_gain,
-                        s_min=config.s_min,s_max=config.s_max, 
-                        track_delta_t=config.track_delta_t,L=config.L,track_H=config.track_H)
-                        t1=time()-t
-
-                        print(p_est)
-                        finish_flag=res_dict['finished']
-                        accept_rates=res_dict['accept_rates']
-                        if config.track_H:
-                            H_stds=res_dict['H_stds']
-                            np.savetxt(fname=os.path.join(log_path,f'H_stds_{i}.txt'),
-                            X=H_stds)
-                            x_T=np.arange(len(H_stds))
-                            plt.plot(x_T,H_stds)
-                            plt.savefig(os.path.join(log_path,f'H_stds_{i}.png'))
-                            plt.close()
-
-                            H_means=res_dict['H_means']
-                            x_T=np.arange(len(H_means))
-                            plt.plot(x_T,H_means)
-                            plt.savefig(os.path.join(log_path,f'H_means_{i}.png'))
-                            plt.close()
-                            np.savetxt(fname=os.path.join(log_path,f'H_means_{i}.txt'),
-                            X=H_means)
-                        if config.track_accept:
-
-                            accept_rates=res_dict['accept_rates']
-                            np.savetxt(fname=os.path.join(log_path,f'accept_rates_{i}.txt')
-                            ,X=accept_rates)
-                            x_T=np.arange(len(accept_rates))
-                            plt.plot(x_T,accept_rates)
-                            plt.savefig(os.path.join(log_path,f'accept_rates_{i}.png'))
-                            plt.close()
-
-                            accept_rates_mcmc=res_dict['accept_rates_mcmc']
-                            np.savetxt(fname=os.path.join(log_path,f'accept_rates_mcmc_{i}.txt')
-                            ,X=accept_rates_mcmc,)
-                            x_T=np.arange(len(accept_rates_mcmc))
-                            plt.plot(x_T,accept_rates_mcmc)
-                            plt.savefig(os.path.join(log_path,f'accept_rates_mcmc_{i}.png'))
-                            plt.close()
+                        
+                        os.mkdir(path=log_path)
+                        run_nb+=1
+                        print(f'Run {run_nb}/{nb_runs}')
+                        times=[]
+                        ests = []
+                        calls=[]
+                        finished_flags=[]
+                        iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
+                        print(f"Starting simulations with p_t:{p_t},g_t:{g_t},T:{T},alpha:{alpha},N:{N},L:{T}")
+                        for i in iterator:
                             
+                            # if not config.test2:
+                            #     t=time()
+                            #     p_est,res_dict,=smc_pyt.LangevinSMCSimpAdaptPyt(gen=norm_gen,
+                            #     l_kernel=kernel_function,N=N,min_rate=config.min_rate,
+                            #     g_target=g_t,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
+                            #     adapt_func=adapt_func,
+                            #     verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
+                            #     allow_zero_est=config.allow_zero_est,gaussian =True,
+                            #     target_accept=config.target_accept,accept_spread=config.accept_spread, 
+                            #     adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
+                            #     d_t_gain=config.d_t_gain,
+                            #     v_min_opt=config.v_min_opt,
+                            #     v1_kernel=config.v1_kernel, lambda_0= config.lambda_0,
+                            #     only_duplicated=config.only_duplicated,
+                            #     )
+                            #     t1=time()-t
+                            # else: 
+                            t=time()
+                            p_est,res_dict,=smc_pyt.HSMCAdaptPyt(gen=norm_gen,
+                            v_kernel=kernel_function,N=N,min_rate=config.min_rate,
+                            g_target=g_t,alpha=alpha,T=T,V= V,gradV=gradV,n_max=10000,return_log_p=False,
+                            adapt_func=adapt_func,
+                            verbose=config.verbose, mh_opt=config.mh_opt,track_accept=config.track_accept,
+                            allow_zero_est=config.allow_zero_est,gaussian =True,
+                            target_accept=config.target_accept,accept_spread=config.accept_spread, 
+                            adapt_d_t=config.adapt_d_t, d_t_decay=config.d_t_decay,
+                            d_t_gain=config.d_t_gain,d_t_min=config.d_t_min,d_t_max=config.d_t_max,
+                            v_min_opt=config.v_min_opt,
+                            v1_kernel=config.v1_kernel, lambda_0= config.lambda_0,
+                            only_duplicated=config.only_duplicated,
+                            s_opt=config.s_opt,
+                            s=config.s,s_decay=config.s_decay,s_gain=config.s_gain,
+                            s_min=config.s_min,s_max=config.s_max, 
+                            track_delta_t=config.track_delta_t,L=config.L,track_H=config.track_H)
+                            t1=time()-t
 
-                        if config.adapt_d_t and config.track_delta_t:
-                            delta_ts=res_dict['delta_ts']
-                            np.savetxt(fname=os.path.join(log_path,f'delta_ts_{i}.txt')
-                            ,X=delta_ts)
-                            x_T=np.arange(len(delta_ts))
-                            plt.plot(x_T,delta_ts)
-                            plt.savefig(os.path.join(log_path,f'delta_ts_{i}.png'))
-                            plt.close()
-                        
-                        finished_flags.append(finish_flag)
-                        times.append(t1)
-                        ests.append(p_est)
-                        calls.append(res_dict['calls'])
-                    times=np.array(times)
-                    ests = np.array(ests)
-                    calls=np.array(calls)
-                
-                    abs_errors=np.abs(ests-p_t)
-                    rel_errors=abs_errors/p_t
-                    bias=np.mean(ests)-p_t
+                            print(p_est)
+                            finish_flag=res_dict['finished']
+                            accept_rates=res_dict['accept_rates']
+                            if config.track_H:
+                                H_stds=res_dict['H_stds']
+                                np.savetxt(fname=os.path.join(log_path,f'H_stds_{i}.txt'),
+                                X=H_stds)
+                                x_T=np.arange(len(H_stds))
+                                plt.plot(x_T,H_stds)
+                                plt.savefig(os.path.join(log_path,f'H_stds_{i}.png'))
+                                plt.close()
 
-                    times=np.array(times)  
-                    ests=np.array(ests)
-                    errs=np.abs(ests-p_t)
-                    #fin = np.array(finished_flags)
+                                H_means=res_dict['H_means']
+                                x_T=np.arange(len(H_means))
+                                plt.plot(x_T,H_means)
+                                plt.savefig(os.path.join(log_path,f'H_means_{i}.png'))
+                                plt.close()
+                                np.savetxt(fname=os.path.join(log_path,f'H_means_{i}.txt'),
+                                X=H_means)
+                            if config.track_accept:
 
+                                accept_rates=res_dict['accept_rates']
+                                np.savetxt(fname=os.path.join(log_path,f'accept_rates_{i}.txt')
+                                ,X=accept_rates)
+                                x_T=np.arange(len(accept_rates))
+                                plt.plot(x_T,accept_rates)
+                                plt.savefig(os.path.join(log_path,f'accept_rates_{i}.png'))
+                                plt.close()
 
-                    np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
-                    np.savetxt(fname=os.path.join(log_path,'ests.txt'),X=ests)
+                                accept_rates_mcmc=res_dict['accept_rates_mcmc']
+                                np.savetxt(fname=os.path.join(log_path,f'accept_rates_mcmc_{i}.txt')
+                                ,X=accept_rates_mcmc,)
+                                x_T=np.arange(len(accept_rates_mcmc))
+                                plt.plot(x_T,accept_rates_mcmc)
+                                plt.savefig(os.path.join(log_path,f'accept_rates_mcmc_{i}.png'))
+                                plt.close()
+                                
 
-                    plt.hist(times, bins=20)
-                    plt.savefig(os.path.join(log_path,'times_hist.png'))
-                    plt.close()
+                            if config.adapt_d_t and config.track_delta_t:
+                                delta_ts=res_dict['delta_ts']
+                                np.savetxt(fname=os.path.join(log_path,f'delta_ts_{i}.txt')
+                                ,X=delta_ts)
+                                x_T=np.arange(len(delta_ts))
+                                plt.plot(x_T,delta_ts)
+                                plt.savefig(os.path.join(log_path,f'delta_ts_{i}.png'))
+                                plt.close()
+                            
+                            finished_flags.append(finish_flag)
+                            times.append(t1)
+                            ests.append(p_est)
+                            calls.append(res_dict['calls'])
+                        times=np.array(times)
+                        ests = np.array(ests)
+                        calls=np.array(calls)
                     
-                    plt.hist(rel_errors,bins=20)
-                    plt.savefig(os.path.join(log_path,'rel_errs_hist.png'))
-                    plt.close()
+                        abs_errors=np.abs(ests-p_t)
+                        rel_errors=abs_errors/p_t
+                        bias=np.mean(ests)-p_t
 
-                    #with open(os.path.join(log_path,'results.txt'),'w'):
-                    results={"p_t":p_t,"method":method_name,'T':T,'N':N,
-                    "g_target":g_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
-                    "method":method,"kernel":kernel_str,'adapt_t':config.adapt_d_t,
-                    'mean_calls':calls.mean(),'std_calls':calls.std()
-                    ,'mean time':times.mean(),'std time':times.std()
-                    ,'mean est':ests.mean(),'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
-                    'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean(), 
-                    "v_min_opt":config.v_min_opt
-                    ,'adapt_d_t_mcmc':config.adapt_d_t_mcmc,"adapt_d_t":config.adapt_d_t,""
-                    "adapt_d_t_mcmc":config.adapt_d_t_mcmc,"d_t_decay":config.d_t_decay,"d_t_gain":config.d_t_gain,
-                    "target_accept":config.target_accept,"accept_spread":config.accept_spread, 
-                    "mh_opt":config.mh_opt,'only_duplicated':config.only_duplicated,
-                    "np_seed":config.np_seed,"torch_seed":config.torch_seed
-                    ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
-                    "d":config.d,"s_opt":config.s_opt,"s":config.s,"clip_s":config.clip_s,"s_min":config.s_min,"s_max":config.s_max,
-                    "ess_opt":config.ess_opt, 
-                    "d_t_min":config.d_t_min,"d_t_max":config.d_t_max}
-                    exp_res.append(results)
-                    results_df=pd.DataFrame([results])
-                    results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
-                    if config.aggr_res_path is None:
-                        aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
-                    else:
-                        aggr_res_path=config.aggr_res_path
-                    if config.update_agg_res:
-                        if not os.path.exists(aggr_res_path):
-                            cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est',
-                            'bias','mean abs error','mean rel error','std est','freq underest','gpu_name','cpu_name']
-                            aggr_res_df= pd.DataFrame(columns=cols)
+                        times=np.array(times)  
+                        ests=np.array(ests)
+                        errs=np.abs(ests-p_t)
+                        #fin = np.array(finished_flags)
+
+
+                        np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
+                        np.savetxt(fname=os.path.join(log_path,'ests.txt'),X=ests)
+
+                        plt.hist(times, bins=20)
+                        plt.savefig(os.path.join(log_path,'times_hist.png'))
+                        plt.close()
+                        
+                        plt.hist(rel_errors,bins=20)
+                        plt.savefig(os.path.join(log_path,'rel_errs_hist.png'))
+                        plt.close()
+
+                        #with open(os.path.join(log_path,'results.txt'),'w'):
+                        results={"p_t":p_t,"method":method_name,'T':T,'N':N,'L':L,
+                        "g_target":g_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
+                        "method":method,"kernel":kernel_str,'adapt_t':config.adapt_d_t,
+                        'mean_calls':calls.mean(),'std_calls':calls.std()
+                        ,'mean time':times.mean(),'std time':times.std()
+                        ,'mean est':ests.mean(),'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
+                        'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean(), 
+                        "v_min_opt":config.v_min_opt
+                        ,'adapt_d_t_mcmc':config.adapt_d_t_mcmc,"adapt_d_t":config.adapt_d_t,""
+                        "adapt_d_t_mcmc":config.adapt_d_t_mcmc,"d_t_decay":config.d_t_decay,"d_t_gain":config.d_t_gain,
+                        "target_accept":config.target_accept,"accept_spread":config.accept_spread, 
+                        "mh_opt":config.mh_opt,'only_duplicated':config.only_duplicated,
+                        "np_seed":config.np_seed,"torch_seed":config.torch_seed
+                        ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
+                        "d":config.d,"s_opt":config.s_opt,"s":config.s,"clip_s":config.clip_s,"s_min":config.s_min,"s_max":config.s_max,
+                        "ess_opt":config.ess_opt, 
+                        "d_t_min":config.d_t_min,"d_t_max":config.d_t_max}
+                        exp_res.append(results)
+                        results_df=pd.DataFrame([results])
+                        results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
+                        if config.aggr_res_path is None:
+                            aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                         else:
-                            aggr_res_df=pd.read_csv(aggr_res_path)
-                        aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
-                        aggr_res_df.to_csv(aggr_res_path,index=False)
+                            aggr_res_path=config.aggr_res_path
+                        if config.update_agg_res:
+                            if not os.path.exists(aggr_res_path):
+                                cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est',
+                                'bias','mean abs error','mean rel error','std est','freq underest','gpu_name','cpu_name']
+                                aggr_res_df= pd.DataFrame(columns=cols)
+                            else:
+                                aggr_res_df=pd.read_csv(aggr_res_path)
+                            aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
+                            aggr_res_df.to_csv(aggr_res_path,index=False)
 exp_df=pd.DataFrame(exp_res)
 exp_df.to_csv(os.path.join(exp_log_path,'exp_results.csv'),index=False)                    
