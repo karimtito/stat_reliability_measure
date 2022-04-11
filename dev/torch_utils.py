@@ -1,4 +1,3 @@
-from random import gauss
 import torch
 import torch.nn as nn
 from stat_reliability_measure.dev.utils import float_to_file_float
@@ -352,7 +351,7 @@ download,model_shape=(1,28,28),force_train=False,dataset='mnist',batch_size=100)
 def apply_l_kernel(Y,v_y,l_kernel,T:int,beta,gradV,V,delta_t:float,mh_opt:bool,track_accept:bool,
  gaussian:bool,device,v1_kernel:bool, adapt_d_t:bool,
 target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bool=False,verbose:float =1
-,track_delta_t=False,d_t_min=None,d_t_max=None):
+,track_delta_t=False,d_t_min=None,d_t_max=None,save_Y=False):
     """_summary_
 
     Args:
@@ -385,6 +384,8 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
     local_accept_rates=[]
     if track_delta_t:
         delta_ts=[]
+    if save_Y:
+        Y_s=[Y]
     for _ in range(T):
             
         if track_accept or mh_opt:
@@ -477,7 +478,8 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
                 v_y=cand_v_y
         else:
             Y=l_kernel(Y, gradV, delta_t, beta)
-            
+        if save_Y:
+            Y_s.append(Y)    
         nb_calls= nb_calls+nb
 
     if not track_accept or mh_opt:
@@ -491,6 +493,8 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
         dict_out['delta_t']=delta_t
         if track_delta_t: 
             dict_out['delta_ts']=delta_ts
+    if save_Y:
+        dict_out['Y_s'] =Y_s
     return Y,v_y,nb_calls,dict_out
 
 
@@ -592,8 +596,8 @@ save_Ys=False):
 
 def Hamiltonian(X,p,V,beta,gaussian=True):
     with torch.no_grad():
-        U = beta*V(X) +torch.sum(X**2,dim=1) if gaussian else beta*V(X)
-    H = U + torch.sum(p**2,dim=1)
+        U = beta*V(X) +0.5*torch.sum(X**2,dim=1) if gaussian else beta*V(X)
+    H = U + 0.5*torch.sum(p**2,dim=1)
     return H
 
 
