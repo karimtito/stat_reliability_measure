@@ -215,6 +215,9 @@ if os.path.exists(results_path):
 else:
     results_g=pd.DataFrame(columns=['p_t','mean_est','mean_time','mean_err','std_time','std_est','T','N','rho','alpha','n_rep','min_rate','method'])
     results_g.to_csv(results_path,index=False)
+raw_logs = os.path.join(config.log_dir,'raw_logs/')
+if not os.path.exists(raw_logs):
+    os.mkdir(raw_logs)
 raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
