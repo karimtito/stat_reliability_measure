@@ -461,16 +461,20 @@ mult_last=True):
                 if verbose>1:
                     print('Strength of kernel increased!')
                     print(f's={s}')
-        if verbose>=2:
+        if verbose>=0.5:
             print(f'Beta old {beta_old}, new beta {beta}, delta_beta={beta_old-beta}')
         
         g_prod*=g_iter
-        if verbose>=1.5:
+        if verbose>=0.5:
             print(f"g_iter:{g_iter},g_prod:{g_prod}")
            
     reach_rate=  (v<=0).float().mean().item() 
+
     finished_flag=reach_rate<min_rate
+    
     P_est = (g_prod*reach_rate).item() if mult_last else g_prod.item()
+    if verbose>=0.5:
+            print(f"g_iter_final:{reach_rate},g_final:{P_est}")
     dic_out = {'p_est':P_est,'X':X,'v':v,'finished':finished_flag}
     if track_accept:
         dic_out['accept_rates']=np.array(accept_rates)
