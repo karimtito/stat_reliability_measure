@@ -291,6 +291,8 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
         h_mean = SX.mean()
         if verbose>=1:
             print('Iter = ',n, ' tau_j = ', tau_j.item(), "h_mean",h_mean.item(),  " Calls = ", Count_h)
+        if verbose>=2.5:
+            print(f'Current prob. estim:{(K/N)**(n-1)}')
         if track_rejection:
             if verbose>1:
                 print(f'Rejection rate: {rejection_rate}')
@@ -305,6 +307,8 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
     p = K/N
     p_last = K_last/N
     P_est = (p**(n-1))*p_last
+    if verbose>=0.5:
+        print(f"P_est={P_est}")
     Var_est = (P_est**2)*((n-1)*(1-p)/p + (1-p_last)/p_last)/N
     P_bias = P_est*n*(1-p)/p/N
     CI_est = P_est*np.array([1,1]) + q*np.sqrt(Var_est)*np.array([-1,1])

@@ -12,8 +12,8 @@ import GPUtil
 import cpuinfo
 import pandas as pd
 import argparse
-from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
-
+from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
+from scipy.special import betainc
 
 method_name="langevin_adapt_pyt"
 
@@ -39,7 +39,7 @@ class config:
     verbose=1
     log_dir='../../logs/linear_gaussian_tests'
     aggr_res_path = None
-    update_agg_res=True
+    update_agg_res=False
     sigma=1
     v1_kernel=True
     torch_seed=None
@@ -81,6 +81,7 @@ class config:
 
     track_delta_t=False
     mult_last=True
+    linear=True
 
 
 
@@ -145,12 +146,15 @@ parser.add_argument('--s_decay',type=float,default=config.s_decay)
 parser.add_argument('--s_gain',type =float,default= config.s_gain)
 parser.add_argument('--track_delta_t',type=str2bool,default=config.track_delta_t)
 parser.add_argument('--mult_last',type=str2bool,default=config.mult_last)
+parser.add_argument('--linear',type=str2bool,default=config.linear)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
     setattr(config, k, v)
 
-
+prblm_str='linear_gaussian' if config.linear else 'gaussian'
+if not config.linear:
+    config.log_dir=config.log_dir.replace('linear_gaussian','gaussian')
 if len(config.p_range)==0:
     config.p_range= [config.p_t]
 
@@ -209,7 +213,7 @@ if not os.path.exists('../../logs'):
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 
-results_path='../../logs/linear_gaussian_tests/results.csv'
+results_path=f'../../logs/'+ prblm_str+'_tests/results.csv' 
 if os.path.exists(results_path):
     results_g=pd.read_csv(results_path)
 else:
@@ -250,19 +254,36 @@ adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBeta
 
 kernel_str='v1_kernel' if config.v1_kernel else 'v2_kernel'
 kernel_function=t_u.langevin_kernel_pyt if config.v1_kernel else t_u.langevin_kernel_pyt2 
-get_c_norm= lambda p:stat.norm.isf(p)
+
 run_nb=0
 iterator= tqdm(range(config.n_rep))
 exp_res=[]
+
 for p_t in config.p_range:
-    c=get_c_norm(p_t)
-    print(f'c:{c}')
-    e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
-    V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=None)
-    
-    gradV= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
-    
-    norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
+    if config.linear:
+        
+        get_c_norm= lambda p:stat.norm.isf(p)
+        c=get_c_norm(p_t)
+        if config.verbose>=1.:
+            print(f'c:{c}')
+        e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
+        V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=None)
+        
+        gradV= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
+        
+        norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
+    else:
+        epsilon=1
+        p_target_f=lambda h: 0.5*betainc(0.5*(d-1),0.5,(2*epsilon*h-h**2)/(epsilon**2))
+        h,P_target = dichotomic_search(f=p_target_f,a=0,b=epsilon,thresh=p_t,n_max=100)
+        c=epsilon-h
+        print(f'c:{c}',f'P_target:{P_target}')
+        e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
+        V = lambda X: torch.clamp(input=torch.norm(X,p=2,dim=-1)*c-X[:,0], min=0, max=None)
+        
+        gradV= lambda X: (c*X/torch.norm(X,p=2,dim=-1)[:,None] -e_1[None,:])*(X[:,0]<c*torch.norm(X,p=2,dim=1))[:,None]
+        
+        norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
 
     for g_t in config.g_range:
         for T in config.T_range:
@@ -401,7 +422,7 @@ for p_t in config.p_range:
                     "np_seed":config.np_seed,"torch_seed":config.torch_seed
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
                     "d":config.d,"s_opt":config.s_opt,"s":config.s,"clip_s":config.clip_s,"s_min":config.s_min,"s_max":config.s_max,
-                    "ess_opt":config.ess_opt, 
+                    "ess_opt":config.ess_opt, "linear":config.linear,
                     "d_t_min":config.d_t_min,"d_t_max":config.d_t_max}
                     exp_res.append(results)
                     results_df=pd.DataFrame([results])
@@ -421,3 +442,4 @@ for p_t in config.p_range:
                         aggr_res_df.to_csv(aggr_res_path,index=False)
 exp_df=pd.DataFrame(exp_res)
 exp_df.to_csv(os.path.join(exp_log_path,'exp_results.csv'),index=False)                    
+

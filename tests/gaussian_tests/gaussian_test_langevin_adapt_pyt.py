@@ -238,10 +238,11 @@ save_every = 1
 epsilon=config.epsilon
 kernel_str='v1_kernel' if config.v1_kernel else 'v2_kernel'
 kernel_function=t_u.langevin_kernel_pyt if config.v1_kernel else t_u.langevin_kernel_pyt2 
-p_target_f=lambda h: 0.5*betainc(0.5*(d-1),0.5,(2*epsilon*h-h**2)/(epsilon**2))
+
 run_nb=0
 iterator= tqdm(range(config.n_rep))
 for p_t in config.p_range:
+    p_target_f=lambda h: 0.5*betainc(0.5*(d-1),0.5,(2*epsilon*h-h**2)/(epsilon**2))
     h,P_target = dichotomic_search(f=p_target_f,a=0,b=epsilon,thresh=p_t,n_max=100)
     c=epsilon-h
     print(f'c:{c}',f'P_target:{P_target}')

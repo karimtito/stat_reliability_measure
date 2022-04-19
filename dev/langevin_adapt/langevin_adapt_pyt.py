@@ -470,8 +470,9 @@ mult_last=True):
            
     reach_rate=  (v<=0).float().mean().item() 
 
-    finished_flag=reach_rate<min_rate
-    
+    finished_flag=reach_rate>=min_rate
+    if verbose>=1.:
+        print(f"finished flag:{finished_flag}")
     P_est = (g_prod*reach_rate).item() if mult_last else g_prod.item()
     if verbose>=0.5:
             print(f"g_iter_final:{reach_rate},g_final:{P_est}")
