@@ -1,9 +1,12 @@
 import torch
+
 import torch.nn as nn
+
 from stat_reliability_measure.dev.utils import float_to_file_float
 from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet
 from torchvision import transforms,datasets
 from torch.utils.data import DataLoader
+
 from torch import optim
 import os
 import math
@@ -106,9 +109,9 @@ def langevin_kernel_pyt(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sig
     with torch.no_grad():
         G_noise = torch.randn(size = X.shape).to(device)
         if not gaussian:
-            X_new =X-delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise 
+            X_new =X-delta_t*grad+math.sqrt(2*delta_t/beta)*G_noise 
         else:
-            X_new=(1-delta_t/beta)*X -delta_t*grad+torch.sqrt(2*delta_t/beta)*G_noise # U(x)=beta*V(x)+(1/2)x^T*Sigma*x
+            X_new=(1-delta_t/beta)*X -delta_t*grad+math.sqrt(2*delta_t/beta)*G_noise # U(x)=beta*V(x)+(1/2)x^T*Sigma*x
     return X_new
 
 def langevin_kernel_pyt3(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_sigma=1):
@@ -143,7 +146,7 @@ def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_si
     return X_new
 
 
-def verlet_kernel1(X, gradV, delta_t, beta,L,p_0=None,lambda_=0, gaussian=True):
+def verlet_kernel1(X, gradV, delta_t, beta,L,p_0=None,lambda_=0, gaussian=True,kappa_opt=False):
     """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
 
     """
@@ -154,20 +157,20 @@ def verlet_kernel1(X, gradV, delta_t, beta,L,p_0=None,lambda_=0, gaussian=True):
     else:
         p_t = p_0
     
-
+    kappa=2. / (1 + (1 - delta_t**2)**(1/2)) if kappa_opt else 1
     for _ in range(L):
         #I. Verlet scheme
         #computing half-point momentum
         #p_t.data = p_t-0.5*dt*gradV(X).detach() / norms(gradV(X).detach())
-        p_t.data = p_t-0.5*delta_t*beta*gradV(q_t).detach()
+        p_t.data = p_t-0.5*kappa*delta_t*beta*gradV(q_t).detach() 
         if gaussian:
-            p_t.data -= 0.5*delta_t*q_t.data
+            p_t.data -= 0.5*kappa*delta_t*q_t.data
         #updating position
         q_t.data = (q_t + delta_t*p_t.data)
         #updating momentum again
-        p_t.data = p_t -0.5*delta_t*beta*gradV(q_t).detach()
+        p_t.data = p_t -0.5*kappa*delta_t*beta*gradV(q_t).detach()
         if gaussian:
-            p_t.data -= 0.5*delta_t*q_t.data
+            p_t.data -= 0.5*kappa*delta_t*q_t.data
         #II. Optional smoothing of momentum memory
         p_t.data = math.exp(-lambda_*delta_t)*p_t
 
@@ -404,6 +407,8 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
                 if gaussian:
                     high_diff+=(delta_t/beta)*cand_Y
                     low_diff+=(delta_t/beta)*Y
+              
+        
                 log_a_high-=(beta/(4*delta_t))*torch.norm(high_diff,p=2 ,dim=1)**2
                 log_a_low-=(beta/(4*delta_t))*torch.norm(low_diff,p=2,dim=1)**2
                 if verbose>=5: 
@@ -607,7 +612,8 @@ def Hamiltonian(X,p,V,beta,gaussian=True):
 def apply_v_kernel(Y,v_y,v_kernel,T:int,beta,gradV,V,delta_t:float,mh_opt:bool,track_accept:bool,
  gaussian:bool,device, adapt_d_t:bool,
 target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bool=False,verbose:float =1
-,track_delta_t=False,d_t_min=None,d_t_max=None,lambda_=0,L=1,gamma=0,track_H=False):
+,track_delta_t=False,d_t_min=None,d_t_max=None,lambda_=0,L=1,gamma=0,track_H=False,
+save_y=False,kappa_opt=True):
     """_summary_
 
     Args:
@@ -642,19 +648,21 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
     if track_delta_t:
         delta_ts=[]
     p_0 = torch.randn_like(Y)
-    H=Hamiltonian(X=Y, p=p_0,V=V,beta=beta,gaussian=gaussian)
+    H=Hamiltonian(X=Y, p=p_0,V=V,beta=beta,gaussian=gaussian,)
     H_s=[]
     if track_H:
         H_s=[H.cpu().mean().item()]
+    if save_y:
+        y_s=[Y]
     nb_calls+=nb
     for _ in range(T):
             
         if track_accept or mh_opt:
-            cand_Y,cand_p=v_kernel(Y,gradV,p_0 =p_0, delta_t=delta_t,beta=beta,lambda_=lambda_,L=L)
+            cand_Y,cand_p=v_kernel(Y,gradV,p_0 =p_0, delta_t=delta_t,beta=beta,lambda_=lambda_,L=L,kappa_opt=kappa_opt)
             nb_calls+=L*nb
             cand_H=Hamiltonian(X=cand_Y,p=cand_p,V=V,beta=beta,gaussian =gaussian)
             nb_calls+=nb
-            alpha_=torch.exp(-cand_H+H)
+            alpha_=min(torch.exp(-cand_H+H),1)
             if verbose>=5: 
                 print(f"alpha_={alpha_}")
             b_size= nb
@@ -689,9 +697,11 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
                     Y=torch.where(accept.unsqueeze(-1),input=cand_Y,other=Y)
                     
                     H=torch.where(accept, input=cand_H,other=H)
-                    H_s.append(H.cpu().mean().item())
+                    if track_H:
+                        H_s.append(H.cpu().mean().item())
 
                     p_0=torch.where(accept.unsqueeze(-1),input=cand_p,other=p_0)
+                    p_0=gamma*p_0+(1-gamma)*torch.randn_like(p_0)
                     nb_calls+=nb
                     if debug:
                         
@@ -704,8 +714,10 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
                 H_s.append(H.cpu().mean().item())
         else:
             Y,p_0=v_kernel(Y, gradV, delta_t, beta)
+            p_0=gamma*p_0+(1-gamma)*torch.randn_like(p_0)
             
-            
+        if save_y:
+            y_s.append(Y)    
         nb_calls= nb_calls+nb
 
     
@@ -724,4 +736,71 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
         H_s=np.array(H_s)
         dict_out['H_stds']=H_s.std()
         dict_out['H_means']=H_s.mean()
+    if save_y:
+        dict_out['Y_s'] = y_s
     return Y,v_y,nb_calls,dict_out
+
+
+
+def verlet_mcmc(q,p,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
+kappa_opt:bool=True,save_H=True,save_func=None,device='cpu'):
+    """ Simple implementation of Hamiltonian dynanimcs MCMC 
+
+    Args:
+        q (_type_): _description_
+        p (_type_): _description_
+        beta (_type_): _description_
+        gaussian (_type_): _description_
+        V (_type_): _description_
+        gradV (_type_): _description_
+        T (_type_): _description_
+        delta_t (_type_): _description_
+        kappa_opt (bool, optional): _description_. Defaults to True.
+        save_H (bool, optional): _description_. Defaults to True.
+        save_Q (bool, optional): _description_. Defaults to True.
+        save_func (_type_, optional): _description_. Defaults to None.
+
+    Returns:
+        _type_: _description_
+    """
+    acc  = 0
+    (N,d)=q.shape
+    H_old = Hamiltonian(X=q,p=p,beta=beta, gaussian=gaussian,V=V)
+    nb_calls=N
+    if save_H:
+        H_ = np.zeros(T+1)
+        H_[0]=H_old.mean()
+
+    if save_func is not None:
+        saved=[save_func(q,p)]
+    for i  in range(T):
+        q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt)
+        nb_calls+=N*L
+        H_trial= Hamiltonian(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian)
+        nb_calls+=N
+        
+        alpha=torch.rand(size=(N,),device=device )
+        delta_H=torch.clamp(-(H_trial-H_old),max=0)
+        accept=torch.exp(delta_H)>alpha
+        acc+=accept.sum()
+        q=torch.where(accept.unsqueeze(-1),input=q_trial,other=q)
+        p = torch.randn(size=(N,d),device=device)
+    
+        H_old= Hamiltonian(X=q, p=p,V=V,beta=beta,gaussian=gaussian)
+        if save_H:
+            H_[i+1] = H_old.mean()
+        nb_calls+=N
+        
+
+        if save_func is not None:
+            saved.append(save_func(q,p))
+    
+    dict_out={'acc_rate':acc/(T*N)}
+
+    if save_H:
+        dict_out['H']=H_
+    if save_func is not None:
+        dict_out['saved']=saved
+    v_q=V(q)
+    nb_calls+=N
+    return q,v_q,nb_calls,dict_out
