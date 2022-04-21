@@ -146,16 +146,26 @@ def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_si
     return X_new
 
 
-def verlet_kernel1(X, gradV, delta_t, beta,L,p_0=None,lambda_=0, gaussian=True,kappa_opt=False):
+def verlet_kernel1(X, gradV, delta_t, beta,L,p_0=None,lambda_=0, gaussian=True,kappa_opt=False,scale_M=None):
     """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
 
     """
-    q_t = X
+    q_t = torch.clone(X)
     # if no initial momentum is given we draw it randomly from gaussian distribution
     if p_0 is None:                        
         p_t = torch.randn_like(X)
+        if scale_M is not None:
+            p_t=torch.sqrt(scale_M)*p_t
+            grad_q=lambda p:delta_t*(p.data/scale_M)
+        else:
+            grad_q=lambda p:delta_t*p.data
     else:
         p_t = p_0
+        if scale_M is not None:
+            grad_q=lambda p:delta_t*(p.data/scale_M)
+        else:
+            grad_q=lambda p:delta_t*p.data
+
     
     kappa=2. / (1 + (1 - delta_t**2)**(1/2)) if kappa_opt else 1
     for _ in range(L):
@@ -166,16 +176,14 @@ def verlet_kernel1(X, gradV, delta_t, beta,L,p_0=None,lambda_=0, gaussian=True,k
         if gaussian:
             p_t.data -= 0.5*kappa*delta_t*q_t.data
         #updating position
-        q_t.data = (q_t + delta_t*p_t.data)
+        q_t.data = (q_t + grad_q(p_t))
         #updating momentum again
         p_t.data = p_t -0.5*kappa*delta_t*beta*gradV(q_t).detach()
         if gaussian:
             p_t.data -= 0.5*kappa*delta_t*q_t.data
         #II. Optional smoothing of momentum memory
-        p_t.data = math.exp(-lambda_*delta_t)*p_t
+        p_t.data = torch.exp(-lambda_*delta_t)*p_t
 
-
-        
     return q_t.detach(),p_t
 
 
@@ -742,8 +750,8 @@ save_y=False,kappa_opt=True):
 
 
 
-def verlet_mcmc(q,p,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
-kappa_opt:bool=True,save_H=True,save_func=None,device='cpu'):
+def verlet_mcmc(q,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
+kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None):
     """ Simple implementation of Hamiltonian dynanimcs MCMC 
 
     Args:
@@ -764,6 +772,10 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu'):
         _type_: _description_
     """
     acc  = 0
+    p=torch.randn_like(q)
+    if scale_M is not None:
+        sqrt_M = torch.sqrt(scale_M)
+        p=sqrt_M*torch.randn_like(q)
     (N,d)=q.shape
     H_old = Hamiltonian(X=q,p=p,beta=beta, gaussian=gaussian,V=V)
     nb_calls=N
@@ -774,7 +786,7 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu'):
     if save_func is not None:
         saved=[save_func(q,p)]
     for i  in range(T):
-        q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt)
+        q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,scale_M=scale_M)
         nb_calls+=N*L
         H_trial= Hamiltonian(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian)
         nb_calls+=N
@@ -784,8 +796,9 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu'):
         accept=torch.exp(delta_H)>alpha
         acc+=accept.sum()
         q=torch.where(accept.unsqueeze(-1),input=q_trial,other=q)
-        p = torch.randn(size=(N,d),device=device)
-    
+        p = torch.randn_like(q)
+        if scale_M is not None:
+            p = sqrt_M*p
         H_old= Hamiltonian(X=q, p=p,V=V,beta=beta,gaussian=gaussian)
         if save_H:
             H_[i+1] = H_old.mean()
@@ -801,6 +814,107 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu'):
         dict_out['H']=H_
     if save_func is not None:
         dict_out['saved']=saved
+    v_q=V(q)
+    nb_calls+=N
+    return q,v_q,nb_calls,dict_out
+
+
+def adapt_verlet_mcmc(q,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
+kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,alpha_p:float=0.1,prop_d=0.1,FT=False,dt_max=None,sig_dt=0.015,
+verbose=0):
+    """ Simple implementation of Hamiltonian dynanimcs MCMC 
+
+    Args:
+        q (_type_): _description_
+        p (_type_): _description_
+        beta (_type_): _description_
+        gaussian (_type_): _description_
+        V (_type_): _description_
+        gradV (_type_): _description_
+        T (_type_): _description_
+        delta_t (_type_): _description_
+        kappa_opt (bool, optional): _description_. Defaults to True.
+        save_H (bool, optional): _description_. Defaults to True.
+        save_Q (bool, optional): _description_. Defaults to True.
+        save_func (_type_, optional): _description_. Defaults to None.
+        alpha_p 
+
+    Returns:
+        _type_: _description_
+    """
+    acc  = 0
+    T_max=T
+    p=torch.randn_like(q)
+    if scale_M is not None:
+        sqrt_M = torch.sqrt(scale_M)
+        p=sqrt_M*torch.randn_like(q)
+        if FT:
+            maha_dist = lambda x,y: ((1/scale_M)*(x-y)**2).sum(1)
+    elif FT:
+        maha_dist = lambda x,y: ((x-y)**2).sum(1)
+    (N,d)=q.shape
+    o_old=q+q**2
+    mu_old,sig_old=(o_old).mean(0),(o_old).std(0)
+    H_old = Hamiltonian(X=q,p=p,beta=beta, gaussian=gaussian,V=V)
+    nb_calls=N
+    if save_H:
+        H_ = np.zeros(T+1)
+        H_[0]=H_old.mean()
+
+    if save_func is not None:
+        saved=[save_func(q,p)]
+    prod_correl=torch.ones(size=(d,),device=q.device)
+    i=0
+    #torch.multinomial(input=)
+    while (prod_correl>alpha_p).sum()>=int(prop_d*d) and i<T_max:
+        
+        q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,scale_M=scale_M)
+        
+        nb_calls+=N*L
+        H_trial= Hamiltonian(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian)
+        nb_calls+=N
+        
+        alpha=torch.rand(size=(N,),device=device)
+        delta_H=torch.clamp(-(H_trial-H_old),max=0)
+        if FT:
+            print(q==q_trial)
+            lambda_i=maha_dist(x=q,y=q_trial)/L*torch.exp(delta_H)
+            print(lambda_i)
+            
+            sel_ind=torch.multinomial(input=lambda_i/lambda_i.sum(),num_samples=N,replacement=True)
+            delta_t = torch.clamp(delta_t[sel_ind]+sig_dt*torch.randn(size=(1,d),device=device),min=0,max=dt_max)
+        accept=torch.exp(delta_H)>alpha
+        nb_accept=accept.sum()
+        acc+=nb_accept
+        q=torch.where(accept.unsqueeze(-1),input=q_trial,other=q)
+        if nb_accept>0:
+            o_new=q+q**2
+            mu_new,sig_new=o_new.mean(0),o_new.std(0)
+            correl=((o_new-mu_new)*(o_old-mu_old)).mean(0)/(sig_old*sig_new)
+            prod_correl*=correl
+    
+        p = torch.randn_like(q)
+        if scale_M is not None:
+            p = sqrt_M*p
+        H_old= Hamiltonian(X=q, p=p,V=V,beta=beta,gaussian=gaussian)
+        if save_H:
+            H_[i+1] = H_old.mean()
+        nb_calls+=N
+        
+
+        if save_func is not None:
+            saved.append(save_func(q,p))
+        i+=1
+    if verbose:
+        print(f"T_final={i}")
+    dict_out={'acc_rate':acc/(i*N)}
+
+    if save_H:
+        dict_out['H']=H_
+    if save_func is not None:
+        dict_out['saved']=saved
+    if FT:
+        dict_out['dt']=delta_t
     v_q=V(q)
     nb_calls+=N
     return q,v_q,nb_calls,dict_out
