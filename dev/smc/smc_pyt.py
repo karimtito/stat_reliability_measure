@@ -1,7 +1,7 @@
 import torch 
 import math
 import numpy as np
-from stat_reliability_measure.dev.torch_utils import TimeStepPyt, apply_l_kernel,apply_simp_kernel, normal_kernel,verlet_mcmc
+from stat_reliability_measure.dev.torch_utils import TimeStepPyt, adapt_verlet_mcmc, apply_l_kernel,apply_simp_kernel, normal_kernel,verlet_mcmc
 
 
 
@@ -54,7 +54,7 @@ def nextBetaSimpESS(beta_old, v,lambda_0=1,max_beta=1e9,multi_output=False):
     """
     delta_beta=(lambda_0/v.std().item())
     res=min(beta_old+delta_beta,max_beta)
-    return res
+    return res,None
 
 def bissection(f,a,b,target,thresh,n_max=100):
     """Implementation of binary search of method to find root of continuous function
@@ -103,6 +103,7 @@ def nextBetaESS(beta_old,v,ess_alpha,max_beta=1e6,verbose=0,thresh=1e-3,debug=Fa
             print(f"New beta:{new_beta}, new ESS:{new_ess}")
         return new_beta,new_ess
     
+supported_beta_adapt={'ess':nextBetaESS,'simp_ess':nextBetaSimpESS}
 
 def tuneFT(X,dt,L):
     pass
@@ -110,7 +111,7 @@ def tuneFT(X,dt,L):
 
 
 
-def SamplerSMC(gen,  V, gradV,ess_alpha=0.8,min_rate=0.8,alpha =0.1,N=300,T = 1,L=1,n_max=300, 
+def SamplerSMC(gen,  V, gradV,adapt_func,ess_alpha=0.8,min_rate=0.8,alpha =0.1,N=300,T = 1,L=1,n_max=300, 
 max_beta=1e6, verbose=False,device=None,
 track_accept=False,track_beta=False,return_log_p=False,gaussian=False,
 adapt_dt=False,
@@ -118,7 +119,7 @@ track_calls=True,track_dt=False,track_H=False,track_v_means=False,track_ratios=F
 target_accept=0.574,accept_spread=0.1,dt_decay=0.999,dt_gain=None,
 dt_min=1e-5,dt_max=1e-2,v_min_opt=False,lambda_0=1,
 debug=False,kappa_opt=False,
- track_ess=False):
+ track_ess=False,M_opt=False,adapt_step=False,alpha_p=0.1,FT=False,sig_dt=0.015):
     """
       Adaptive SMC estimator with transition kernels either based on:
       underdamped Langevin dynamics  (L=1) or Hamiltonian dynamics (L>1) kernels
@@ -150,7 +151,8 @@ debug=False,kappa_opt=False,
     # adaptative parameters
     if adapt_dt and dt_gain is None:
         dt_gain= 1/dt_decay
-    
+
+    mcmc_func=verlet_mcmc if not adapt_step else adapt_verlet_mcmc
     #Initializing failure probability
     g_prod=1
 
@@ -177,6 +179,7 @@ debug=False,kappa_opt=False,
     finished_flag=False
     beta=0
     reach_beta_inf=False
+    scale_M=None
     ## For
     while not reach_beta_inf:
         n += 1
@@ -185,16 +188,27 @@ debug=False,kappa_opt=False,
 
         if n==1:
             X=gen(N)
-            p=torch.randn_like(X)
+            #p=torch.randn_like(X)
             v=V(X)
 
-            
-            dt = torch.clamp(alpha*TimeStepPyt(V,X,gradV),min=dt_min,max=dt_max)
+            d=X.shape[-1]
+            dt_scalar =torch.clamp(alpha*TimeStepPyt(V,X,gradV),min=dt_min,max=dt_max)
+            dt= torch.clamp(dt_scalar*torch.ones(size=(1,d),device=device)+sig_dt*torch.randn(size=(1,d),device=device),min=0,max=dt_max)
             if track_calls:
                 Count_v = 3*N 
         else:
-            X,v,nb_calls,dict_out=verlet_mcmc(q=X,p=p,beta=beta,gaussian=gaussian,
-                V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None)
+            if M_opt:
+                scale_M=1/X.var(0)
+                if verbose>=0.1:
+                    print(f"avg. var:{X.var(0).mean()}")
+            if adapt_step:
+                X,v,nb_calls,dict_out=mcmc_func(q=X,beta=beta,gaussian=gaussian,
+                    V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
+                    alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose)
+            else:
+                X,v,nb_calls,dict_out=verlet_mcmc(q=X,beta=beta,gaussian=gaussian,
+                                    V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
+                                    scale_M=scale_M)
             if track_calls:
                 Count_v+=nb_calls
             if track_accept:
@@ -214,9 +228,9 @@ debug=False,kappa_opt=False,
                 if dt_max is not None:
                     dt=torch.clamp(dt,max=dt_max)
                 if verbose>=2.5:
-                    print(f"New dt:{dt.item()}")
+                    print(f"New mean dt:{dt.mean().item()}")
                 if track_dt:
-                    dt_s.append(dt)
+                    dt_s.append(dt.mean())
                 
 
 
@@ -231,14 +245,15 @@ debug=False,kappa_opt=False,
         
         #Selecting next beta
         beta_old=beta
-        beta,ess = nextBetaESS(beta_old=beta_old,v=v,ess_alpha=ess_alpha,max_beta=max_beta)
+        beta,ess = adapt_func(beta_old,v,)
         if verbose>=0.5:
             print(f'Beta old {beta_old}, new beta {beta}, delta_beta={beta-beta_old}')
         
         if track_ess:
             ess_.append(ess)
         reach_beta_inf=beta==max_beta
-        if reach_beta_inf:
+        reach_rate=(v<=0).float().mean().item()
+        if reach_beta_inf or reach_rate>=min_rate:
             beta=torch.inf
             G= v<=0
             g_iter=G.float().mean()
