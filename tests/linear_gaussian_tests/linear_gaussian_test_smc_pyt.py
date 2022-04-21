@@ -1,4 +1,4 @@
-import stat_reliability_measure.dev.torch_utils as t_u 
+import stat_reliability_measure.dev.torch_utils as t_u
 import stat_reliability_measure.dev.smc.smc_pyt as smc_pyt
 import scipy.stats as stat
 import numpy as np
@@ -93,7 +93,10 @@ class config:
 
     kappa_opt=True
 
-
+    adapt_func='ESS'
+    M_opt = False
+    adapt_step=False
+    FT=False
 
 
 parser=argparse.ArgumentParser()
@@ -156,11 +159,22 @@ parser.add_argument('--test2',type=str2bool,default =config.test2)
 parser.add_argument('--print_config',type=str2bool,default=config.print_config)
 parser.add_argument('--track_dt',type=str2bool,default=config.track_dt)
 parser.add_argument('--linear',type=str2bool,default=config.linear)
+parser.add_argument('--adapt_func',type=str,default=config.adapt_func)
+parser.add_argument('--M_opt',type=str2bool,default=config.M_opt)
+parser.add_argument('--adapt_step',type=str2bool,default=config.adapt_step)
+parser.add_argument('--FT',type=str2bool,default=config.FT)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
     setattr(config, k, v)
 
+
+assert config.adapt_func.lower() in smc_pyt.supported_beta_adapt.keys(),f"select adaptive function in {smc_pyt.supported_beta_adapt.keys}"
+adapt_func=smc_pyt.supported_beta_adapt[config.adapt_func.lower()]
+if config.adapt_func.lower()=='ess':
+    adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=config.ess_alpha,max_beta=1e6)
+elif config.adapt_func.lower()=='simp_ess':
+    adapt_func = lambda beta,v : smc_pyt.nextBetaSimpESS(beta_old=beta,v=v,lambda_0=config.lambda_0,max_beta=1e6)
 prblm_str='linear_gaussian' if config.linear else 'gaussian'
 if not config.linear:
     config.log_dir=config.log_dir.replace('linear_gaussian','gaussian')
@@ -261,7 +275,7 @@ param_ranges = [config.N_range,config.T_range,config.rho_range,config.alpha_rang
 param_lens=np.array([len(l) for l in param_ranges])
 nb_runs= np.prod(param_lens)
 
-mh_str="adjusted" if config.mh_opt else "unadjusted"
+mh_str="adjusted" 
 method=method_name+'_'+mh_str
 save_every = 1
 #adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBetaPyt
@@ -320,7 +334,7 @@ for p_t in config.p_range:
                         print(f"Starting simulations with p_t:{p_t},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N}")
                         for i in iterator:
                             t=time()
-                            p_est,res_dict,=smc_pyt.SamplerSMC(gen=norm_gen,V= V,gradV=gradV,min_rate=config.min_rate,N=N,T=T,L=L,
+                            p_est,res_dict,=smc_pyt.SamplerSMC(gen=norm_gen,V= V,gradV=gradV,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,
                             alpha=alpha,n_max=10000,ess_alpha=ess_t,
                             verbose=config.verbose, track_accept=config.track_accept,track_beta=config.track_beta,track_v_means=config.track_v_means,
                             track_ratios=config.track_ratios,track_ess=config.track_ess,kappa_opt=config.kappa_opt
@@ -328,7 +342,7 @@ for p_t in config.p_range:
                             adapt_dt=config.adapt_dt, dt_decay=config.dt_decay,
                             dt_gain=config.dt_gain,dt_min=config.dt_min,dt_max=config.dt_max,
                             v_min_opt=config.v_min_opt, lambda_0= config.lambda_0,
-                            track_dt=config.track_dt,
+                            track_dt=config.track_dt,M_opt=config.M_opt,adapt_step=config.adapt_step,FT=config.FT
                             )
                             t1=time()-t
 
@@ -402,9 +416,10 @@ for p_t in config.p_range:
                         "mh_opt":config.mh_opt,'only_duplicated':config.only_duplicated,
                         "np_seed":config.np_seed,"torch_seed":config.torch_seed
                         ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
-                        "d":config.d,
+                        "d":config.d,"adapt_func":config.adapt_func,
                         "ess_opt":config.ess_opt, "linear":config.linear,
-                        "dt_min":config.dt_min,"dt_max":config.dt_max}
+                        "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
+                        "M_opt":config.M_opt,"adapt_step":config.adapt_step}
                         exp_res.append(results)
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
