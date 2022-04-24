@@ -63,8 +63,8 @@ def get_lirpa_bounds(x_0,y_0,model,epsilon,num_classes,noise_dist,a,device):
         return (p_l,p_u)
 
 
-
-def get_lirpa_cert(x_0,y_0,model,epsilon,num_classes,noise_dist,a,device):
+#TODO complete lirpa certification 
+def get_lirpa_cert(x_0,y_0,model,epsilon,num_classes,device):
     image=x_0.view(1,1,28,28)
     bounded_model=BoundedModule(model,global_input=torch.zeros_like(input=image),bound_opts={"conv_mode": "patches"})
 # Step 2: define perturbation. Here we use a Linf perturbation on input image.
@@ -73,3 +73,7 @@ def get_lirpa_cert(x_0,y_0,model,epsilon,num_classes,noise_dist,a,device):
     ptb = PerturbationLpNorm(norm = norm, eps = epsilon)
     # Input tensor is wrapped in a BoundedTensor object.
     bounded_image = BoundedTensor(image, ptb)
+
+    lirpa_safe=False
+
+    return lirpa_safe
