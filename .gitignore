@@ -7,7 +7,7 @@
 #project specific 
 logs
 data/ImageNet
-
+models
 # User-specific files
 *.rsuser
 *.suo
