@@ -32,14 +32,19 @@ class config:
     ess_alpha=0.9
     e_range=[]
     p_range=[]
-    p_t=1e-15
+    
+    p_s=1e-5
+    p_w=1e-1
+    p_t=1e-6
     n_rep=10
     
     save_config=False 
     print_config=True
     d=1024
+    d_s=1
+    d_w=1
     verbose=1
-    log_dir='../../logs/linear_gaussian_tests'
+    log_dir='../../logs/anisotrop_tests'
     aggr_res_path = None
     update_agg_res=False
     sigma=1
@@ -99,7 +104,6 @@ class config:
     FT=False
     sig_dt=0.015
     L_min=1
-    
 
 
 parser=argparse.ArgumentParser()
@@ -108,7 +112,8 @@ parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--d',type=int,default=config.d)
-
+parser.add_argument('--d_s',type=int,default=config.d_s)
+parser.add_argument('--d_w',type=int,default=config.d_w)
 parser.add_argument('--min_rate',type=float,default=config.min_rate)
 parser.add_argument('--alpha',type=float,default=config.alpha)
 parser.add_argument('--n_max',type=int,default=config.n_max)
@@ -126,7 +131,8 @@ parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_
 parser.add_argument('--torch_seed',type=int, default=config.torch_seed)
 parser.add_argument('--np_seed',type=int, default=config.np_seed)
 parser.add_argument('--sigma', type=float,default=config.sigma)
-parser.add_argument('--p_t',type=float,default=config.p_t)
+parser.add_argument('--p_w',type=float,default=config.p_w)
+parser.add_argument('--p_s',type=float,default=config.p_s)
 parser.add_argument('--p_range',type=str2floatList,default=config.p_range)
 parser.add_argument('--ess_alpha',type=float,default=config.ess_alpha)
 parser.add_argument('--e_range',type=str2floatList,default=config.e_range)
@@ -174,17 +180,20 @@ for k,v in vars(args).items():
     setattr(config, k, v)
 
 
+assert config.d_s+config.d_w<=config.d
+
+
+
 assert config.adapt_func.lower() in smc_pyt.supported_beta_adapt.keys(),f"select adaptive function in {smc_pyt.supported_beta_adapt.keys}"
 adapt_func=smc_pyt.supported_beta_adapt[config.adapt_func.lower()]
 if config.adapt_func.lower()=='ess':
     adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=config.ess_alpha,max_beta=1e6)
 elif config.adapt_func.lower()=='simp_ess':
     adapt_func = lambda beta,v : smc_pyt.nextBetaSimpESS(beta_old=beta,v=v,lambda_0=config.lambda_0,max_beta=1e6)
-prblm_str='linear_gaussian' if config.linear else 'gaussian'
-if not config.linear:
-    config.log_dir=config.log_dir.replace('linear_gaussian','gaussian')
+prblm_str='anisotrop'
+
 if len(config.p_range)==0:
-    config.p_range= [config.p_t]
+    config.p_range= [config.p_s]
 
 if len(config.e_range)==0:
     config.e_range= [config.ess_alpha]
@@ -238,6 +247,8 @@ else:
     device=config.device
 
 d=config.d
+d_w=config.d_w
+d_s=config.d_s
 #epsilon=config.epsilon
 
 
@@ -292,17 +303,22 @@ run_nb=0
 iterator= tqdm(range(config.n_rep))
 exp_res=[]
 
-for p_t in config.p_range:
+for p_s in config.p_range:
     if config.linear:
-        
+        p_t=p_s**d_s*config.p_w**d_w
         get_c_norm= lambda p:stat.norm.isf(p)
-        c=get_c_norm(p_t)
+        c_w=get_c_norm(config.p_w)
+        c_s=get_c_norm(p_s)
+
         if config.verbose>=1.:
-            print(f'c:{c}')
-        e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
-        V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=None)
-        
-        gradV= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
+            print(f'c_w:{c_w}')
+            print(f'c_s:{c_s}')
+            print(f"p_t:{p_t}")
+
+        e_=torch.eye(n=d_w+d_s,m=d,device=device)
+        V = lambda X: torch.clamp(input=c_s-X[:,:d_s], min=0, max=None).sum(1)+torch.clamp(input=c_w-X[:,:d_s+d_w], min=0, max=None).sum(1)
+
+        gradV= lambda X:    (e_[None,:d_s]*(X[:,:d_s]<c_s).unsqueeze(-1)).sum(1)+(e_[None,d_s:d_s+d_w]*(X[:,d_s:d_s+d_w]<c_w).unsqueeze(-1)).sum(1)
         
         norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
     else:
@@ -352,7 +368,7 @@ for p_t in config.p_range:
                             )
                             t1=time()-t
 
-                            print(p_est)
+                            print(f"p_est:{p_est}")
                             #finish_flag=res_dict['finished']
                             
                             if config.track_accept:
@@ -425,8 +441,8 @@ for p_t in config.p_range:
                         "d":config.d,"adapt_func":config.adapt_func,
                         "ess_opt":config.ess_opt, "linear":config.linear,
                         "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
-                        "M_opt":config.M_opt,"adapt_step":config.adapt_step,"sig_dt":config.sig_dt,
-                        "L_min":config.L_min}
+                        "M_opt":config.M_opt,"adapt_step":config.adapt_step,
+                        "p_s":p_s,"d_s":config.d_s,"d_w":config.d_w,"p_w":config.p_w,"L_min":config.L_min}
                         exp_res.append(results)
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)

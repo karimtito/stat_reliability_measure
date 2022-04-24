@@ -19,6 +19,7 @@ from time import time
 from datetime import datetime
 
 from stat_reliability_measure.dev.torch_utils import get_model
+import stat_reliability_measure.dev.torch_utils as t_u
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
 
@@ -68,7 +69,7 @@ class config:
     track_accept=False
     
     d = 784
-    epsilon = 1
+    epsilon = 0.1
     
     n_max=2000
     tqdm_opt=True
@@ -276,7 +277,7 @@ num_classes=10
 if not os.path.exists("../data/MNIST"):
     config.download=True
 
-if config.x_mean!=0: 
+if config.x_mean!=0 or config.x_std!=1: 
     assert config.x_std!=0, "Can't normalize with 0 std."
     transform_=transforms.Compose([
                            transforms.ToTensor(),
@@ -292,28 +293,29 @@ test_loader = DataLoader(mnist_test, batch_size = config.load_batch_size, shuffl
 
 
 
-supported_arch_list=['cnn_custom','dnn2','dnn4']
+supported_arch=['cnn_custom','dnn2','dnn4','lenet']
 
 
-if config.model_arch.lower() in supported_arch_list:
+if config.model_arch.lower() in t_u.supported_arch:
     model, model_shape,model_name=get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
     nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
     download=config.download)
 
 else:
-    raise NotImplementedError(f"Supported architectures are :{supported_arch_list}")
+    raise NotImplementedError(f"Supported architectures are :{list(t_u.supported_arch.keys())}")
 
 for X,y in test_loader:
     X,y = X.to(device), y.to(device)
     break
-
-#X.requires_grad=True
-normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 with torch.no_grad():
     logits=model(X)
     y_pred= torch.argmax(logits,-1)
     correct_idx=y_pred==y
     X_correct, label_correct= X[correct_idx], y[correct_idx]
+
+#X.requires_grad=True
+normal_dist=torch.distributions.Normal(loc=0, scale=1.)
+
 
 #inf=float('inf')
 
@@ -341,7 +343,7 @@ param_lists= [ inp_indices,config.T_list,config.N_list,config.s_list ,config.rat
 lenghts=np.array([len(L) for L in param_lists])
 nb_exps= np.prod(lenghts)
 
-for l in inp_indices:
+for l in range(len(inp_indices)):
     with torch.no_grad():
     
         x_0,y_0 = X[correct_idx][l], y[correct_idx][l]
@@ -365,7 +367,7 @@ for l in inp_indices:
         if config.gaussian_latent:
             amls_gen = lambda N: torch.randn(size=(N,d),device=config.device)
         else:
-            amls_gen= lambda N: (2*torch.rand(size=(N,dim), device=device )-1)
+            amls_gen= lambda N: (2*torch.rand(size=(N,d), device=device )-1)
         
         
         
@@ -385,6 +387,8 @@ for l in inp_indices:
                 y_diff, _ = y_diff.max(dim=1)
             return y_diff #.max(dim=1)
         h_batch_pyt= lambda x: h(x).reshape((x.shape[0],1))
+        
+        
         for T in config.T_list:
             for N in config.N_list: 
                 for s in config.s_list :
@@ -424,7 +428,7 @@ for l in inp_indices:
                             t=time()-t
                             
                             est=amls_res[0]
-                            
+                            print(f"Est:{est}")
                             dict_out=amls_res[1]
                             if config.track_accept:
                                 accept_logs=os.path.join(log_path,'accept_logs')

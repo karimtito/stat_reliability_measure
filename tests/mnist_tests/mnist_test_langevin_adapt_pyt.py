@@ -95,6 +95,9 @@ class config:
     input_stop=None
     model_arch="CNN_custom"
     v_min_opt=False
+    robust_model=False
+    robust_eps=0.1
+    nb_epochs=10
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',type=str,default=config.log_dir)
@@ -176,10 +179,6 @@ np.random.seed(seed=config.np_seed)
 if config.torch_seed is None:
     config.torch_seed=int(time.time())
 torch.manual_seed(seed=config.torch_seed)
-
-
-
-
 if len(config.T_list)<1:
     config.T_list=[config.T]
 if len(config.N_list)<1:
@@ -211,8 +210,6 @@ else:
 
 d=config.d
 
-
-
 if not os.path.exists('../../logs'):
     os.mkdir('../../logs')
 if not os.path.exists(config.log_dir):
@@ -221,11 +218,6 @@ if not os.path.exists(config.log_dir):
 raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
-
-
-
-
-
 if config.epsilons is None:
     log_min,log_max=np.log(config.eps_min),np.log(config.eps_max)
     log_line=np.linspace(start=log_min,stop=log_max,num=config.eps_num)
