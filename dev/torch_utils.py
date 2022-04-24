@@ -146,44 +146,42 @@ def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_si
     return X_new
 
 
-def verlet_kernel1(X, gradV, delta_t, beta,L,p_0=None,lambda_=0, gaussian=True,kappa_opt=False,scale_M=None):
+def verlet_kernel1(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaussian=True,kappa_opt=False,scale_M=None):
     """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
 
     """
+    if ind_L is None:
+        ind_L=L*torch.ones(size=(X.shape[0],),dtype=torch.int16)
     q_t = torch.clone(X)
     # if no initial momentum is given we draw it randomly from gaussian distribution
+    if scale_M is None:
+        scale_M=1
     if p_0 is None:                        
-        p_t = torch.randn_like(X)
-        if scale_M is not None:
-            p_t=torch.sqrt(scale_M)*p_t
-            grad_q=lambda p:delta_t*(p.data/scale_M)
-        else:
-            grad_q=lambda p:delta_t*p.data
+        p_t=torch.sqrt(scale_M)*torch.randn_like(X)
+
     else:
         p_t = p_0
-        if scale_M is not None:
-            grad_q=lambda p:delta_t*(p.data/scale_M)
-        else:
-            grad_q=lambda p:delta_t*p.data
-
-    
-    kappa=2. / (1 + (1 - delta_t**2)**(1/2)) if kappa_opt else 1
-    for _ in range(L):
+    grad_q=lambda p,dt:dt*(p.data/scale_M)
+    kappa= 2. / (1 + (1 - delta_t**2)**(1/2)) if kappa_opt else 1
+    k=1
+    i_k=ind_L>=k
+    while (i_k).sum()>0:
         #I. Verlet scheme
         #computing half-point momentum
         #p_t.data = p_t-0.5*dt*gradV(X).detach() / norms(gradV(X).detach())
-        p_t.data = p_t-0.5*kappa*delta_t*beta*gradV(q_t).detach() 
+        p_t.data[i_k] = p_t[i_k]-0.5*kappa[i_k]*beta*delta_t[i_k]*gradV(q_t[i_k]).detach() 
         if gaussian:
-            p_t.data -= 0.5*kappa*delta_t*q_t.data
+            p_t.data[i_k] -= 0.5*kappa[i_k]*delta_t[i_k]*q_t.data[i_k]
         #updating position
-        q_t.data = (q_t + grad_q(p_t))
+        q_t.data[i_k] = (q_t[i_k] + grad_q(p_t[i_k],delta_t[i_k]))
         #updating momentum again
-        p_t.data = p_t -0.5*kappa*delta_t*beta*gradV(q_t).detach()
+        p_t.data[i_k] = p_t[i_k] -0.5*kappa[i_k]*delta_t[i_k]*beta*gradV(q_t[i_k]).detach()
         if gaussian:
-            p_t.data -= 0.5*kappa*delta_t*q_t.data
+            p_t.data[i_k] -= 0.5*kappa[i_k]*delta_t[i_k]*q_t.data[i_k]
         #II. Optional smoothing of momentum memory
-        p_t.data = torch.exp(-lambda_*delta_t)*p_t
-
+        p_t.data[i_k] = torch.exp(-lambda_*delta_t[i_k])*p_t[i_k]
+        k+=1
+        i_k=ind_L>=k
     return q_t.detach(),p_t
 
 
@@ -295,26 +293,60 @@ def gradV_pyt(x_,x_0,model,target_class,epsilon=0.05,gaussian_latent=True,clippi
         grad_x=grad_u
     return grad_x
 
+def correct_min_max(x_min,x_max,x_mean,x_std):
+    if x_min is None or x_max is None: 
+        if x_min is None:
+            x_min=0
+        if x_max is None:
+            x_max=1
+    if x_mean!=0 or x_std!=1:
+        x_min=(x_min-x_mean)/x_std
+        x_max=(x_max-x_mean)/x_std
+    return x_min,x_max
 
 supported_datasets=['mnist','cifar10']
 datasets_idx={'mnist':0,'cifar10':1}
 datasets_in_shape=[(1,28,28),(3,32,32)]
-
-def get_loader(train,data_dir,download,dataset='mnist',batch_size=100): 
+datasets_dims=[784,3072]
+datasets_num_c={'mnist':10,'cifar10':10}
+def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=0,x_std=1): 
     assert dataset in supported_datasets,f"support datasets are in {supported_datasets}"
     if dataset=='mnist':
-        mnist_dataset = datasets.MNIST(data_dir, train=train, download=download, transform=transforms.ToTensor())
-        data_loader = DataLoader(mnist_dataset, batch_size = batch_size, shuffle=train,)
+        if x_mean!=0 or x_std!=1: 
+            assert x_std!=0, "Can't normalize with 0 std."
+            transform_=transforms.Compose([
+                                transforms.ToTensor(),
+                                transforms.Normalize((x_mean,), (x_std,))
+                            ])
+        else: 
+            transform_ =transforms.ToTensor()
+        mnist_dataset = datasets.MNIST(data_dir, train=train, download=download,
+         transform=transform_)
+        data_loader = DataLoader(mnist_dataset, batch_size = batch_size, shuffle=train)
     elif dataset=='cifar10':
         data_transform=transforms.Compose([
                           transforms.ToTensor(),
                           transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
                       ])
         cifar10_dataset = datasets.CIFAR10("../data", train=train, download=download, transform=data_transform)
-        data_loader = DataLoader(cifar10_dataset , batch_size = 100, shuffle=train)    
+        data_loader = DataLoader(cifar10_dataset , batch_size = batch_size, shuffle=train)    
     
                     
     return data_loader
+
+
+def get_correct_x_y(data_loader,device,model):
+    for X,y in data_loader:
+        X,y = X.to(device), y.to(device)
+        break
+    with torch.no_grad():
+        logits=model(X)
+        y_pred= torch.argmax(logits,-1)
+        correct_idx=y_pred==y
+        X_correct, label_correct= X[correct_idx], y[correct_idx]
+    return X_correct,label_correct
+
+supported_arch={'cnn_custom':CNN_custom,'dnn2':dnn2,'dnn4':dnn4,'lenet':LeNet}
 
 def get_model(model_arch, robust_model, robust_eps,nb_epochs,model_dir,data_dir,test_loader, device ,
 download,model_shape=(1,28,28),force_train=False,dataset='mnist',batch_size=100):
@@ -322,20 +354,12 @@ download,model_shape=(1,28,28),force_train=False,dataset='mnist',batch_size=100)
     model_shape=datasets_in_shape[datasets_idx[dataset]]
     if robust_model:
         c_robust_eps=float_to_file_float(robust_eps)
-    model_name="model_"+model_arch +'_' + dataset if not robust_model else f"{model_arch}_robust_{c_robust_eps}"
+    model_name="model_"+model_arch +'_' + dataset if not robust_model else f"model_{model_arch}_{dataset}_robust_{c_robust_eps}"
     
     c_model_path=model_name+'.pt'
     model_path=os.path.join(model_dir,c_model_path)
-    if model_arch.lower()=='cnn_custom':
-        model=CNN_custom()
-    elif model_arch.lower()=='dnn2':
-        model=dnn2()
-    elif model_arch.lower()=='dnn4':
-        model=dnn4()
-    elif model_arch.lowwer()=='lenet':
-        model=LeNet()
-    else:
-        raise RuntimeError("Model architecture not supported.")
+    assert model_arch.lower() in supported_arch.keys(),f"/!\\Architecture supported for {dataset} are:{list(supported_arch.keys())}"
+    model=supported_arch[model_arch.lower()]()
     if not os.path.exists(model_path) or force_train: 
         #if the model doesn't exist we retrain a model from scratch
         model.to(device)
@@ -819,9 +843,9 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None):
     return q,v_q,nb_calls,dict_out
 
 
-def adapt_verlet_mcmc(q,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
+def adapt_verlet_mcmc(q,ind_L,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
 kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,alpha_p:float=0.1,prop_d=0.1,FT=False,dt_max=None,sig_dt=0.015,
-verbose=0):
+verbose=0,L_min=1):
     """ Simple implementation of Hamiltonian dynanimcs MCMC 
 
     Args:
@@ -850,8 +874,10 @@ verbose=0):
         p=sqrt_M*torch.randn_like(q)
         if FT:
             maha_dist = lambda x,y: ((1/scale_M)*(x-y)**2).sum(1)
+            ones_L=torch.ones_like(ind_L)
     elif FT:
         maha_dist = lambda x,y: ((x-y)**2).sum(1)
+        ones_L=torch.ones_like(ind_L)
     (N,d)=q.shape
     o_old=q+q**2
     mu_old,sig_old=(o_old).mean(0),(o_old).std(0)
@@ -868,26 +894,30 @@ verbose=0):
     #torch.multinomial(input=)
     while (prod_correl>alpha_p).sum()>=int(prop_d*d) and i<T_max:
         
-        q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,scale_M=scale_M)
+        q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,scale_M=scale_M, ind_L=ind_L)
         
-        nb_calls+=N*L
+        nb_calls+=ind_L.sum().item()
         H_trial= Hamiltonian(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian)
         nb_calls+=N
         
         alpha=torch.rand(size=(N,),device=device)
         delta_H=torch.clamp(-(H_trial-H_old),max=0)
         if FT:
-            print(q==q_trial)
-            lambda_i=maha_dist(x=q,y=q_trial)/L*torch.exp(delta_H)
-            print(lambda_i)
             
-            sel_ind=torch.multinomial(input=lambda_i/lambda_i.sum(),num_samples=N,replacement=True)
-            delta_t = torch.clamp(delta_t[sel_ind]+sig_dt*torch.randn(size=(1,d),device=device),min=0,max=dt_max)
+            lambda_i=maha_dist(x=q,y=q_trial)/L*torch.exp(delta_H)
+            
+            sel_ind=torch.multinomial(input=lambda_i,num_samples=N,replacement=True,)
+            
+            delta_t = torch.clamp(delta_t[sel_ind]+sig_dt*torch.randn(size=(N,1),device=device),min=0,max=dt_max)
+            noise_L=torch.rand(size=(N,),device=ind_L.device)
+            
+            ind_L= ind_L[sel_ind]+ones_L*(ind_L[sel_ind]<L).float()*(noise_L>=(2/3))-(ind_L[sel_ind]>L_min).int()*(noise_L<=1/3)*ones_L
+            
         accept=torch.exp(delta_H)>alpha
         nb_accept=accept.sum()
         acc+=nb_accept
         q=torch.where(accept.unsqueeze(-1),input=q_trial,other=q)
-        if nb_accept>0:
+        if nb_accept.item()>0:
             o_new=q+q**2
             mu_new,sig_new=o_new.mean(0),o_new.std(0)
             correl=((o_new-mu_new)*(o_old-mu_old)).mean(0)/(sig_old*sig_new)
@@ -915,6 +945,7 @@ verbose=0):
         dict_out['saved']=saved
     if FT:
         dict_out['dt']=delta_t
+        dict_out['ind_L']=ind_L
     v_q=V(q)
     nb_calls+=N
     return q,v_q,nb_calls,dict_out
