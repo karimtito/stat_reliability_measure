@@ -119,7 +119,7 @@ track_calls=True,track_dt=False,track_H=False,track_v_means=False,track_ratios=F
 target_accept=0.574,accept_spread=0.1,dt_decay=0.999,dt_gain=None,
 dt_min=1e-5,dt_max=1e-2,v_min_opt=False,lambda_0=1,
 debug=False,kappa_opt=False,
- track_ess=False,M_opt=False,adapt_step=False,alpha_p=0.1,FT=False,sig_dt=0.015):
+ track_ess=False,M_opt=False,adapt_step=False,alpha_p=0.1,FT=False,sig_dt=0.015,L_min=1,only_duplicated=False):
     """
       Adaptive SMC estimator with transition kernels either based on:
       underdamped Langevin dynamics  (L=1) or Hamiltonian dynamics (L>1) kernels
@@ -192,33 +192,44 @@ debug=False,kappa_opt=False,
             v=V(X)
 
             d=X.shape[-1]
-            dt_scalar =torch.clamp(alpha*TimeStepPyt(V,X,gradV),min=dt_min,max=dt_max)
-            dt= torch.clamp(dt_scalar*torch.ones(size=(1,d),device=device)+sig_dt*torch.randn(size=(1,d),device=device),min=0,max=dt_max)
+            dt_scalar =alpha*TimeStepPyt(V,X,gradV)
+            dt= torch.clamp(dt_scalar*torch.ones(size=(N,d),device=device)+sig_dt*torch.randn(size=(N,d),device=device),min=0,max=dt_max)
+            ind_L=torch.randint(low=L_min,high=L,size=(N,)) if L_min<L else L*torch.ones(size=(N,))
             if track_calls:
                 Count_v = 3*N 
+    
         else:
             if M_opt:
                 scale_M=1/X.var(0)
                 if verbose>=0.1:
                     print(f"avg. var:{X.var(0).mean()}")
             if adapt_step:
-                X,v,nb_calls,dict_out=mcmc_func(q=X,beta=beta,gaussian=gaussian,
+                
+                X,v,nb_calls,dict_out=mcmc_func(q=X,ind_L=ind_L,beta=beta,gaussian=gaussian,
                     V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
                     alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose)
+                if FT:
+                    dt=dict_out['dt']
+                    ind_L=dict_out['ind_L']
+                    if verbose>=1.5:
+                        print(f"New dt mean:{dt.mean().item()}, dt std:{dt.std().item()}")
+                        print(f"New L mean: {ind_L.mean().item()}, L std:{ind_L.std().item()}")
             else:
                 X,v,nb_calls,dict_out=verlet_mcmc(q=X,beta=beta,gaussian=gaussian,
                                     V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
                                     scale_M=scale_M)
+            
             if track_calls:
                 Count_v+=nb_calls
             if track_accept:
                 accept_rates_mcmc.append(dict_out['acc_rate'])
+                accept_rate=dict_out['acc_rate'] 
+                if verbose>=2.5:
+                    print(f"Accept rate: {accept_rate}")
             if track_H:
                 H_s.extend(list(dic_out['H']))
             if adapt_dt:
                 accept_rate=dict_out['acc_rate'] 
-                if verbose>=2.5:
-                    print(f"Accept rate: {accept_rate}")
                 if accept_rate>target_accept+accept_spread:
                     dt*=dt_gain
                 elif accept_rate<target_accept-accept_spread: 
