@@ -77,6 +77,6 @@ def get_lirpa_cert(x_0,y_0,model,epsilon,num_classes,device,method='CROWN'):
     with torch.no_grad():
         lb,ub = bounded_model.compute_bounds(x=(bounded_image),method=method)
       
-    lirpa_safe=lb[:,y_0]<=ub.max(1) 
+    lirpa_safe=lb[:,y_0]>=ub.max(1) 
 
     return lirpa_safe
