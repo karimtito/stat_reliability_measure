@@ -229,7 +229,7 @@ for k,v in vars(args).items():
     setattr(config, k, v)
 
 if config.model_dir is None:
-    config.model_dir=os.path.join("../../models/",config.data_dir)
+    config.model_dir=os.path.join("../../models/",config.dataset)
 
 #assert config.adapt_func.lower() in smc_pyt.supported_beta_adapt.keys(),f"select adaptive function in {smc_pyt.supported_beta_adapt.keys}"
 #adapt_func=smc_pyt.supported_beta_adapt[config.adapt_func.lower()]
@@ -417,8 +417,6 @@ for l in inp_indices:
             gen= lambda N: (2*torch.rand(size=(N,d), device=device )-1)
         V_ = lambda X: t_u.V_pyt(X,x_0=x_0,model=model,epsilon=epsilon, target_class=y_0,gaussian_latent=config.gaussian_latent)
         gradV_ = lambda X: t_u.gradV_pyt(X,x_0=x_0,model=model, target_class=y_0,epsilon=epsilon, gaussian_latent=config.gaussian_latent)
-       
-        
         for ess_t in config.e_range:
             if config.adapt_func.lower()=='ess':
                 adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=ess_t,max_beta=1e6)
