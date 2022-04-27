@@ -102,6 +102,8 @@ class config:
     M_opt = False
     adapt_step=False
     FT=False
+    GK_opt=False
+    GV_opt=True
     sig_dt=0.015
     L_min=1
     skip_mh=False
@@ -173,6 +175,7 @@ parser.add_argument('--adapt_func',type=str,default=config.adapt_func)
 parser.add_argument('--M_opt',type=str2bool,default=config.M_opt)
 parser.add_argument('--adapt_step',type=str2bool,default=config.adapt_step)
 parser.add_argument('--FT',type=str2bool,default=config.FT)
+parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
 parser.add_argument('--sig_dt', type=float,default=config.sig_dt)
 parser.add_argument('--L_min',type=int,default=config.L_min)
 parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
@@ -367,8 +370,9 @@ for p_s in config.p_range:
                             dt_gain=config.dt_gain,dt_min=config.dt_min,dt_max=config.dt_max,
                             v_min_opt=config.v_min_opt, lambda_0= config.lambda_0,
                             track_dt=config.track_dt,M_opt=config.M_opt,adapt_step=config.adapt_step,FT=config.FT,
-                            sig_dt=config.sig_dt,L_min=config.L_min
-                            )
+                            sig_dt=config.sig_dt,L_min=config.L_min,GV_opt=config.GV_opt,GK_opt=config.GK_opt,skip_mh=config.skip_mh
+
+                                )
                             t1=time()-t
 
                             print(f"p_est:{p_est}")
@@ -441,10 +445,10 @@ for p_s in config.p_range:
                         "mh_opt":config.mh_opt,'only_duplicated':config.only_duplicated,
                         "np_seed":config.np_seed,"torch_seed":config.torch_seed
                         ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
-                        "d":config.d,"adapt_func":config.adapt_func,
+                        "d":config.d,"adapt_func":config.adapt_func,"GV_opt":config.GV_opt,"GK_opt":config.GK_opt,
                         "ess_opt":config.ess_opt, "linear":config.linear,
                         "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
-                        "M_opt":config.M_opt,"adapt_step":config.adapt_step,
+                        "M_opt":config.M_opt,"adapt_step":config.adapt_step,"skip_mh":config.skip_mh,
                         "p_s":p_s,"d_s":config.d_s,"d_w":config.d_w,"p_w":config.p_w,"L_min":config.L_min}
                         exp_res.append(results)
                         results_df=pd.DataFrame([results])
