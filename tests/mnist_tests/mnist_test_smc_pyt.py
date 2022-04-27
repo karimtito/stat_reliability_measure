@@ -14,8 +14,6 @@ import cpuinfo
 import pandas as pd
 import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
-from scipy.special import betainc
-
 method_name="smc_pyt"
 
 #gaussian_linear
@@ -138,7 +136,10 @@ class config:
 
     model_dir=None 
     L_min=1
-    
+    GK_opt=False
+    GV_opt=False
+    g_target=0.8
+    skip_mh=False
 
 
 parser=argparse.ArgumentParser()
@@ -217,6 +218,11 @@ parser.add_argument('--eps_min',type=float,default=config.eps_min)
 parser.add_argument('--eps_num',type=int,default=config.eps_num)
 parser.add_argument('--epsilons',type=str2floatList,default=config.epsilons)
 parser.add_argument('--L_min',type=int,default=config.L_min)
+parser.add_argument('--GK_opt',type=str2bool,default=config.GK_opt)
+parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
+parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
+parser.add_argument('--g_target',type=float,default=config.g_target)
+parser.add_argument('--kappa_opt',type=str2bool,default=config.kappa_opt)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -225,12 +231,13 @@ for k,v in vars(args).items():
 if config.model_dir is None:
     config.model_dir=os.path.join("../../models/",config.data_dir)
 
-assert config.adapt_func.lower() in smc_pyt.supported_beta_adapt.keys(),f"select adaptive function in {smc_pyt.supported_beta_adapt.keys}"
-adapt_func=smc_pyt.supported_beta_adapt[config.adapt_func.lower()]
-if config.adapt_func.lower()=='ess':
-    adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=config.ess_alpha,max_beta=1e6)
-elif config.adapt_func.lower()=='simp_ess':
+#assert config.adapt_func.lower() in smc_pyt.supported_beta_adapt.keys(),f"select adaptive function in {smc_pyt.supported_beta_adapt.keys}"
+#adapt_func=smc_pyt.supported_beta_adapt[config.adapt_func.lower()]
+
+if config.adapt_func.lower()=='simp_ess':
     adapt_func = lambda beta,v : smc_pyt.nextBetaSimpESS(beta_old=beta,v=v,lambda_0=config.lambda_0,max_beta=1e6)
+elif config.adapt_func.lower()=='simp':
+    adapt_func = lambda beta,v: smc_pyt.SimpAdaptBetaPyt(beta,v,config.g_target,v_min_opt=config.v_min_opt)
 prblm_str=config.dataset
 if not config.linear:
     config.log_dir=config.log_dir.replace('linear_gaussian','gaussian')
@@ -410,7 +417,11 @@ for l in inp_indices:
             gen= lambda N: (2*torch.rand(size=(N,d), device=device )-1)
         V_ = lambda X: t_u.V_pyt(X,x_0=x_0,model=model,epsilon=epsilon, target_class=y_0,gaussian_latent=config.gaussian_latent)
         gradV_ = lambda X: t_u.gradV_pyt(X,x_0=x_0,model=model, target_class=y_0,epsilon=epsilon, gaussian_latent=config.gaussian_latent)
+       
+        
         for ess_t in config.e_range:
+            if config.adapt_func.lower()=='ess':
+                adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=ess_t,max_beta=1e6)
             for T in config.T_range:
                 for L in config.L_range:
                     for alpha in config.alpha_range:       
@@ -432,15 +443,15 @@ for l in inp_indices:
                             for i in iterator:
                                 t=time()
                                 p_est,res_dict,=smc_pyt.SamplerSMC(gen=gen,V= V_,gradV=gradV_,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,
-                                alpha=alpha,n_max=config.n_max,ess_alpha=ess_t,
+                                alpha=alpha,n_max=config.n_max,L_min=config.L_min,
                                 verbose=config.verbose, track_accept=config.track_accept,track_beta=config.track_beta,track_v_means=config.track_v_means,
                                 track_ratios=config.track_ratios,track_ess=config.track_ess,kappa_opt=config.kappa_opt
                                 ,gaussian =True,accept_spread=config.accept_spread, 
                                 adapt_dt=config.adapt_dt, dt_decay=config.dt_decay,
                                 dt_gain=config.dt_gain,dt_min=config.dt_min,dt_max=config.dt_max,
-                                v_min_opt=config.v_min_opt, lambda_0= config.lambda_0,
+                                v_min_opt=config.v_min_opt,
                                 track_dt=config.track_dt,M_opt=config.M_opt,adapt_step=config.adapt_step,FT=config.FT,
-                                sig_dt=config.sig_dt
+                                sig_dt=config.sig_dt, skip_mh=config.skip_mh,GV_opt=config.GV_opt
                                 )
                                 t1=time()-t
 
@@ -457,7 +468,7 @@ for l in inp_indices:
                                     plt.close()
                                     
 
-                                if config.adapt_dt and config.track_dt:
+                                if config.track_dt:
                                     dts=res_dict['dts']
                                     np.savetxt(fname=os.path.join(log_path,f'dts_{i}.txt')
                                     ,X=dts)
@@ -512,7 +523,8 @@ for l in inp_indices:
                             "ess_opt":config.ess_opt, "linear":config.linear,
                             "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
                             "M_opt":config.M_opt,"adapt_step":config.adapt_step,
-                            "noise_dist":config.noise_dist,"lirpa_safe":lirpa_safe}
+                            "noise_dist":config.noise_dist,"lirpa_safe":lirpa_safe,"L_min":config.L_min,
+                            "skip_mh":config.skip_mh,"GV_opt":config.GV_opt}
                             exp_res.append(results)
                             results_df=pd.DataFrame([results])
                             results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)

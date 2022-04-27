@@ -1,7 +1,7 @@
 import torch 
 import math
 import numpy as np
-from stat_reliability_measure.dev.torch_utils import TimeStepPyt, adapt_verlet_mcmc, apply_l_kernel,apply_simp_kernel, normal_kernel,verlet_mcmc
+from stat_reliability_measure.dev.torch_utils import TimeStepPyt, adapt_verlet_mcmc, apply_gaussian_kernel,verlet_mcmc
 
 
 
@@ -30,6 +30,31 @@ def dichotomic_search_d(f, a, b, thresh=0, n_max =50):
 
     return high, f(high)
 
+def SimpAdaptBetaPyt(beta_old,v,g_target,search_method=dichotomic_search_d,max_beta=1e6,verbose=0,multi_output=True,v_min_opt=False):
+
+    """ Simple adaptive mechanism to select next inverse temperature
+
+    Returns:
+        float: new_beta, next inverse temperature
+        float: g, next mean weight
+    """
+    ess_beta = lambda beta : torch.exp(-(beta-beta_old)*(v)).mean() #decreasing funtion of the parameter beta
+    if v_min_opt:
+        v_min=v.min()
+        ess_beta=lambda beta : torch.exp(-(beta-beta_old)*(v-v_min)).mean() 
+    assert ((g_target>0) and (g_target<1)),"The target average weigh g_target must be a positive number in (0,1)"
+    results= search_method(f=ess_beta,a=beta_old,b=max_beta,thresh = g_target) 
+    new_beta, g = results[0],results[-1] 
+    
+    if verbose>0:
+        print(f"g_target: {g_target}, actual g:{g}")
+
+    if multi_output:
+        if v_min_opt:
+            g=torch.exp((-(new_beta-beta_old)*v)).mean() #in case we use v_min_opt we need to output original g
+        return (new_beta,g)
+    else:
+        return new_beta
 
 
 def ESSAdaptBetaPyt(beta_old, v,lambda_0=1,max_beta=1e9,g_target=None,v_min_opt=None,multi_output=False):
@@ -111,7 +136,7 @@ def tuneFT(X,dt,L):
 
 
 
-def SamplerSMC(gen,  V, gradV,adapt_func,ess_alpha=0.8,min_rate=0.8,alpha =0.1,N=300,T = 1,L=1,n_max=300, 
+def SamplerSMC(gen,  V, gradV,adapt_func,min_rate=0.8,alpha =0.1,N=300,T = 1,L=1,n_max=500, 
 max_beta=1e6, verbose=False,device=None,
 track_accept=False,track_beta=False,return_log_p=False,gaussian=False,
 adapt_dt=False,
@@ -119,10 +144,13 @@ track_calls=True,track_dt=False,track_H=False,track_v_means=False,track_ratios=F
 target_accept=0.574,accept_spread=0.1,dt_decay=0.999,dt_gain=None,
 dt_min=1e-5,dt_max=1e-2,v_min_opt=False,lambda_0=1,
 debug=False,kappa_opt=False,
- track_ess=False,M_opt=False,adapt_step=False,alpha_p=0.1,FT=False,sig_dt=0.015,L_min=1,only_duplicated=False):
+ track_ess=False,M_opt=False,adapt_step=False,alpha_p=0.1,FT=False,sig_dt=0.015,L_min=1,only_duplicated=False,
+ GK_opt=False,GV_opt=False,dt_d=1,skip_mh=False):
     """
       Adaptive SMC estimator with transition kernels either based on:
-      underdamped Langevin dynamics  (L=1) or Hamiltonian dynamics (L>1) kernels
+      underdamped Langevin dynamics  (L=1) or Hamiltonian dynamics (L>1) kernels (GK_opt=False)
+      or Gaussian-Verlet kernel (GV_opt=True,GK_opt=False)
+      or simple Gaussian kernels (GK_opt=True)
       Args:
         gen: generator of iid samples X_i with respect to the reference measure  [fun]
         l_kernel: Langevin mixing kernel almost invariant to the Gibbs measure with 
@@ -148,6 +176,7 @@ debug=False,kappa_opt=False,
     if device is None: 
         device= "cuda:0" if torch.cuda.is_available() else "cpu"
 
+    
     # adaptative parameters
     if adapt_dt and dt_gain is None:
         dt_gain= 1/dt_decay
@@ -192,8 +221,9 @@ debug=False,kappa_opt=False,
             v=V(X)
 
             d=X.shape[-1]
+            assert dt_d==1 or dt_d==d,"dt dimension can be 1 (isotropic diff.) or d (anisotropic diff.)"
             dt_scalar =alpha*TimeStepPyt(V,X,gradV)
-            dt= torch.clamp(dt_scalar*torch.ones(size=(N,d),device=device)+sig_dt*torch.randn(size=(N,d),device=device),min=0,max=dt_max)
+            dt= torch.clamp(dt_scalar*torch.ones(size=(N,dt_d),device=device)+sig_dt*torch.randn(size=(N,dt_d),device=device),min=dt_min,max=dt_max)
             ind_L=torch.randint(low=L_min,high=L,size=(N,)) if L_min<L else L*torch.ones(size=(N,))
             if track_calls:
                 Count_v = 3*N 
@@ -201,24 +231,29 @@ debug=False,kappa_opt=False,
         else:
             if M_opt:
                 scale_M=1/X.var(0)
-                if verbose>=0.1:
-                    print(f"avg. var:{X.var(0).mean()}")
-            if adapt_step:
-                
-                X,v,nb_calls,dict_out=mcmc_func(q=X,ind_L=ind_L,beta=beta,gaussian=gaussian,
-                    V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
-                    alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose)
-                if FT:
-                    dt=dict_out['dt']
-                    ind_L=dict_out['ind_L']
-                    if verbose>=1.5:
-                        print(f"New dt mean:{dt.mean().item()}, dt std:{dt.std().item()}")
-                        print(f"New L mean: {ind_L.mean().item()}, L std:{ind_L.std().item()}")
+                if verbose:
+                    print(f"Avg. var.:{X.var(0).mean()}")
+            if GK_opt:
+                X,v,nb_calls,dict_out=apply_gaussian_kernel(Y=X,v_y=v,T=T,beta=beta,
+                V=V,)
             else:
-                X,v,nb_calls,dict_out=verlet_mcmc(q=X,beta=beta,gaussian=gaussian,
-                                    V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
-                                    scale_M=scale_M)
-            
+                if adapt_step:
+                    X,v,nb_calls,dict_out=mcmc_func(q=X,ind_L=ind_L,beta=beta,gaussian=gaussian,
+                        V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
+                        alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,L_min=L_min,
+                        gaussian_verlet=GV_opt,dt_min=dt_min,skip_mh=skip_mh)
+                    if FT:
+                        dt=dict_out['dt']
+                        ind_L=dict_out['ind_L']
+                        if verbose>=1.5:
+                            print(f"New dt mean:{dt.mean().item()}, dt std:{dt.std().item()}")
+                            print(f"New L mean: {ind_L.mean().item()}, L std:{ind_L.std().item()}")
+                else:
+                    X,v,nb_calls,dict_out=verlet_mcmc(q=X,beta=beta,gaussian=gaussian,
+                                        V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
+                                        scale_M=scale_M)
+                    if track_H:
+                        H_s.extend(list(dic_out['H']))
             if track_calls:
                 Count_v+=nb_calls
             if track_accept:
@@ -226,22 +261,18 @@ debug=False,kappa_opt=False,
                 accept_rate=dict_out['acc_rate'] 
                 if verbose>=2.5:
                     print(f"Accept rate: {accept_rate}")
-            if track_H:
-                H_s.extend(list(dic_out['H']))
             if adapt_dt:
                 accept_rate=dict_out['acc_rate'] 
                 if accept_rate>target_accept+accept_spread:
                     dt*=dt_gain
                 elif accept_rate<target_accept-accept_spread: 
                     dt*=dt_decay
-                if dt_min is not None:
-                    dt=torch.clamp(dt,min=dt_min)
-                if dt_max is not None:
-                    dt=torch.clamp(dt,max=dt_max)
+                dt=torch.clamp(dt,min=dt_min,max=dt_max)
                 if verbose>=2.5:
                     print(f"New mean dt:{dt.mean().item()}")
-                if track_dt:
-                    dt_s.append(dt.mean())
+            if track_dt:
+                dt_s.append(dt.mean().item())
+            
                 
 
 
@@ -256,12 +287,15 @@ debug=False,kappa_opt=False,
         
         #Selecting next beta
         beta_old=beta
-        beta,ess = adapt_func(beta_old,v,)
+        beta,ess = adapt_func(beta_old,v)
         if verbose>=0.5:
             print(f'Beta old {beta_old}, new beta {beta}, delta_beta={beta-beta_old}')
         
+        
         if track_ess:
             ess_.append(ess)
+            if verbose:
+                print(f'next ESS:{ess}')
         reach_beta_inf=beta==max_beta
         reach_rate=(v<=0).float().mean().item()
         if reach_beta_inf or reach_rate>=min_rate:
@@ -287,7 +321,7 @@ debug=False,kappa_opt=False,
             print(f"g_iter:{g_iter},g_prod:{g_prod}")
         if track_ratios:
             g_s.append(g_iter)
-        
+
         nb_to_renew=to_renew.int().sum().item()
         if nb_to_renew>0:
             renew_idx=torch.multinomial(input=G/G.sum(), num_samples=nb_to_renew)

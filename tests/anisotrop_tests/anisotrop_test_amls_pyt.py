@@ -204,7 +204,7 @@ for p_s in config.p_range:
         print(f"P_target:{P_target}")
         print(f"c_w={c_w},c_s={c_s}")
     arb_thresh=40 #pretty useless a priori but should not hurt results
-    h = lambda X: torch.min(torch.clamp(input=X[:,:d_s]-c_s, min=-arb_thresh).sum(1),torch.clamp(input=X[:,:d_s+d_w]-c_w, min=-arb_thresh).sum(1))
+    h = lambda X: (torch.clamp(input=X[:,:d_s]-c_s, min=-arb_thresh,max=0).sum(1)+torch.clamp(input=X[:,d_s:d_s+d_w]-c_w, min=-arb_thresh,max=0).sum(1))
     amls_gen = lambda N: torch.randn(size=(N,d),device=config.device)
     normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 
     h_batch= lambda x: h(x).unsqueeze(-1)
@@ -233,7 +233,7 @@ for p_s in config.p_range:
                         t=time()
                         if config.batch_opt:
                             amls_res=amls_pyt.ImportanceSplittingPytBatch(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_batch, 
-                        tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
+                        tau=-1e-15 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                         s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                         device=config.device,track_accept=config.track_accept)
 

@@ -99,6 +99,7 @@ class config:
     FT=False
     sig_dt=0.015
     L_min=1
+    skip_mh=False
     
 
 
@@ -166,8 +167,10 @@ parser.add_argument('--adapt_func',type=str,default=config.adapt_func)
 parser.add_argument('--M_opt',type=str2bool,default=config.M_opt)
 parser.add_argument('--adapt_step',type=str2bool,default=config.adapt_step)
 parser.add_argument('--FT',type=str2bool,default=config.FT)
+parser.add_argument('--kappa_opt',type=str2bool,default=config.kappa_opt)
 parser.add_argument('--sig_dt', type=float,default=config.sig_dt)
 parser.add_argument('--L_min',type=int,default=config.L_min)
+parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -176,9 +179,8 @@ for k,v in vars(args).items():
 
 assert config.adapt_func.lower() in smc_pyt.supported_beta_adapt.keys(),f"select adaptive function in {smc_pyt.supported_beta_adapt.keys}"
 adapt_func=smc_pyt.supported_beta_adapt[config.adapt_func.lower()]
-if config.adapt_func.lower()=='ess':
-    adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=config.ess_alpha,max_beta=1e6)
-elif config.adapt_func.lower()=='simp_ess':
+
+if config.adapt_func.lower()=='simp_ess':
     adapt_func = lambda beta,v : smc_pyt.nextBetaSimpESS(beta_old=beta,v=v,lambda_0=config.lambda_0,max_beta=1e6)
 prblm_str='linear_gaussian' if config.linear else 'gaussian'
 if not config.linear:
@@ -319,6 +321,8 @@ for p_t in config.p_range:
         norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
 
     for ess_t in config.e_range:
+        if config.adapt_func.lower()=='ess':
+            adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=ess_t,max_beta=1e6)
         for T in config.T_range:
             for L in config.L_range:
                 for alpha in config.alpha_range:       
@@ -340,7 +344,7 @@ for p_t in config.p_range:
                         for i in iterator:
                             t=time()
                             p_est,res_dict,=smc_pyt.SamplerSMC(gen=norm_gen,V= V,gradV=gradV,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,
-                            alpha=alpha,n_max=10000,ess_alpha=ess_t,
+                            alpha=alpha,n_max=10000,
                             verbose=config.verbose, track_accept=config.track_accept,track_beta=config.track_beta,track_v_means=config.track_v_means,
                             track_ratios=config.track_ratios,track_ess=config.track_ess,kappa_opt=config.kappa_opt
                             ,gaussian =True,accept_spread=config.accept_spread, 
@@ -348,7 +352,7 @@ for p_t in config.p_range:
                             dt_gain=config.dt_gain,dt_min=config.dt_min,dt_max=config.dt_max,
                             v_min_opt=config.v_min_opt, lambda_0= config.lambda_0,
                             track_dt=config.track_dt,M_opt=config.M_opt,adapt_step=config.adapt_step,FT=config.FT,
-                            sig_dt=config.sig_dt,L_min=config.L_min
+                            sig_dt=config.sig_dt,L_min=config.L_min,skip_mh=config.skip_mh
                             )
                             t1=time()-t
 
@@ -426,7 +430,7 @@ for p_t in config.p_range:
                         "ess_opt":config.ess_opt, "linear":config.linear,
                         "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
                         "M_opt":config.M_opt,"adapt_step":config.adapt_step,"sig_dt":config.sig_dt,
-                        "L_min":config.L_min}
+                        "L_min":config.L_min,"kappa_opt":config.kappa_opt,"skip_mh":config.skip_mh}
                         exp_res.append(results)
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)

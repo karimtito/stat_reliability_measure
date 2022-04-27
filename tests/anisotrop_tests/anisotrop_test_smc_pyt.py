@@ -33,16 +33,16 @@ class config:
     e_range=[]
     p_range=[]
     
-    p_s=1e-5
+    p_s=1e-4
     p_w=1e-1
     p_t=1e-6
-    n_rep=10
+    n_rep=1
     
     save_config=False 
     print_config=True
     d=1024
     d_s=1
-    d_w=1
+    d_w=2
     verbose=1
     log_dir='../../logs/anisotrop_tests'
     aggr_res_path = None
@@ -104,6 +104,7 @@ class config:
     FT=False
     sig_dt=0.015
     L_min=1
+    skip_mh=False
 
 
 parser=argparse.ArgumentParser()
@@ -174,6 +175,7 @@ parser.add_argument('--adapt_step',type=str2bool,default=config.adapt_step)
 parser.add_argument('--FT',type=str2bool,default=config.FT)
 parser.add_argument('--sig_dt', type=float,default=config.sig_dt)
 parser.add_argument('--L_min',type=int,default=config.L_min)
+parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -186,9 +188,8 @@ assert config.d_s+config.d_w<=config.d
 
 assert config.adapt_func.lower() in smc_pyt.supported_beta_adapt.keys(),f"select adaptive function in {smc_pyt.supported_beta_adapt.keys}"
 adapt_func=smc_pyt.supported_beta_adapt[config.adapt_func.lower()]
-if config.adapt_func.lower()=='ess':
-    adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=config.ess_alpha,max_beta=1e6)
-elif config.adapt_func.lower()=='simp_ess':
+
+if config.adapt_func.lower()=='simp_ess':
     adapt_func = lambda beta,v : smc_pyt.nextBetaSimpESS(beta_old=beta,v=v,lambda_0=config.lambda_0,max_beta=1e6)
 prblm_str='anisotrop'
 
@@ -305,7 +306,7 @@ exp_res=[]
 
 for p_s in config.p_range:
     if config.linear:
-        p_t=p_s**d_s*config.p_w**d_w
+        p_t=(p_s**d_s)*(config.p_w**d_w)
         get_c_norm= lambda p:stat.norm.isf(p)
         c_w=get_c_norm(config.p_w)
         c_s=get_c_norm(p_s)
@@ -316,11 +317,11 @@ for p_s in config.p_range:
             print(f"p_t:{p_t}")
 
         e_=torch.eye(n=d_w+d_s,m=d,device=device)
-        V = lambda X: torch.clamp(input=c_s-X[:,:d_s], min=0, max=None).sum(1)+torch.clamp(input=c_w-X[:,:d_s+d_w], min=0, max=None).sum(1)
+        V = lambda X: (torch.clamp(input=c_s-X[:,:d_s], min=0, max=None)**2).sum(1)+(torch.clamp(input=c_w-X[:,d_s:d_s+d_w], min=0, max=None)**2).sum(1)
 
         gradV= lambda X:    (e_[None,:d_s]*(X[:,:d_s]<c_s).unsqueeze(-1)).sum(1)+(e_[None,d_s:d_s+d_w]*(X[:,d_s:d_s+d_w]<c_w).unsqueeze(-1)).sum(1)
         
-        norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
+        norm_gen = lambda N: torch.randn(size=(N,d),device=device)
     else:
         epsilon=1
         p_target_f=lambda h: 0.5*betainc(0.5*(d-1),0.5,(2*epsilon*h-h**2)/(epsilon**2))
@@ -335,6 +336,8 @@ for p_s in config.p_range:
         norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
 
     for ess_t in config.e_range:
+        if config.adapt_func.lower()=='ess':
+            adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=ess_t,max_beta=1e6)
         for T in config.T_range:
             for L in config.L_range:
                 for alpha in config.alpha_range:       
@@ -356,7 +359,7 @@ for p_s in config.p_range:
                         for i in iterator:
                             t=time()
                             p_est,res_dict,=smc_pyt.SamplerSMC(gen=norm_gen,V= V,gradV=gradV,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,
-                            alpha=alpha,n_max=10000,ess_alpha=ess_t,
+                            alpha=alpha,n_max=config.n_max,
                             verbose=config.verbose, track_accept=config.track_accept,track_beta=config.track_beta,track_v_means=config.track_v_means,
                             track_ratios=config.track_ratios,track_ess=config.track_ess,kappa_opt=config.kappa_opt
                             ,gaussian =True,accept_spread=config.accept_spread, 
