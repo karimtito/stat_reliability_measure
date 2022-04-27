@@ -299,7 +299,7 @@ debug=False,kappa_opt=False,
         reach_beta_inf=beta==max_beta
         reach_rate=(v<=0).float().mean().item()
         if reach_beta_inf or reach_rate>=min_rate:
-            beta=torch.inf
+            beta=math.inf
             G= v<=0
             g_iter=G.float().mean()
             g_prod*=g_iter
