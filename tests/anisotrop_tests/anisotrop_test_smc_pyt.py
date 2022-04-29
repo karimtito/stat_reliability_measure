@@ -108,7 +108,7 @@ class config:
     L_min=1
     skip_mh=False
     kappa_opt=False
-    only_duplicated=True
+    
 
 
 parser=argparse.ArgumentParser()
@@ -182,7 +182,7 @@ parser.add_argument('--sig_dt', type=float,default=config.sig_dt)
 parser.add_argument('--L_min',type=int,default=config.L_min)
 parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
 parser.add_argument('--kappa_opt',type=str2bool,default=config.kappa_opt)
-parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
+
 
 args=parser.parse_args()
 

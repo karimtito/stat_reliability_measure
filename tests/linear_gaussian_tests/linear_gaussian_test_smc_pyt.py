@@ -348,7 +348,7 @@ for p_t in config.p_range:
                             verbose=config.verbose, track_accept=config.track_accept,track_beta=config.track_beta,track_v_means=config.track_v_means,
                             track_ratios=config.track_ratios,track_ess=config.track_ess,kappa_opt=config.kappa_opt
                             ,gaussian =True,accept_spread=config.accept_spread, 
-                            adapt_dt=config.adapt_dt, dt_decay=config.dt_decay,
+                            adapt_dt=config.adapt_dt, dt_decay=config.dt_decay,only_duplicated=config.only_duplicated,
                             dt_gain=config.dt_gain,dt_min=config.dt_min,dt_max=config.dt_max,
                             v_min_opt=config.v_min_opt, lambda_0= config.lambda_0,
                             track_dt=config.track_dt,M_opt=config.M_opt,adapt_step=config.adapt_step,FT=config.FT,

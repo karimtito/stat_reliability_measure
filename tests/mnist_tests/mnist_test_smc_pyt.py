@@ -194,7 +194,7 @@ parser.add_argument('--adapt_dt_mcmc',type=str2bool,default=config.adapt_dt_mcmc
 parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
 parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
 parser.add_argument('--ess_opt',type=str2bool,default=config.ess_opt)
-parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
+
 parser.add_argument('--lambda_0',type=float,default=config.lambda_0)
 parser.add_argument('--test2',type=str2bool,default =config.test2)
 parser.add_argument('--print_config',type=str2bool,default=config.print_config)
@@ -224,6 +224,7 @@ parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
 parser.add_argument('--g_target',type=float,default=config.g_target)
 parser.add_argument('--kappa_opt',type=str2bool,default=config.kappa_opt)
 parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
+parser.add_argument('--dataset',type=str, default=config.dataset)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
