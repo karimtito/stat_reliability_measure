@@ -224,32 +224,47 @@ debug=False,kappa_opt=False,
             assert dt_d==1 or dt_d==d,"dt dimension can be 1 (isotropic diff.) or d (anisotropic diff.)"
             dt_scalar =alpha*TimeStepPyt(V,X,gradV)
             dt= torch.clamp(dt_scalar*torch.ones(size=(N,dt_d),device=device)+sig_dt*torch.randn(size=(N,dt_d),device=device),min=dt_min,max=dt_max)
-            ind_L=torch.randint(low=L_min,high=L,size=(N,)) if L_min<L else L*torch.ones(size=(N,))
+            ind_L=torch.randint(low=L_min,high=L,size=(N,)).float() if L_min<L else L*torch.ones(size=(N,))
             if track_calls:
                 Count_v = 3*N 
     
         else:
+            if only_duplicated:
+                Y=X[to_renew]
+                v_y=v[to_renew]
+                ind_L_y=ind_L[to_renew]
+                dt_y=dt[to_renew]
+            else:
+                Y=X
+                v_y=v
+                ind_L_y=ind_L
+                dt_y=dt
             if M_opt:
-                scale_M=1/X.var(0)
+                scale_M=1/Y.var(0)
                 if verbose:
-                    print(f"Avg. var.:{X.var(0).mean()}")
+                    print(f"Avg. var.:{Y.var(0).mean()}")
             if GK_opt:
-                X,v,nb_calls,dict_out=apply_gaussian_kernel(Y=X,v_y=v,T=T,beta=beta,
+                Y,v_y,nb_calls,dict_out=apply_gaussian_kernel(Y=Y,v_y=v_y,T=T,beta=beta,
                 V=V,)
             else:
+                
                 if adapt_step:
-                    X,v,nb_calls,dict_out=mcmc_func(q=X,ind_L=ind_L,beta=beta,gaussian=gaussian,
-                        V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
+                    Y,v_y,nb_calls,dict_out=mcmc_func(q=Y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
+                        V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_y,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
                         alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,L_min=L_min,
                         gaussian_verlet=GV_opt,dt_min=dt_min,skip_mh=skip_mh)
                     if FT:
-                        dt=dict_out['dt']
-                        ind_L=dict_out['ind_L']
+                        if only_duplicated:
+                            dt[to_renew]=dict_out['dt']
+                            ind_L[to_renew]=dict_out['ind_L']
+                        else:
+                            dt=dict_out['dt']
+                            ind_L=dict_out['ind_L']
                         if verbose>=1.5:
                             print(f"New dt mean:{dt.mean().item()}, dt std:{dt.std().item()}")
                             print(f"New L mean: {ind_L.mean().item()}, L std:{ind_L.std().item()}")
                 else:
-                    X,v,nb_calls,dict_out=verlet_mcmc(q=X,beta=beta,gaussian=gaussian,
+                    Y,v_y,nb_calls,dict_out=verlet_mcmc(q=Y,beta=beta,gaussian=gaussian,
                                         V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
                                         scale_M=scale_M)
                     if track_H:
@@ -272,7 +287,12 @@ debug=False,kappa_opt=False,
                     print(f"New mean dt:{dt.mean().item()}")
             if track_dt:
                 dt_s.append(dt.mean().item())
-            
+            if only_duplicated:
+                X[to_renew]=Y
+                v[to_renew]=v_y
+            else:
+                X=Y
+                v=v_y
                 
 
 
