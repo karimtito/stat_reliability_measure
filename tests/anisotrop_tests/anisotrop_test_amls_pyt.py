@@ -49,8 +49,8 @@ class config:
     p_w=1e-1
 
     d = 1024
-    d_w=1
-    d_s=1 
+    d_w=2
+    d_s=1
     epsilon = 1
     
     
@@ -76,7 +76,7 @@ class config:
     gpu_name=None 
     cpu_name=None
     cores_number=None
-
+    correct_T=False
 parser=argparse.ArgumentParser()
 
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
@@ -117,6 +117,7 @@ parser.add_argument('--allow_multi_gpu',type=str2bool,default=config.allow_multi
 parser.add_argument('--batch_opt',type=str2bool,default=config.batch_opt)
 parser.add_argument('--track_accept',type=str2bool,default= config.track_accept)
 parser.add_argument('--track_finish',type=str2bool,default=config.track_finish)
+parser.add_argument('--correct_T',type=str2bool,default=config.correct_T)
 parser.add_argument('--np_seed',type=int,default=config.np_seed)
 parser.add_argument('--torch_seed',type=int,default=config.torch_seed)
 parser.add_argument('--decay',type=float,default=config.decay)
@@ -310,7 +311,7 @@ for p_s in config.p_range:
                     ,'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
                     'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean()
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
-                    'batch_opt':config.batch_opt,"d":d, 
+                    'batch_opt':config.batch_opt,"d":d, "correct_T":config.correct_T,
                     "np_seed":config.np_seed,"torch_seed":config.torch_seed,
                     "p_s":p_s,"d_s":config.d_s,"d_w":config.d_w,"p_w":config.p_w}
                     exp_res.append(results)
