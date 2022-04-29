@@ -6,7 +6,6 @@
 
 #project specific 
 logs
-data/ImageNet
 data
 models
 # User-specific files
