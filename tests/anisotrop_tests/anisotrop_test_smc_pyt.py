@@ -96,7 +96,7 @@ class config:
     track_v_means=True
     track_ratios=False
 
-    kappa_opt=True
+   
 
     adapt_func='ESS'
     M_opt = False
@@ -107,6 +107,8 @@ class config:
     sig_dt=0.015
     L_min=1
     skip_mh=False
+    kappa_opt=False
+    only_duplicated=True
 
 
 parser=argparse.ArgumentParser()
@@ -179,6 +181,9 @@ parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
 parser.add_argument('--sig_dt', type=float,default=config.sig_dt)
 parser.add_argument('--L_min',type=int,default=config.L_min)
 parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
+parser.add_argument('--kappa_opt',type=str2bool,default=config.kappa_opt)
+parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
+
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -364,13 +369,14 @@ for p_s in config.p_range:
                             p_est,res_dict,=smc_pyt.SamplerSMC(gen=norm_gen,V= V,gradV=gradV,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,
                             alpha=alpha,n_max=config.n_max,
                             verbose=config.verbose, track_accept=config.track_accept,track_beta=config.track_beta,track_v_means=config.track_v_means,
-                            track_ratios=config.track_ratios,track_ess=config.track_ess,kappa_opt=config.kappa_opt
+                            track_ratios=config.track_ratios,track_ess=config.track_ess
                             ,gaussian =True,accept_spread=config.accept_spread, 
                             adapt_dt=config.adapt_dt, dt_decay=config.dt_decay,
                             dt_gain=config.dt_gain,dt_min=config.dt_min,dt_max=config.dt_max,
                             v_min_opt=config.v_min_opt, lambda_0= config.lambda_0,
                             track_dt=config.track_dt,M_opt=config.M_opt,adapt_step=config.adapt_step,FT=config.FT,
                             sig_dt=config.sig_dt,L_min=config.L_min,GV_opt=config.GV_opt,GK_opt=config.GK_opt,skip_mh=config.skip_mh
+                            , kappa_opt=config.kappa_opt,only_duplicated=config.only_duplicated
 
                                 )
                             t1=time()-t
@@ -447,8 +453,8 @@ for p_s in config.p_range:
                         ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
                         "d":config.d,"adapt_func":config.adapt_func,"GV_opt":config.GV_opt,"GK_opt":config.GK_opt,
                         "ess_opt":config.ess_opt, "linear":config.linear,
-                        "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
-                        "M_opt":config.M_opt,"adapt_step":config.adapt_step,"skip_mh":config.skip_mh,
+                        "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,"only_duplicated":config.only_duplicated,
+                        "M_opt":config.M_opt,"adapt_step":config.adapt_step,"skip_mh":config.skip_mh,"kappa_opt":config.kappa_opt,
                         "p_s":p_s,"d_s":config.d_s,"d_w":config.d_w,"p_w":config.p_w,"L_min":config.L_min}
                         exp_res.append(results)
                         results_df=pd.DataFrame([results])

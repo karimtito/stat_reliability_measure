@@ -223,6 +223,7 @@ parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
 parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
 parser.add_argument('--g_target',type=float,default=config.g_target)
 parser.add_argument('--kappa_opt',type=str2bool,default=config.kappa_opt)
+parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
