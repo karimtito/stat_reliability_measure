@@ -53,7 +53,7 @@ class config:
     tqdm_opt=True
     save_config = True
     print_config=True
-    update_agg_res=True
+    update_agg_res=False
     aggr_res_path = None
 
     track_accept=False
@@ -72,6 +72,7 @@ class config:
     gpu_name=None 
     cpu_name=None
     cores_number=None
+    correct_T=False
 
 parser=argparse.ArgumentParser()
 
@@ -114,6 +115,7 @@ parser.add_argument('--np_seed',type=int,default=config.np_seed)
 parser.add_argument('--torch_seed',type=int,default=config.torch_seed)
 parser.add_argument('--decay',type=float,default=config.decay)
 parser.add_argument('--gain_rate',type=float,default=config.gain_rate)
+parser.add_argument('--correct_T',type=str2bool,default=config.correct_T)
 args=parser.parse_args()
 for k,v in vars(args).items():
     setattr(config, k, v)
@@ -222,13 +224,13 @@ for p_t in config.p_range:
                         t=time()
                         if config.batch_opt:
                             amls_res=amls_pyt.ImportanceSplittingPytBatch(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
-                        tau=0 , n_max=config.n_max,clip_s=config.clip_s , 
+                        tau=1e-15 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                         s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                         device=config.device,track_accept=config.track_accept)
 
                         else:
                             amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
-                        tau=0 , n_max=config.n_max,clip_s=config.clip_s , 
+                        tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                         s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                         device=config.device, )
                         t=time()-t
@@ -299,7 +301,7 @@ for p_t in config.p_range:
                     ,'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
                     'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean()
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
-                    'batch_opt':config.batch_opt,"d":d, 
+                    'batch_opt':config.batch_opt,"d":d, "correct_T":config.correct_T,
                     "np_seed":config.np_seed,"torch_seed":config.torch_seed}
                     exp_res.append(results)
                     results_df=pd.DataFrame([results])
