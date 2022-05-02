@@ -57,7 +57,7 @@ class config:
     tqdm_opt=True
     save_config = True
     print_config=True
-    update_agg_res=True
+    update_agg_res=False
     aggr_res_path = None
 
     track_accept=False
@@ -175,13 +175,16 @@ if not os.path.exists('../../logs'):
 elif not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir
     )
+raw_path=os.path.join(config.log_dir,'raw_logs/')
+if not os.path.exists(raw_path):
+    os.mkdir(raw_path)
 raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
 loc_time= datetime.today().isoformat().split('.')[0]
 
-exp_log_path=os.path.join(config.log_dir,method_name+'_t_'+loc_time.split('_')[0])
+exp_log_path=os.path.join(raw_logs_path,method_name+'_t_'+loc_time.split('_')[0])
 os.mkdir(exp_log_path)
 exp_res = []
 config.json=vars(args)
