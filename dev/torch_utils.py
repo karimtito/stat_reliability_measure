@@ -347,7 +347,7 @@ def gradV_pyt(x_,x_0,model,target_class,epsilon=0.05,gaussian_latent=True,clippi
     _,grad_u = compute_V_grad_pyt(model=model,input_=x_p,target_class=target_class)
     grad_u=torch.reshape(grad_u,x_.shape)
     if gaussian_latent:
-        grad_x=torch.exp(normal_dist.log_prob(x_))*grad_u/(2*epsilon)
+        grad_x=torch.exp(normal_dist.log_prob(x_))*grad_u*(2*epsilon)
     else:
         grad_x=grad_u
     return grad_x
