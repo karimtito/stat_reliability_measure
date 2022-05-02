@@ -234,7 +234,7 @@ debug=False,kappa_opt=False,
                 v_y=v[to_renew]
                 ind_L_y=ind_L[to_renew]
                 dt_y=dt[to_renew]
-            else:
+            if not only_duplicated or nb_to_renew==0:
                 Y=X
                 v_y=v
                 ind_L_y=ind_L
