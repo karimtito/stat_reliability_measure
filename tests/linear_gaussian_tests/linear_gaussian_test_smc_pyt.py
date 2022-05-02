@@ -26,7 +26,7 @@ class config:
     L=1
     L_range=[]
     min_rate=0.90
-    rho_range=[]
+    
     alpha=0.002
     alpha_range=[]
     ess_alpha=0.9
@@ -136,7 +136,6 @@ parser.add_argument('--T',type=int,default=config.T)
 parser.add_argument('--T_range',type=str2intList,default=config.T_range)
 parser.add_argument('--L',type=int,default=config.L)
 parser.add_argument('--L_range',type=str2intList,default=config.L_range)
-parser.add_argument('--rho_range', type=str2floatList,default=config.rho_range)
 parser.add_argument('--alpha_range',type=str2floatList,default=config.alpha_range)
 parser.add_argument('--v1_kernel',type=str2bool,default=config.v1_kernel)
 parser.add_argument('--track_accept',type=str2bool,default=config.track_accept)
@@ -278,7 +277,7 @@ config.json=vars(args)
 if config.print_config:
     print(config.json)
 
-param_ranges = [config.N_range,config.T_range,config.rho_range,config.alpha_range,config.p_range]
+param_ranges = [config.N_range,config.T_range,config.alpha_range,config.p_range,config.L_range,config.e_range]
 param_lens=np.array([len(l) for l in param_ranges])
 nb_runs= np.prod(param_lens)
 

@@ -33,9 +33,10 @@ str2intList=lambda x: str2list(in_str=x, type_out=int)
 low_str=lambda x: str(x).lower()
 
 method_name="amls_pyt"
-dataset="mnist"
+
 
 class config:
+    dataset="mnist"
     log_dir="../../logs/mnist_tests"
     model_dir="../../models/mnist"
     n_rep=10
@@ -104,7 +105,7 @@ class config:
     use_attack=True
     attack='PGD'
     lirpa_bounds=False
-    download=False
+    download=True
     train_model=False
     
     noise_dist='uniform'
@@ -128,21 +129,17 @@ parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--d',type=int,default=config.d)
 parser.add_argument('--min_rate',type=float,default=config.min_rate)
-
 parser.add_argument('--clip_s',type=str2bool,default=config.clip_s)
 parser.add_argument('--s_min',type=float,default=config.s_min)
 parser.add_argument('--s_max',type=float,default=config.s_max)
-
 parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
 parser.add_argument('--T',type=int,default=config.T)
 parser.add_argument('--save_config',type=str2bool, default=config.save_config)
 parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
 parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
-
 parser.add_argument('--gaussian_latent',type=str2bool, default=config.gaussian_latent)
 parser.add_argument('--allow_multi_gpu',type=str2bool)
-
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
 parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
 parser.add_argument('--device',type=str, default=config.device)
@@ -161,11 +158,10 @@ parser.add_argument('--eps_max',type=float, default=config.eps_max)
 parser.add_argument('--eps_num',type=int,default=config.eps_num)
 parser.add_argument('--train_model',type=str2bool,default=config.train_model)
 parser.add_argument('--noise_dist',type=str, default=config.noise_dist)
+parser.add_argument('--data_dir',type=str, default=config.data_dir)
 parser.add_argument('--a',type=float, default=config.a)
 parser.add_argument('--N_list',type=str2intList,default=config.N_list)
 parser.add_argument('--T_list',type=str2intList,default=config.T_list)
-
-
 parser.add_argument('--download',type=str2bool, default=config.download)
 parser.add_argument('--model_path',type=str,default=config.model_path)
 parser.add_argument('--ratio',type=float,default=config.ratio)
@@ -174,7 +170,6 @@ parser.add_argument('--s',type=float,default=config.s)
 parser.add_argument('--s_list ',type=str2floatList,default=config.s_list )
 parser.add_argument('--track_finish',type=str2bool,default=config.track_finish)
 parser.add_argument('--lirpa_cert',type=str2bool,default=config.lirpa_cert)
-
 parser.add_argument('--load_batch_size',type=int,default=config.load_batch_size)
 parser.add_argument('--model_arch',type=str,default = config.model_arch)
 parser.add_argument('--robust_model',type=str2bool, default=config.robust_model)
@@ -184,6 +179,10 @@ args=parser.parse_args()
 
 for k,v in vars(args).items():
     setattr(config, k, v)
+
+if config.dataset!='mnist':
+    config.log_dir=config.log_dir.repalce('mnist',config.dataset)
+    config.model_dir=config.model_dir.repalce('mnist',config.dataset)
 
 if len(config.epsilons)==0:
     log_eps=np.linspace(start=np.log(config.eps_min),stop=np.log(config.eps_max),num=config.eps_num)
@@ -274,44 +273,23 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 dim=784
 num_classes=10
-if not os.path.exists("../data/MNIST"):
-    config.download=True
+test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
+,dataset=config.dataset,batch_size=config.load_batch_size,
+           x_mean=None,x_std=None)
 
-if config.x_mean!=0 or config.x_std!=1: 
-    assert config.x_std!=0, "Can't normalize with 0 std."
-    transform_=transforms.Compose([
-                           transforms.ToTensor(),
-                           transforms.Normalize((config.x_mean,), (config.x_std,))
-                       ])
-else: 
-    transform_ =transforms.ToTensor()
-
-mnist_test = datasets.MNIST(config.data_dir, train=False, download=config.download, transform=transform_)
-
-test_loader = DataLoader(mnist_test, batch_size = config.load_batch_size, shuffle=False)
-
-
-
-
-supported_arch=['cnn_custom','dnn2','dnn4','lenet']
-
-
-if config.model_arch.lower() in t_u.supported_arch:
-    model, model_shape,model_name=get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
+model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
     nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
-    download=config.download)
+    download=config.download,dataset=config.dataset)
+X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
+if config.verbose>=2:
+    print(f"model accuracy on test batch:{accuracy}")
 
-else:
-    raise NotImplementedError(f"Supported architectures are :{list(t_u.supported_arch.keys())}")
+config.x_mean=t_u.datasets_means[config.dataset]
+config.x_std=t_u.datasets_stds[config.dataset]
 
-for X,y in test_loader:
-    X,y = X.to(device), y.to(device)
-    break
-with torch.no_grad():
-    logits=model(X)
-    y_pred= torch.argmax(logits,-1)
-    correct_idx=y_pred==y
-    X_correct, label_correct= X[correct_idx], y[correct_idx]
+
+
+
 
 #X.requires_grad=True
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
@@ -327,12 +305,14 @@ if config.x_min is None or config.x_max is None:
     if config.x_mean!=0 or config.x_std!=1:
         x_min=(x_min-config.x_mean)/config.x_std
         x_max=(x_max-config.x_mean)/config.x_std
-
+else:
+    x_min=config.x_min
+    x_max=config.x_max
 if config.use_attack:
     fmodel = fb.PyTorchModel(model, bounds=(0,1))
     attack=fb.attacks.LinfPGD()
     
-    #epsilons= np.array([0.0, 0.001, 0.01, 0.03,0.04,0.05,0.07,0.08,0.0825,0.085,0.086,0.087,0.09, 0.1, 0.3, 0.5, 1.0])
+   
     _, advs, success = attack(fmodel, X_correct[config.input_start:config.input_stop], 
     label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
 
@@ -346,7 +326,7 @@ nb_exps= np.prod(lenghts)
 for l in range(len(inp_indices)):
     with torch.no_grad():
     
-        x_0,y_0 = X[correct_idx][l], y[correct_idx][l]
+        x_0,y_0 = X_correct[l], label_correct[l]
     input_shape=x_0.shape
     x_0.requires_grad=True
     for idx in range(len(config.epsilons)):
@@ -380,7 +360,8 @@ for l in range(len(inp_indices)):
             if gaussian_latent:
                 2*normal_dist.cdf(x_m)-1
             with torch.no_grad():
-                input_m=torch.clamp(x_0+epsilon*x_m, min=x_min,max=x_max)
+
+                input_m=torch.clamp(x_0+eps*x_m, min=x_min,max=x_max)
                 
                 y = model(input_m)
                 y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)

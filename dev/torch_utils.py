@@ -322,7 +322,11 @@ def V_pyt(x_,x_0,model,target_class,epsilon=0.05,gaussian_latent=True,clipping=T
         u=x_
     if reshape:
         u=torch.reshape(u,(u.shape[0],)+input_shape)
-    x_p = x_0+u if not clipping else torch.clamp(x_0+u,min=clip_min,max=clip_max)
+    if not clipping:
+        x_p = x_0+u 
+    else:
+        x_p=torch.min(torch.max(x_0+u,other=clip_min),other=clip_max)
+    #x_p = x_0+u if not clipping else torch.clamp(x_0+u,min=clip_min,max=clip_max)
     v = compute_V_pyt(model=model,input_=x_p,target_class=target_class)
     return v
 
@@ -335,7 +339,11 @@ def gradV_pyt(x_,x_0,model,target_class,epsilon=0.05,gaussian_latent=True,clippi
         u=x_
     if reshape:
         u=torch.reshape(u,(u.shape[0],)+input_shape)
-    x_p = x_0+u if not clipping else torch.clamp(x_0+u,min=clip_min,max=clip_max)
+    if not clipping:
+        x_p = x_0+u 
+    else:
+        x_p=torch.min(torch.max(x_0+u,other=clip_min),other=clip_max)
+
     _,grad_u = compute_V_grad_pyt(model=model,input_=x_p,target_class=target_class)
     grad_u=torch.reshape(grad_u,x_.shape)
     if gaussian_latent:
@@ -350,22 +358,24 @@ def correct_min_max(x_min,x_max,x_mean,x_std):
             x_min=0
         if x_max is None:
             x_max=1
-    if x_mean!=0 or x_std!=1:
-        x_min=(x_min-x_mean)/x_std
-        x_max=(x_max-x_mean)/x_std
+    
+    x_min=(x_min-x_mean)/x_std
+    x_max=(x_max-x_mean)/x_std
     return x_min,x_max
 
 supported_datasets=['mnist','cifar10']
 datasets_idx={'mnist':0,'cifar10':1}
-datasets_in_shape=[(1,28,28),(3,32,32)]
-datasets_dims=[784,3072]
+datasets_in_shape={'mnist':(1,28,28),'cifar10':(3,32,32),'cifar100':(3,32,32)}
+datasets_dims={'mnist':784,'cifar10':3*1024,'cifar100':3*1024}
 datasets_num_c={'mnist':10,'cifar10':10}
-
-def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=0,x_std=1): 
+datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465)}
+datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010)}
+def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=None,x_std=None): 
     assert dataset in supported_datasets,f"support datasets are in {supported_datasets}"
     if dataset=='mnist':
-        if x_mean!=0 or x_std!=1: 
+        if x_mean is not None and x_std is not None: 
             assert x_std!=0, "Can't normalize with 0 std."
+        
             transform_=transforms.Compose([
                                 transforms.ToTensor(),
                                 transforms.Normalize((x_mean,), (x_std,))
@@ -376,12 +386,24 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=0,x
          transform=transform_)
         data_loader = DataLoader(mnist_dataset, batch_size = batch_size, shuffle=train)
     elif dataset=='cifar10':
-        data_transform=transforms.Compose([
-                          transforms.ToTensor(),
-                          transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-                      ])
+        if train:
+            data_transform = transforms.Compose([
+                #transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=datasets_stds['cifar10'],
+                 std=datasets_stds['cifar10']),
+            ])
+        else:
+            data_transform=transforms.Compose([
+                            transforms.ToTensor(),
+                            transforms.Normalize(mean=datasets_stds['cifar10'],
+                 std=datasets_stds['cifar10'])
+                        ])
         cifar10_dataset = datasets.CIFAR10("../data", train=train, download=download, transform=data_transform)
-        data_loader = DataLoader(cifar10_dataset , batch_size = batch_size, shuffle=train)    
+        data_loader = DataLoader(cifar10_dataset , batch_size = batch_size, shuffle=train)  
+    elif dataset=='cifar100':
+        pass 
     
                     
     return data_loader
@@ -395,15 +417,15 @@ def get_correct_x_y(data_loader,device,model):
         logits=model(X)
         y_pred= torch.argmax(logits,-1)
         correct_idx=y_pred==y
-        X_correct, label_correct= X[correct_idx], y[correct_idx]
-    return X_correct,label_correct
+    return X[correct_idx],y[correct_idx],correct_idx.float().mean()
 
-supported_arch={'cnn_custom':CNN_custom,'dnn2':dnn2,'dnn4':dnn4,'lenet':LeNet}
+supported_arch={'cnn_custom':CNN_custom,'dnn2':dnn2,'dnn4':dnn4,}
 
 def get_model(model_arch, robust_model, robust_eps,nb_epochs,model_dir,data_dir,test_loader, device ,
-download,model_shape=(1,28,28),force_train=False,dataset='mnist',batch_size=100):
-
-    model_shape=datasets_in_shape[datasets_idx[dataset]]
+download,force_train=False,dataset='mnist',batch_size=100):
+    
+    input_shape=datasets_in_shape[dataset]
+    print(f"input_shape:{input_shape}")
     if robust_model:
         c_robust_eps=float_to_file_float(robust_eps)
     model_name="model_"+model_arch +'_' + dataset if not robust_model else f"model_{model_arch}_{dataset}_robust_{c_robust_eps}"
@@ -411,7 +433,7 @@ download,model_shape=(1,28,28),force_train=False,dataset='mnist',batch_size=100)
     c_model_path=model_name+'.pt'
     model_path=os.path.join(model_dir,c_model_path)
     assert model_arch.lower() in supported_arch.keys(),f"/!\\Architecture supported for {dataset} are:{list(supported_arch.keys())}"
-    model=supported_arch[model_arch.lower()]()
+    model=supported_arch[model_arch.lower()](dataset=dataset)
     if not os.path.exists(model_path) or force_train: 
         #if the model doesn't exist we retrain a model from scratch
         model.to(device)
@@ -433,7 +455,7 @@ download,model_shape=(1,28,28),force_train=False,dataset='mnist',batch_size=100)
     model.load_state_dict(torch.load(model_path))
     model.eval()
     model.to(device)
-    return model, model_shape, model_name
+    return model, input_shape, model_name
 
 def apply_l_kernel(Y,v_y,l_kernel,T:int,beta,gradV,V,delta_t:float,mh_opt:bool,track_accept:bool,
  gaussian:bool,device,v1_kernel:bool, adapt_d_t:bool,
@@ -996,14 +1018,23 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
         nb_calls+=2*ind_L.sum().item()
         H_trial= Hamiltonian(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
         nb_calls+=N
-        
-        
         delta_H=torch.clamp(-(H_trial-H_old),max=0)
         if FT:
-            
-            
-            lambda_i=((q-q_trial)**2).sum(1)/ind_L.float().to(device)*torch.exp(torch.clamp(delta_H,max=0))
-            
+            exp_weight=torch.exp(torch.clamp(delta_H,max=0))
+            m_distances= maha_dist(x=q,y=q_trial)/ind_L.float().to(device)
+            lambda_i=m_distances*exp_weight+1e-8*torch.ones_like(m_distances)
+            if lambda_i.isnan().any():
+                print(f"NaN values in lambda_i:")
+                print(lambda_i)
+            elif (lambda_i==0).sum()>0:
+                print(f"zero values in lambda_i")
+                print(f"lambda_i")
+                print(f"exp_weight:{exp_weight}")
+                print(f"m_distances:{m_distances}")
+                if (m_distances==0).sum()>0:
+                    print(f"q_trial:{q_trial}")
+                    print(f"q:{q}")
+                print(f"ind_L:{ind_L}")
             
             sel_ind=torch.multinomial(input=lambda_i,num_samples=N,replacement=True,)
             

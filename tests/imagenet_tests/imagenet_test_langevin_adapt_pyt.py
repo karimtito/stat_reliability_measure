@@ -98,6 +98,7 @@ class config:
     model_name='resnet18'
 
     load_batch_size=100
+    quantized=False
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
@@ -150,7 +151,7 @@ parser.add_argument('--accept_spread',type=float,default=config.accept_spread)
 parser.add_argument('--d_t_decay',type=float,default=config.d_t_decay)
 parser.add_argument('--d_t_gain',type=float,default=config.d_t_gain)
 parser.add_argument('--adapt_d_t_mcmc',type=str2bool,default=config.adapt_d_t_mcmc)
-
+parser.add_argument('--quantized',type=str2bool,default=config.quantized)
 parser.add_argument('--split',type=str,default=config.split)
 parser.add_argument('--model_name',type=str,default=config.model_name)
 parser.add_argument('--data_dir',type=str,default=config.data_dir)
@@ -276,6 +277,8 @@ if config.model_name  not in  supported_model_list:
 else: 
     if config.model_name.lower()=='resnet18':
         model=models.resnet18(pretrained=True)
+    elif config.model_name.lower()=='alexnet':
+        model=models.AlexNet(pretrained=True)
 
 # if config.train_model:
 #     mnist_train = datasets.MNIST(config.data_dir, train=True, download=config.download, transform=transforms.ToTensor())

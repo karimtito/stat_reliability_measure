@@ -18,7 +18,7 @@ method_name="smc_pyt"
 
 #gaussian_linear
 class config:
-    dataset='mnist'
+    dataset='imagenet'
     N=100
     N_range=[]
     T=1

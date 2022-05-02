@@ -219,11 +219,13 @@ for p_s in config.p_range:
                     log_path=os.path.join(exp_log_path,log_name)
                     os.mkdir(path=log_path)
                     i_run+=1
-                    print(f"Starting run {i_run}/{nb_runs}, with p_t= {p_t},p_s={p_s},p_w={config.p_w},N={N},T={T},s={s}")
+                    
 
                     K=int(N*ratio)
+                    print(f"Starting run {i_run}/{nb_runs}, with p_t= {p_t},p_s={p_s},p_w={config.p_w},N={N},K={K},T={T},s={s}")
                     if config.verbose>3:
                         print(f"K/N:{K/N}")
+                    
                     times= []
                     rel_error= []
                     ests = [] 
