@@ -369,7 +369,7 @@ test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=confi
 ,dataset=config.dataset,batch_size=config.load_batch_size,
            x_mean=None,x_std=None)
 
-model,mean,std=t_u.get_model_imagenet(config.model_arch)
+model,mean,std=t_u.get_model_imagenet(config.model_arch,model_dir=config.model_dir)
 X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
 if config.verbose>=2:
     print(f"model accuracy on test batch:{accuracy}")

@@ -434,7 +434,8 @@ def get_correct_x_y(data_loader,device,model):
     return X[correct_idx],y[correct_idx],correct_idx.float().mean()
 
 supported_arch={'cnn_custom':CNN_custom,'dnn2':dnn2,'dnn4':dnn4,}
-def get_model_imagenet(model_arch):
+def get_model_imagenet(model_arch,model_dir):
+    torch.hub.set_dir(model_dir)
     mean = [0.485, 0.456, 0.406]
     std = [0.229, 0.224, 0.225]
     normalizer = transforms.Normalize(mean=mean, std=std)
