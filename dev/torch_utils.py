@@ -435,7 +435,6 @@ def get_correct_x_y(data_loader,device,model):
 
 supported_arch={'cnn_custom':CNN_custom,'dnn2':dnn2,'dnn4':dnn4,}
 def get_model_imagenet(model_arch):
-    torch.hub.set_dir("/srv/tempdd/tmaho/torch_models")
     mean = [0.485, 0.456, 0.406]
     std = [0.229, 0.224, 0.225]
     normalizer = transforms.Normalize(mean=mean, std=std)
