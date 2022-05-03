@@ -394,7 +394,7 @@ if config.use_attack:
     if color_dataset:
         X_correct_un=X_correct*torch.tensor(config.x_std).to(device).view((1,3,1,1))-torch.tensor(config.x_mean).to(device).view((1,3,1,1))
     #epsilons= np.array([0.0, 0.001, 0.01, 0.03,0.04,0.05,0.07,0.08,0.0825,0.085,0.086,0.087,0.09, 0.1, 0.3, 0.5, 1.0])
-    _, advs, success = attack(fmodel, X_correct[config.input_start:config.input_stop], 
+    _, advs, success = attack(fmodel, X_correct_un[config.input_start:config.input_stop], 
     label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
 
 

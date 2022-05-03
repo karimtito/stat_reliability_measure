@@ -128,12 +128,7 @@ def nextBetaESS(beta_old,v,ess_alpha,max_beta=1e6,verbose=0,thresh=1e-3,debug=Fa
             print(f"New beta:{new_beta}, new ESS:{new_ess}")
         return new_beta,new_ess
     
-supported_beta_adapt={'ess':nextBetaESS,'simp_ess':nextBetaSimpESS}
-
-def tuneFT(X,dt,L):
-    pass
-
-
+supported_beta_adapt={'ess':nextBetaESS,'simp_ess':nextBetaSimpESS,'simp':ESSAdaptBetaPyt}
 
 
 def SamplerSMC(gen,  V, gradV,adapt_func,min_rate=0.8,alpha =0.1,N=300,T = 1,L=1,n_max=500, 
@@ -229,12 +224,12 @@ debug=False,kappa_opt=False,
                 Count_v = 3*N 
     
         else:
-            if only_duplicated:
+            if only_duplicated and nb_to_renew>0:
                 Y=X[to_renew]
                 v_y=v[to_renew]
                 ind_L_y=ind_L[to_renew]
                 dt_y=dt[to_renew]
-            if not only_duplicated or nb_to_renew==0:
+            else:
                 Y=X
                 v_y=v
                 ind_L_y=ind_L
@@ -254,7 +249,7 @@ debug=False,kappa_opt=False,
                         alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,L_min=L_min,
                         gaussian_verlet=GV_opt,dt_min=dt_min,skip_mh=skip_mh)
                     if FT:
-                        if only_duplicated:
+                        if only_duplicated and nb_to_renew>0:
                             dt[to_renew]=dict_out['dt']
                             ind_L[to_renew]=dict_out['ind_L']
                         else:
