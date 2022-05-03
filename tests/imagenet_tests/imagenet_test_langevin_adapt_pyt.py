@@ -256,7 +256,7 @@ data_transform=transforms.Compose([
             transforms.CenterCrop(224),
             #transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            normalize,
+            
         ])
 
 imagenet_dataset = datasets.ImageNet(config.data_dir, split=config.split, download=config.download, transform=data_transform)

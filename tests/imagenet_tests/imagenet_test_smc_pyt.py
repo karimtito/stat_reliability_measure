@@ -368,31 +368,18 @@ test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=confi
 ,dataset=config.dataset,batch_size=config.load_batch_size,
            x_mean=None,x_std=None)
 
-model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
-    nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
-    download=config.download,dataset=config.dataset)
+model,mean,std=t_u.get_model_imagenet(config.model_arch)
 X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
 if config.verbose>=2:
     print(f"model accuracy on test batch:{accuracy}")
 
-config.x_mean=t_u.datasets_means[config.dataset]
-config.x_std=t_u.datasets_stds[config.dataset]
-if color_dataset:
-    x_min,x_max=t_u.correct_min_max(x_min=config.x_min,x_max=config.x_max,
-                                x_mean=np.array(config.x_mean),x_std=np.array(config.x_std))
-else:
-    x_min,x_max=t_u.correct_min_max(x_min=config.x_min,x_max=config.x_max,
-                                x_mean=config.x_mean,x_std=config.x_std)
+x_min=torch.tensor(0)
+x_max=torch.tensor(1)
 
 if config.use_attack:
-    pre_mean=config.x_mean if color_dataset else np.array(config.x_mean).reshape((1,))
-    pre_std=config.x_std if color_dataset else np.array(config.x_std).reshape((1,))
-    preprocessing = dict(mean=pre_mean, std=pre_std, axis=-3)
-    fmodel = fb.PyTorchModel(model, bounds=(0,1),device=device,preprocessing=preprocessing)
+    fmodel = fb.PyTorchModel(model, bounds=(0,1),device=device)
     attack=fb.attacks.LinfPGD()
     #un-normalize data before performing attack
-    if color_dataset:
-        X_correct_un=X_correct*torch.tensor(config.x_std).to(device).view((1,3,1,1))-torch.tensor(config.x_mean).to(device).view((1,3,1,1))
     #epsilons= np.array([0.0, 0.001, 0.01, 0.03,0.04,0.05,0.07,0.08,0.0825,0.085,0.086,0.087,0.09, 0.1, 0.3, 0.5, 1.0])
     _, advs, success = attack(fmodel, X_correct[config.input_start:config.input_stop], 
     label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
