@@ -339,7 +339,7 @@ for p_t in config.p_range:
                         calls=[]
                         finished_flags=[]
                         iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
-                        print(f"Starting simulations with p_t:{p_t},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N}")
+                        print(f"Starting simulations with p_t:{p_t},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
                         for i in iterator:
                             t=time()
                             p_est,res_dict,=smc_pyt.SamplerSMC(gen=norm_gen,V= V,gradV=gradV,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,

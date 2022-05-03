@@ -127,7 +127,7 @@ class config:
     load_batch_size=100 
     nb_epochs= 10
     adversarial_every=1
-    data_dir="../../data"
+    data_dir="../../data/ImageNet/"
     p_ref_compute=False
     input_start=0
     input_stop=None
@@ -143,7 +143,8 @@ class config:
 
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--log_dir',default=config.log_dir)
+parser.add_argument('--log_dir',type=str,default=config.log_dir)
+parser.add_argument('--data_dir',type=str,default=config.data_dir)
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
