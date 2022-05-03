@@ -46,7 +46,7 @@ class config:
     eps_max=0.3
     eps_min=0.1 
     eps_num=5
-    model_arch='CNN_custom'
+    model_arch='torchvision_resnet18'
     model_path=None
     export_to_onnx=False
     use_attack=True
@@ -364,7 +364,7 @@ save_every = 1
 #adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBetaPyt
 num_classes=t_u.datasets_num_c[config.dataset.lower()]
 print(f"Running reliability experiments on architecture {config.model_arch} trained on  {config.dataset}.")
-print(f"Testing uniform noise pertubatin with epsilon in {config.epsilons}")
+print(f"Testing uniform noise pertubation with epsilon in {config.epsilons}")
 test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
 ,dataset=config.dataset,batch_size=config.load_batch_size,
            x_mean=None,x_std=None)

@@ -412,7 +412,7 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
             
         ])
 
-        imagenet_dataset = datasets.ImageNet(data_dir, split="val", download=False, transform=data_transform)
+        imagenet_dataset = datasets.ImageNet(data_dir, split="val", transform=data_transform)
 
         data_loader = DataLoader(imagenet_dataset, batch_size =batch_size, shuffle=False)
 
@@ -434,7 +434,7 @@ def get_correct_x_y(data_loader,device,model):
     return X[correct_idx],y[correct_idx],correct_idx.float().mean()
 
 supported_arch={'cnn_custom':CNN_custom,'dnn2':dnn2,'dnn4':dnn4,}
-def get_model_imagent(model_arch):
+def get_model_imagenet(model_arch):
     torch.hub.set_dir("/srv/tempdd/tmaho/torch_models")
     mean = [0.485, 0.456, 0.406]
     std = [0.229, 0.224, 0.225]
