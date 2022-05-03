@@ -392,7 +392,7 @@ normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 run_nb=0
 iterator= tqdm(range(config.n_rep))
 exp_res=[]
-
+model_name=config.model_arch
 clip_min=torch.tensor(x_min).to(device)
 
 clip_max=torch.tensor(x_max).to(device)
