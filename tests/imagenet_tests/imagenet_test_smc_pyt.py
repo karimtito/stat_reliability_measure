@@ -364,7 +364,7 @@ save_every = 1
 #adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBetaPyt
 num_classes=t_u.datasets_num_c[config.dataset.lower()]
 print(f"Running reliability experiments on architecture {config.model_arch} trained on  {config.dataset}.")
-print(f"Testing uniform noise pertubation with epsilon in {config.epsilons}")
+print(f"Testing uniform noise perturbation with epsilon in {config.epsilons}")
 test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
 ,dataset=config.dataset,batch_size=config.load_batch_size,
            x_mean=None,x_std=None)
@@ -392,13 +392,10 @@ normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 run_nb=0
 iterator= tqdm(range(config.n_rep))
 exp_res=[]
-if color_dataset:
-            clip_min=torch.tensor(x_min).to(device).view((1,3,1,1)).float()
-            clip_max=torch.tensor(x_max).to(device).view((1,3,1,1)).float()
-else:
-    clip_min=torch.tensor(x_min).to(device)
-    
-    clip_max=torch.tensor(x_max).to(device)
+
+clip_min=torch.tensor(x_min).to(device)
+
+clip_max=torch.tensor(x_max).to(device)
 for l in inp_indices:
     with torch.no_grad():
     
