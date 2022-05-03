@@ -4,9 +4,9 @@ import torch.nn as nn
 
 from stat_reliability_measure.dev.utils import float_to_file_float
 from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet
-from torchvision import transforms,datasets
+from torchvision import transforms,datasets,models as tv_models
 from torch.utils.data import DataLoader
-
+import timm
 from torch import device, optim
 import os
 import math
@@ -363,11 +363,11 @@ def correct_min_max(x_min,x_max,x_mean,x_std):
     x_max=(x_max-x_mean)/x_std
     return x_min,x_max
 
-supported_datasets=['mnist','cifar10']
+supported_datasets=['mnist','cifar10','cifar100','imagenet']
 datasets_idx={'mnist':0,'cifar10':1}
-datasets_in_shape={'mnist':(1,28,28),'cifar10':(3,32,32),'cifar100':(3,32,32)}
-datasets_dims={'mnist':784,'cifar10':3*1024,'cifar100':3*1024}
-datasets_num_c={'mnist':10,'cifar10':10}
+datasets_in_shape={'mnist':(1,28,28),'cifar10':(3,32,32),'cifar100':(3,32,32),'imagenet':(3,224,224)}
+datasets_dims={'mnist':784,'cifar10':3*1024,'cifar100':3*1024,'imagenet':3*224**2}
+datasets_num_c={'mnist':10,'cifar10':10,'imagenet':1000}
 datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465)}
 datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010)}
 def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=None,x_std=None): 
@@ -385,7 +385,7 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
         mnist_dataset = datasets.MNIST(data_dir, train=train, download=download,
          transform=transform_)
         data_loader = DataLoader(mnist_dataset, batch_size = batch_size, shuffle=train)
-    elif dataset=='cifar10':
+    elif dataset in ('cifar10','cifar100'):
         if train:
             data_transform = transforms.Compose([
                 #transforms.RandomCrop(32, padding=4),
@@ -402,8 +402,22 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
                         ])
         cifar10_dataset = datasets.CIFAR10("../data", train=train, download=download, transform=data_transform)
         data_loader = DataLoader(cifar10_dataset , batch_size = batch_size, shuffle=train)  
-    elif dataset=='cifar100':
-        pass 
+    elif dataset=='imagenet':
+        assert train==False,"Only validation data can be loaded for the ImageNet dataset."
+        data_transform=transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            #transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            
+        ])
+
+        imagenet_dataset = datasets.ImageNet(data_dir, split="val", download=False, transform=data_transform)
+
+        data_loader = DataLoader(imagenet_dataset, batch_size =batch_size, shuffle=False)
+
+
+
     
                     
     return data_loader
@@ -420,6 +434,21 @@ def get_correct_x_y(data_loader,device,model):
     return X[correct_idx],y[correct_idx],correct_idx.float().mean()
 
 supported_arch={'cnn_custom':CNN_custom,'dnn2':dnn2,'dnn4':dnn4,}
+def get_model_imagent(model_arch):
+    torch.hub.set_dir("/srv/tempdd/tmaho/torch_models")
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+    normalizer = transforms.Normalize(mean=mean, std=std)
+    if model_arch.lower().startswith("torchvision"):
+        model = getattr(tv_models, model_arch[len("torchvision_"):])(pretrained=True)
+    else:
+        model = timm.create_model(model_arch, pretrained=True)
+        mean = model.default_cfg["mean"]
+        std = model.default_cfg["std"]
+        normalizer = transforms.Normalize(mean=mean, std=std)
+
+    model = torch.nn.Sequential(normalizer, model).cuda(0).eval()
+    return model,mean,std
 
 def get_model(model_arch, robust_model, robust_eps,nb_epochs,model_dir,data_dir,test_loader, device ,
 download,force_train=False,dataset='mnist',batch_size=100):
@@ -428,7 +457,7 @@ download,force_train=False,dataset='mnist',batch_size=100):
     print(f"input_shape:{input_shape}")
     if robust_model:
         c_robust_eps=float_to_file_float(robust_eps)
-    model_name="model_"+model_arch +'_' + dataset if not robust_model else f"model_{model_arch}_{dataset}_robust_{c_robust_eps}"
+    model_name=model_arch +'_' + dataset if not robust_model else f"model_{model_arch}_{dataset}_robust_{c_robust_eps}"
     
     c_model_path=model_name+'.pt'
     model_path=os.path.join(model_dir,c_model_path)
