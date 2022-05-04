@@ -991,7 +991,7 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussia
     return q,v_q,nb_calls,dict_out
 
 
-def adapt_verlet_mcmc(q,ind_L,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
+def adapt_verlet_mcmc(q,v_q,ind_L,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
 kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,alpha_p:float=0.1,prop_d=0.1,FT=False,dt_max=None,dt_min=None,sig_dt=0.015,
 verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     """ Simple implementation of Hamiltonian dynanimcs MCMC 
@@ -1029,8 +1029,8 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     (N,d)=q.shape
     o_old=q+q**2
     mu_old,sig_old=(o_old).mean(0),(o_old).std(0)
-    H_old = Hamiltonian(X=q,p=p,beta=beta, gaussian=gaussian,V=V,scale_M=scale_M)
-    nb_calls=N
+    H_old= Hamiltonian(X=q, p=p,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
+    nb_calls=0 #we can reuse the potential value v_q of previous iteration: no new potential computation
     if save_H:
         H_ = np.zeros(T+1)
         H_[0]=H_old.mean()
@@ -1044,9 +1044,9 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
         q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
         
-        nb_calls+=2*ind_L.sum().item()
+        nb_calls+=2*ind_L.sum().item() # for each particle each vertlet integration step requires two oracle calls (gradients)
         H_trial= Hamiltonian(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
-        nb_calls+=N
+        nb_calls+=N # N new potentials are computed 
         delta_H=torch.clamp(-(H_trial-H_old),max=0)
         if FT:
             exp_weight=torch.exp(torch.clamp(delta_H,max=0))
@@ -1091,9 +1091,10 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
         if scale_M is not None:
             p = sqrt_M*p
         H_old= Hamiltonian(X=q, p=p,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
+        #no new potential is computed 
         if save_H:
             H_[i+1] = H_old.mean()
-        nb_calls+=N
+        
         
 
         if save_func is not None:
@@ -1111,5 +1112,153 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
         dict_out['dt']=delta_t
         dict_out['ind_L']=ind_L
     v_q=V(q)
-    nb_calls+=N
+    #no new potential computation 
+    
     return q,v_q,nb_calls,dict_out
+
+
+def Hamiltonian2(X,p,beta,v_x=None,V=None,scale_M=1,gaussian=True):
+    if v_x is None:
+        assert V is not None
+        with torch.no_grad():
+            U = beta*V(X) +0.5*torch.sum(X**2,dim=1) if gaussian else beta*V(X)
+    else:
+        U = beta*v_x +0.5*torch.sum(X**2,dim=1) if gaussian else beta*v_x
+    H = U + 0.5*torch.sum((1/scale_M)*p**2,dim=1)
+    return H
+
+
+
+def adapt_verlet_mcmc2(q,v_q,ind_L,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
+kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,alpha_p:float=0.1,prop_d=0.1,FT=False,dt_max=None,dt_min=None,sig_dt=0.015,
+verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
+    """ Simple implementation of Hamiltonian dynanimcs MCMC 
+
+    Args:
+        q (_type_): _description_
+        p (_type_): _description_
+        beta (_type_): _description_
+        gaussian (_type_): _description_
+        V (_type_): _description_
+        gradV (_type_): _description_
+        T (_type_): _description_
+        delta_t (_type_): _description_
+        kappa_opt (bool, optional): _description_. Defaults to True.
+        save_H (bool, optional): _description_. Defaults to True.
+        save_Q (bool, optional): _description_. Defaults to True.
+        save_func (_type_, optional): _description_. Defaults to None.
+        alpha_p 
+
+    Returns:
+        _type_: _description_
+    """
+    acc  = 0
+    T_max=T
+    if scale_M is None:
+        scale_M=1
+        sqrt_M=1
+    else:
+        sqrt_M = torch.sqrt(scale_M) 
+    p=sqrt_M*torch.randn_like(q)
+    if FT:
+        
+        maha_dist = lambda x,y: ((1/scale_M)*(x-y)**2).sum(1)
+        ones_L=torch.ones_like(ind_L)
+    (N,d)=q.shape
+    o_old=q+q**2
+    mu_old,sig_old=(o_old).mean(0),(o_old).std(0)
+    
+    U = beta*v_q +0.5*torch.sum(q**2,dim=1)
+    H_old=U+ torch.sum((1/scale_M)*p**2,dim=1)
+    nb_calls=0 #we reuse the potential value v_q of previous iteration
+    if save_H:
+        H_ = np.zeros(T+1)
+        H_[0]=H_old.mean()
+
+    if save_func is not None:
+        saved=[save_func(q,p)]
+    prod_correl=torch.ones(size=(d,),device=q.device)
+    i=0
+    while (prod_correl>alpha_p).sum()>=prop_d*d and i<T_max:
+        q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
+        scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
+        
+        nb_calls+=2*ind_L.sum().item() # for each particle each vertlet integration step requires two gradient computations
+        v_trial=V(q_trial)
+        nb_calls+=N             # we compute the potential of the new particle                        
+        H_trial= Hamiltonian2(X=q_trial, p=p_trial,v_x=v_trial,beta=beta,gaussian=gaussian,scale_M=scale_M)
+
+        delta_H=torch.clamp(-(H_trial-H_old),max=0)          
+        if FT:
+            exp_weight=torch.exp(torch.clamp(delta_H,max=0))
+            m_distances= maha_dist(x=q,y=q_trial)/ind_L.float().to(device)
+            lambda_i=m_distances*exp_weight+1e-8*torch.ones_like(m_distances)
+            if lambda_i.isnan().any():
+                print(f"NaN values in lambda_i:")
+                print(lambda_i)
+            elif (lambda_i==0).sum()>0:
+                print(f"zero values in lambda_i")
+                print(f"lambda_i")
+                print(f"exp_weight:{exp_weight}")
+                print(f"m_distances:{m_distances}")
+                if (m_distances==0).sum()>0:
+                    print(f"q_trial:{q_trial}")
+                    print(f"q:{q}")
+                print(f"ind_L:{ind_L}")
+            
+            sel_ind=torch.multinomial(input=lambda_i,num_samples=N,replacement=True,)
+            
+            delta_t = torch.clamp(delta_t[sel_ind]+sig_dt*torch.randn_like(delta_t),min=dt_min,max=dt_max,)
+            noise_L=torch.rand(size=(N,),device=ind_L.device)
+            
+            ind_L= torch.clamp(ind_L[sel_ind]+((noise_L>=(2/3)).float()-(noise_L<=1/3).float())*ones_L,min=L_min,max=L+1e-3)
+            
+        alpha=torch.rand(size=(N,),device=device)
+        accept=torch.exp(delta_H)>alpha
+        nb_accept=accept.sum().item()
+        acc+=nb_accept
+        if skip_mh:
+            q=q_trial
+            v_q=v_trial
+            nb_accept=N
+        else:
+            q=torch.where(accept.unsqueeze(-1),input=q_trial,other=q)
+            v_q=torch.where(accept,input=v_trial,other=v_q)
+        if nb_accept>0:
+            o_new=q+q**2
+            mu_new,sig_new=o_new.mean(0),o_new.std(0)
+            correl=((o_new-mu_new)*(o_old-mu_old)).mean(0)/(sig_old*sig_new)
+            prod_correl*=correl
+    
+        
+        
+
+
+        p = torch.randn_like(q)
+        if scale_M is not None:
+            p = sqrt_M*p
+        H_old= Hamiltonian2(X=q, p=p,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
+        
+        if save_H:
+            H_[i+1] = H_old.mean()
+        
+
+        if save_func is not None:
+            saved.append(save_func(q,p))
+        i+=1
+    if verbose:
+        print(f"T_final={i}")
+    dict_out={'acc_rate':acc/(i*N),'T_final':i}
+
+    if save_H:
+        dict_out['H']=H_
+    if save_func is not None:
+        dict_out['saved']=saved
+    if FT:
+        dict_out['dt']=delta_t
+        dict_out['ind_L']=ind_L
+    
+    
+    return q,v_q,nb_calls,dict_out
+
+

@@ -1,7 +1,7 @@
 import torch 
 import math
 import numpy as np
-from stat_reliability_measure.dev.torch_utils import TimeStepPyt, adapt_verlet_mcmc, apply_gaussian_kernel,verlet_mcmc
+from stat_reliability_measure.dev.torch_utils import TimeStepPyt, adapt_verlet_mcmc, adapt_verlet_mcmc2, apply_gaussian_kernel,verlet_mcmc
 
 
 
@@ -214,14 +214,16 @@ debug=False,kappa_opt=False,
             X=gen(N)
             #p=torch.randn_like(X)
             v=V(X)
+            
 
             d=X.shape[-1]
             assert dt_d==1 or dt_d==d,"dt dimension can be 1 (isotropic diff.) or d (anisotropic diff.)"
             dt_scalar =alpha*TimeStepPyt(V,X,gradV)
+            
             dt= torch.clamp(dt_scalar*torch.ones(size=(N,dt_d),device=device)+sig_dt*torch.randn(size=(N,dt_d),device=device),min=dt_min,max=dt_max)
             ind_L=torch.randint(low=L_min,high=L,size=(N,)).float() if L_min<L else L*torch.ones(size=(N,))
             if track_calls:
-                Count_v = 3*N 
+                Count_v = 3*N #N calls to V + 2*N calls to grad_V
     
         else:
             if only_duplicated and nb_to_renew>0:
@@ -244,7 +246,7 @@ debug=False,kappa_opt=False,
             else:
                 
                 if adapt_step:
-                    Y,v_y,nb_calls,dict_out=mcmc_func(q=Y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
+                    Y,v_y,nb_calls,dict_out=mcmc_func(q=Y,v_q=v_y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
                         V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_y,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
                         alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,L_min=L_min,
                         gaussian_verlet=GV_opt,dt_min=dt_min,skip_mh=skip_mh)
