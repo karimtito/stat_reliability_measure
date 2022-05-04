@@ -155,8 +155,8 @@ rejection_ctrl = True, reject_thresh=0.9, gain_rate = 1.0001, prog_thresh=0.01,c
     thresh=1e-3
     kernel_pass=0
     rejection_rate=0
-
-    while L_j<L_target-thresh:
+    move_levels=True
+    while move_levels and L_j<L_target-thresh:
         
         n += 1 # increases iteration number
         if n >=n_max:
