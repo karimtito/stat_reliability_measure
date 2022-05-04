@@ -19,6 +19,8 @@ method_name="smc_pyt"
 #gaussian_linear
 class config:
     dataset='imagenet'
+    log_dir="../../logs/imagenet_tests"
+    model_dir="../../models/imagenet"
     N=100
     N_range=[]
     T=1
@@ -27,7 +29,7 @@ class config:
     L_range=[]
     min_rate=0.51
     
-    alpha=0.002
+    alpha=0.2
     alpha_range=[]
     ess_alpha=0.9
     e_range=[]
@@ -115,7 +117,7 @@ class config:
 
     adapt_func='ESS'
     M_opt = False
-    adapt_step=False
+    adapt_step=True
     FT=False
     sig_dt=0.015
 
@@ -138,6 +140,7 @@ class config:
     L_min=1
     GK_opt=False
     GV_opt=False
+    mala=False
     g_target=0.8
     skip_mh=False
 
@@ -224,6 +227,7 @@ parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
 parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
 parser.add_argument('--g_target',type=float,default=config.g_target)
 parser.add_argument('--kappa_opt',type=str2bool,default=config.kappa_opt)
+parser.add_argument('--lirpa_cert',type=str2bool,default=config.lirpa_cert)
 parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
 parser.add_argument('--dataset',type=str, default=config.dataset)
 args=parser.parse_args()
@@ -237,7 +241,7 @@ if config.model_dir is None:
         os.mkdir(config.model_dir)
 
 config.d = t_u.datasets_dims[config.dataset]
-color_dataset=config.dataset in ('cifar10','cifar100','imagenet') 
+
 #assert config.adapt_func.lower() in smc_pyt.supported_beta_adapt.keys(),f"select adaptive function in {smc_pyt.supported_beta_adapt.keys}"
 #adapt_func=smc_pyt.supported_beta_adapt[config.adapt_func.lower()]
 
@@ -366,9 +370,7 @@ num_classes=t_u.datasets_num_c[config.dataset.lower()]
 print(f"Running reliability experiments on architecture {config.model_arch} trained on  {config.dataset}.")
 print(f"Testing uniform noise perturbation with epsilon in {config.epsilons}")
 test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
-,dataset=config.dataset,batch_size=config.load_batch_size,
-           x_mean=None,x_std=None)
-
+,dataset=config.dataset,batch_size=config.load_batch_size,)
 model,mean,std=t_u.get_model_imagenet(config.model_arch,model_dir=config.model_dir)
 X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
 if config.verbose>=2:
@@ -536,7 +538,7 @@ for l in inp_indices:
                             "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
                             "M_opt":config.M_opt,"adapt_step":config.adapt_step,
                             "noise_dist":config.noise_dist,"lirpa_safe":lirpa_safe,"L_min":config.L_min,
-                            "skip_mh":config.skip_mh,"GV_opt":config.GV_opt}
+                            "skip_mh":config.skip_mh,"GV_opt":config.GV_opt,"mala":config.mala}
                             exp_res.append(results)
                             results_df=pd.DataFrame([results])
                             results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
