@@ -8,7 +8,10 @@ datasets_in_shape={'mnist':(1,28,28),'cifar10':(3,32,32),'cifar100':(3,32,32)}
 class Flatten(nn.Module):
     def forward(self, x):
         return x.view(x.shape[0], -1)    
-
+#####################################################################################
+#######   MNIST models
+#######
+#####################################################################################
 
 class dnn2(nn.Module):
     def __init__(self,num_classes=10,dataset='mnist') -> None:
@@ -66,6 +69,10 @@ class CNN_custom(nn.Module):
         out= self.linear2(out)
         return out
 
+#####################################################################################
+#######   CIFAR10/CIFAR100 models
+#######
+#####################################################################################
 
 class LeNet(nn.Module):
     def __init__(self,num_classes=10,dataset='cifar10'):
