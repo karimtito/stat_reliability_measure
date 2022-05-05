@@ -44,7 +44,7 @@ class config:
 
     epsilons = None
     eps_max=0.3
-    eps_min=0.1 
+    eps_min=0.2
     eps_num=5
     model_arch='CNN_custom'
     model_path=None
