@@ -266,7 +266,7 @@ if not os.path.exists(ROOT_DIR+'/logs'):
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 
-results_path=fROOT_DIR+'/logs/'+ prblm_str+'_tests/results.csv' 
+results_path=ROOT_DIR+'/logs/'+ prblm_str+'_tests/results.csv' 
 if os.path.exists(results_path):
     results_g=pd.read_csv(results_path)
 else:

@@ -25,20 +25,20 @@ class config:
     T_range=[]
     L=1
     L_range=[]
-    min_rate=0.90
+    min_rate=0.2
     
     alpha=0.2
     alpha_range=[]
     ess_alpha=0.9
     e_range=[]
     p_range=[]
-    p_t=1e-15
+    p_t=1e-6
     n_rep=10
     
     save_config=False 
     print_config=True
     d=1024
-    verbose=1
+    verbose=0
     log_dir=ROOT_DIR+'/logs/linear_gaussian_tests'
     aggr_res_path = None
     update_agg_res=False
@@ -247,7 +247,7 @@ if not os.path.exists(ROOT_DIR+'/logs'):
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 
-results_path=fROOT_DIR+'/logs/'+ prblm_str+'_tests/results.csv' 
+results_path=ROOT_DIR+'/logs/'+ prblm_str+'_tests/results.csv' 
 if os.path.exists(results_path):
     results_g=pd.read_csv(results_path)
 else:
@@ -397,7 +397,9 @@ for p_t in config.p_range:
                         
                         print(f"mean est:{ests.mean()}, std est:{ests.std()}")
                         print(f"mean rel error:{rel_errors.mean()}")
-                        print(f"MSE rel. adj.:{MSE_rel_adj}")
+                        print(f"MSE rel:{MSE/p_t**2}")
+                        print(f"MSE adj.:{MSE_adj}")
+                        print(f"MSE rel. adj.:{MSE_adj/p_t**2}")
                         print(f"mean calls:{calls.mean()}")
 
                         times=np.array(times)  
