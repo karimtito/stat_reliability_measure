@@ -1182,8 +1182,8 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     while (prod_correl>alpha_p).sum()>=prop_d*d and i<T_max:
         q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
-        
-        nb_calls+=2*ind_L.sum().item() # for each particle each vertlet integration step requires two gradient computations
+        # for each particle each vertlet integration step requires two gradient computations
+        nb_calls+=4*(ind_L).sum().item()-N 
         v_trial=V(q_trial)
         nb_calls+=N             # we compute the potential of the new particle                        
         H_trial= Hamiltonian2(X=q_trial, p=p_trial,v_x=v_trial,beta=beta,gaussian=gaussian,scale_M=scale_M)
