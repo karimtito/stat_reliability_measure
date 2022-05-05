@@ -464,7 +464,7 @@ download,force_train=False,dataset='mnist',batch_size=100):
         #if the model doesn't exist we retrain a model from scratch
         model=torch.nn.Sequential(normalizer, network)
         model.to(device)
-        if force_train:
+        if force_train and os.path.exists(model_path):
             print("Retraining model from scratch")
             os.remove(model_path)
         else:
