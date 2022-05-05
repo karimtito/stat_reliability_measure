@@ -27,7 +27,7 @@ class config:
     L_range=[]
     min_rate=0.90
     
-    alpha=0.002
+    alpha=0.2
     alpha_range=[]
     ess_alpha=0.9
     e_range=[]
@@ -64,8 +64,8 @@ class config:
     accept_spread=0.1
     dt_decay=0.999
     dt_gain=None
-    dt_min=1e-5
-    dt_max=1e-1
+    dt_min=1e-3
+    dt_max=0.5
     v_min_opt=False
     ess_opt=False
     only_duplicated=False
@@ -95,9 +95,9 @@ class config:
 
     adapt_func='ESS'
     M_opt = False
-    adapt_step=False
-    FT=False
-    sig_dt=0.015
+    adapt_step=True
+    FT=True
+    sig_dt=0.02
     L_min=1
     skip_mh=False
     
