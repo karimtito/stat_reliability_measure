@@ -23,6 +23,7 @@ from stat_reliability_measure.dev.torch_arch import CNN_custom#,CNN,dnn2
 from stat_reliability_measure.dev.utils import str2bool,str2list,float_to_file_float
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
 import stat_reliability_measure.dev.torch_utils as t_u 
+from stat_reliability_measure.home import ROOT_DIR
 #setting PRNG seeds for reproducibility
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
@@ -32,8 +33,8 @@ low_str=lambda x: str(x).lower()
 method_name="vanilla_mc"
 
 class config:
-    log_dir="../../logs/mnist_tests"
-    data_dir="../../data"
+    log_dir=ROOT_DIR+"/logs/mnist_tests"
+    data_dir=ROOT_DIR+"/data"
     n_rep=10
     N=int(1e5)
     N_list=[]
@@ -218,7 +219,7 @@ test_loader = DataLoader(mnist_test, batch_size = 100, shuffle=False)
 if config.model_path is None:
     model = CNN_custom()
     model=model.to(device)
-    model_path="../../models/mnist/model_CNN_custom.pt"
+    model_path=ROOT_DIR+"/models/mnist/model_CNN_custom.pt"
 else: 
     raise NotImplementedError("Testing of custom models is not yet implemented.")
 

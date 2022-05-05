@@ -14,7 +14,7 @@ import pandas as pd
 import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
 from scipy.special import betainc
-
+from stat_reliability_measure.home import ROOT_DIR
 method_name="hmc_adapt_pyt"
 
 #gaussian_linear
@@ -162,7 +162,7 @@ for k,v in vars(args).items():
 prblm_str='linear_gaussian' if config.linear else "gaussian"
 
 if config.log_dir is None:
-    config.log_dir=f'../../logs/{prblm_str}_tests'
+    config.log_dir=fROOT_DIR+'/logs/{prblm_str}_tests'
 
 if len(config.p_range)==0:
     config.p_range= [config.p_t]
@@ -224,12 +224,12 @@ d=config.d
 #epsilon=config.epsilon
 
 
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 
-results_path=f'../../logs/{prblm_str}_tests/results.csv'
+results_path=fROOT_DIR+'/logs/{prblm_str}_tests/results.csv'
 if os.path.exists(results_path):
     results_g=pd.read_csv(results_path)
 else:

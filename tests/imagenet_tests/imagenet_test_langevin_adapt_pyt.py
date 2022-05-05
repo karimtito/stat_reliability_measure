@@ -33,8 +33,8 @@ low_str=lambda x: str(x).lower()
 method_name="langevin_adapt_pyt"
 
 class config:
-    log_dir="../../logs/mnist_tests"
-    data_dir="../../data/ImageNet"
+    log_dir=ROOT_DIR+"/logs/mnist_tests"
+    data_dir=ROOT_DIR+"/data/ImageNet"
     n_rep=10
     N=40
     N_list=[]
@@ -216,8 +216,8 @@ d=config.d
 
 
 
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 

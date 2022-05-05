@@ -17,6 +17,7 @@ from datetime import datetime
 
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList
 import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
+from stat_reliability_measure.home import ROOT_DIR
 method_name="amls_pyt"
 
 class config:
@@ -67,7 +68,7 @@ class config:
     torch_seed=0
     np_seed=0
 
-    log_dir="../../logs/anisotrop_tests"
+    log_dir=ROOT_DIR+"/logs/anisotrop_tests"
     batch_opt=True
     allow_multi_gpu=False
     track_gpu=True
@@ -169,8 +170,8 @@ d=config.d
 d_w=config.d_w
 d_s=config.d_s
 
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')
     os.mkdir(config.log_dir)
 elif not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir

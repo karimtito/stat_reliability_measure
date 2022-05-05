@@ -33,7 +33,7 @@ class config:
     save_config=False 
     d=1024
     verbose=1
-    log_dir='../../logs/gaussian_tests'
+    log_dir=ROOT_DIR+'/logs/gaussian_tests'
     aggr_res_path = None
     update_agg_res=True
     sigma=1
@@ -199,12 +199,12 @@ d=config.d
 #epsilon=config.epsilon
 
 
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 
-results_path='../../logs/linear_gaussian_tests/results.csv'
+results_path=ROOT_DIR+'/logs/linear_gaussian_tests/results.csv'
 if os.path.exists(results_path):
     results_g=pd.read_csv(results_path)
 else:

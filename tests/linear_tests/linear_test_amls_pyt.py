@@ -55,7 +55,7 @@ class config:
 
     device = None
 
-    log_dir="../../logs/linear_tests"
+    log_dir=ROOT_DIR+"/logs/linear_tests"
     batch_opt=False
     allow_multi_gpu=False
     track_gpu=True
@@ -146,8 +146,8 @@ assert type(gaussian_latent)==bool, "The conversion of string to bool for 'gauss
 
 
 
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')
     os.mkdir(config.log_dir)
 elif not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)

@@ -44,7 +44,7 @@ class config:
     d_s=1
     d_w=2
     verbose=1
-    log_dir='../../logs/anisotrop_tests'
+    log_dir=ROOT_DIR+'/logs/anisotrop_tests'
     aggr_res_path = None
     update_agg_res=False
     sigma=1
@@ -261,12 +261,12 @@ d_s=config.d_s
 #epsilon=config.epsilon
 
 
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 
-results_path=f'../../logs/'+ prblm_str+'_tests/results.csv' 
+results_path=fROOT_DIR+'/logs/'+ prblm_str+'_tests/results.csv' 
 if os.path.exists(results_path):
     results_g=pd.read_csv(results_path)
 else:

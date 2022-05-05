@@ -14,6 +14,7 @@ import cpuinfo
 import pandas as pd
 import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
+from stat_reliability_measure.home import ROOT_DIR
 method_name="smc_pyt"
 
 #gaussian_linear
@@ -27,7 +28,7 @@ class config:
     L_range=[]
     min_rate=0.51
     
-    alpha=0.002
+    alpha=0.2
     alpha_range=[]
     ess_alpha=0.9
     e_range=[]
@@ -116,8 +117,8 @@ class config:
     adapt_func='ESS'
     M_opt = False
     adapt_step=True
-    FT=False
-    sig_dt=0.015
+    FT=True
+    sig_dt=0.02
 
     batch_opt=True
     track_finish=False
@@ -127,7 +128,7 @@ class config:
     load_batch_size=100 
     nb_epochs= 10
     adversarial_every=1
-    data_dir="../../data"
+    data_dir=ROOT_DIR+"/data"
     p_ref_compute=False
     input_start=0
     input_stop=None
@@ -233,7 +234,7 @@ for k,v in vars(args).items():
     setattr(config, k, v)
 
 if config.model_dir is None:
-    config.model_dir=os.path.join("../../models/",config.dataset)
+    config.model_dir=os.path.join(ROOT_DIR+"/models/",config.dataset)
     if not os.path.exists(config.model_dir):
         os.mkdir(config.model_dir)
 
@@ -313,9 +314,9 @@ d=config.d
 #epsilon=config.epsilon
 
 if config.log_dir is None:
-    config.log_dir=os.path.join('../../logs',config.dataset+'_tests')
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')  
+    config.log_dir=os.path.join(ROOT_DIR+'/logs',config.dataset+'_tests')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')  
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 
@@ -339,7 +340,7 @@ os.mkdir(path=exp_log_path)
 config.json=vars(args)
 
 # if config.aggr_res_path is None:
-#     aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+#     aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
 # else:
 #     aggr_res_path=config.aggr_res_path
 
@@ -530,7 +531,8 @@ for l in inp_indices:
                             #with open(os.path.join(log_path,'results.txt'),'w'):
                             results={"method":method_name,'T':T,'N':N,'L':L,
                             "ess_alpha":ess_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
-                            "method":method,'adapt_dt':config.adapt_dt,
+                            "method":method,'adapt_dt':config.adapt_dt,"epsilon":epsilon,
+                            "model_name":model_name,"image_idx":l, 
                             'mean_calls':calls.mean(),'std_calls':calls.std()
                             ,'mean time':times.mean(),'std time':times.std()
                             ,'mean est':ests.mean(),'std est':ests.std(), 
@@ -551,7 +553,7 @@ for l in inp_indices:
                             results_df=pd.DataFrame([results])
                             results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
                             if config.aggr_res_path is None:
-                                aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                                aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
                             else:
                                 aggr_res_path=config.aggr_res_path
                             if config.update_agg_res:

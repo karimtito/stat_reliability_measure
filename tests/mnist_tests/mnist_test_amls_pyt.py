@@ -17,8 +17,7 @@ import os
 
 from time import time
 from datetime import datetime
-
-from stat_reliability_measure.dev.torch_utils import get_model
+from stat_reliability_measure.home import ROOT_DIR
 import stat_reliability_measure.dev.torch_utils as t_u
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
@@ -37,8 +36,8 @@ method_name="amls_pyt"
 
 class config:
     dataset="mnist"
-    log_dir="../../logs/mnist_tests"
-    model_dir="../../models/mnist"
+    log_dir=ROOT_DIR+"/logs/mnist_tests"
+    model_dir=ROOT_DIR+"/models/mnist"
     n_rep=10
     a=0
     verbose=0
@@ -118,7 +117,7 @@ class config:
     load_batch_size=100 
     nb_epochs= 10
     adversarial_every=1
-    data_dir="../../data"
+    data_dir=ROOT_DIR+"/data"
     p_ref_compute=False
     force_train=False
 
@@ -244,9 +243,9 @@ d=config.d
 #epsilon=config.epsilon
 
 
-if not os.path.exists('../../logs'):
+if not os.path.exists(ROOT_DIR+'/logs'):
     print('logs not found')
-    os.mkdir('../../logs')
+    os.mkdir(ROOT_DIR+'/logs')
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 
@@ -261,7 +260,7 @@ if config.epsilons is None:
     config.epsilons=np.exp(log_line)
 
 if config.aggr_res_path is None:
-    aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+    aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
 else:
     aggr_res_path=config.aggr_res_path
 
@@ -483,7 +482,7 @@ for l in range(len(inp_indices)):
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),)
                         if config.aggr_res_path is None:
-                            aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                            aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
                         else: 
                             aggr_res_path=config.aggr_res_path
 

@@ -12,7 +12,7 @@ import cpuinfo
 import argparse
 from tqdm import tqdm
 import torch
-
+from stat_reliability_measure.home import ROOT_DIR
 from datetime import datetime
 
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList
@@ -63,7 +63,7 @@ class config:
     torch_seed=0
     np_seed=0
 
-    log_dir="../../logs/linear_gaussian_tests"
+    log_dir=ROOT_DIR+"/logs/linear_gaussian_tests"
     batch_opt=True
     allow_multi_gpu=False
     track_gpu=True
@@ -160,8 +160,8 @@ if config.track_cpu:
 epsilon=config.epsilon
 d=config.d
 
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')
     os.mkdir(config.log_dir)
 elif not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir

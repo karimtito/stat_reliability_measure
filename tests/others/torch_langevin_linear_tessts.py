@@ -18,8 +18,8 @@ str2floatList=lambda x: str2list(in_str=x, type_out=float)
 str2intList=lambda x: str2list(in_str=x, type_out=int)
 
 import os
-if os.path.exists('../../logs/linear_tests/torch_results.csv'):
-    results=pd.read_csv('../../logs/linear_tests/torch_results.csv')
+if os.path.exists(ROOT_DIR+'/logs/linear_tests/torch_results.csv'):
+    results=pd.read_csv(ROOT_DIR+'/logs/linear_tests/torch_results.csv')
 else:
     results=pd.DataFrame(columns=['p_t','mean_est','mean_time','mean_err','std_time','std_est','T','N','rho','alpha','n_rep','min_rate'])
 
@@ -45,12 +45,12 @@ class config:
     allow_multi_gpu=False
     gaussian_latent=False
     n_max=5000
-    aggr_res_path='../../logs/linear_tests/torch_results.csv'
+    aggr_res_path=ROOT_DIR+'/logs/linear_tests/torch_results.csv'
     gpu_name=None
     cpu_name=None
     print_config=True
     cpu_count=None
-    log_dir='../../logs/linear_tests'
+    log_dir=ROOT_DIR+'/logs/linear_tests'
     json=None
 
 parser=argparse.ArgumentParser()

@@ -36,8 +36,8 @@ method_name="amls_pyt"
 
 class config:
     dataset="imagenet"
-    log_dir="../../logs/imagenet_tests"
-    model_dir="../../models/imagenet"
+    log_dir=ROOT_DIR+"/logs/imagenet_tests"
+    model_dir=ROOT_DIR+"/models/imagenet"
     n_rep=10
     a=0
     verbose=0
@@ -117,7 +117,7 @@ class config:
     load_batch_size=100 
     nb_epochs= 10
     adversarial_every=1
-    data_dir="../../data/ImageNet/"
+    data_dir=ROOT_DIR+"/data/ImageNet/"
     p_ref_compute=False
 
 
@@ -239,9 +239,9 @@ d=config.d
 #epsilon=config.epsilon
 
 
-if not os.path.exists('../../logs'):
+if not os.path.exists(ROOT_DIR+'/logs'):
     print('logs folder not found')
-    os.mkdir('../../logs')
+    os.mkdir(ROOT_DIR+'/logs')
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 

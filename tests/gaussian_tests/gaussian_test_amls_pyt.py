@@ -58,7 +58,7 @@ class config:
     track_finish=True
     device = None
 
-    log_dir="../../logs/gaussian_tests"
+    log_dir=ROOT_DIR+"/logs/gaussian_tests"
     batch_opt=True
     allow_multi_gpu=False
     track_gpu=True
@@ -147,8 +147,8 @@ if config.track_cpu:
 epsilon=config.epsilon
 d=config.d
 
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')
     os.mkdir(config.log_dir)
 elif not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir

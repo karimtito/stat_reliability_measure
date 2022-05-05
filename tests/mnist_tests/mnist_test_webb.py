@@ -14,7 +14,7 @@ import cpuinfo
 from torch import optim
 import argparse
 import os
-
+from stat_reliability_measure.home import ROOT_DIR
 from time import time
 from datetime import datetime
 
@@ -37,8 +37,8 @@ method_name="amls_pyt"
 
 class config:
     dataset="mnist"
-    log_dir="../../logs/mnist_tests"
-    model_dir="../../models/mnist"
+    log_dir=ROOT_DIR+"/logs/mnist_tests"
+    model_dir=ROOT_DIR+"/models/mnist"
     n_rep=10
     a=0
     verbose=0
@@ -118,7 +118,7 @@ class config:
     load_batch_size=100 
     nb_epochs= 10
     adversarial_every=1
-    data_dir="../../data"
+    data_dir=ROOT_DIR+"/data"
     p_ref_compute=False
     force_train=False
 
@@ -244,9 +244,9 @@ d=config.d
 #epsilon=config.epsilon
 
 
-if not os.path.exists('../../logs'):
+if not os.path.exists(ROOT_DIR+'/logs'):
     print('logs not found')
-    os.mkdir('../../logs')
+    os.mkdir(ROOT_DIR+'/logs')
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 
@@ -261,7 +261,7 @@ if config.epsilons is None:
     config.epsilons=np.exp(log_line)
 
 if config.aggr_res_path is None:
-    aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+    aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
 else:
     aggr_res_path=config.aggr_res_path
 
@@ -318,7 +318,6 @@ nb_exps= np.prod(lenghts)
 
 for l in range(len(inp_indices)):
     with torch.no_grad():
-    
         x_0,y_0 = X_correct[l], label_correct[l]
     input_shape=x_0.shape
     x_0.requires_grad=True
@@ -334,15 +333,12 @@ for l in range(len(inp_indices)):
             p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
             num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)
             p_l,p_u=p_l.item(),p_u.item()
+        def prop(x):
+            y = model(x)
+            y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)
+            y_diff, _ = y_diff.max(dim=1)
+            return y_diff #.max(dim=1)
             
-        
-        
-        
-        
-            
-        
-        
-        
         for T in config.T_range:
             for N in config.N_range: 
                 for s in config.s_list :
@@ -368,7 +364,7 @@ for l in range(len(inp_indices)):
                             finish_flags=[]
                         for i in tqdm(range(config.n_rep)):
                             t=time()
-                            
+                            log_p,ma
                             t=time()-t
                             
                             est=amls_res[0]
@@ -454,7 +450,7 @@ for l in range(len(inp_indices)):
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),)
                         if config.aggr_res_path is None:
-                            aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                            aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
                         else: 
                             aggr_res_path=config.aggr_res_path
 

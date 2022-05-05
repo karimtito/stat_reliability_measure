@@ -52,7 +52,7 @@ class config:
     update_agg_res=True
     aggr_res_path = None
 
-    log_dir="../../logs/linear_tests"
+    log_dir=ROOT_DIR+"/logs/linear_tests"
     allow_multi_gpu=False
     track_gpu=True
     track_cpu=True
@@ -140,8 +140,8 @@ assert type(gaussian_latent)==bool, "The conversion of string to bool for 'gauss
 epsilon=config.epsilon
 d=config.d
 
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')
     os.mkdir(config.log_dir)
 elif not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir

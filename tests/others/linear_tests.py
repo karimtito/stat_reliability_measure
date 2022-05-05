@@ -4,7 +4,7 @@ import subprocess
 from stat_reliability_measure.dev.utils import str2bool
 
 class config:
-    log_dir="../../logs/linear_tests"
+    log_dir=ROOT_DIR+"/logs/linear_tests"
     n_rep='10'
     N='10,40'
     verbose=0

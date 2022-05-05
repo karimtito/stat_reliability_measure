@@ -19,7 +19,7 @@ from stat_reliability_measure.dev.utils import dichotomic_search, float_to_file_
 method_name="langevin_base_pyt"
 
 class config:
-    log_dir="../../logs/linear_tests"
+    log_dir=ROOT_DIR+"/logs/linear_tests"
     n_rep=10
     N=40
     verbose=0
@@ -124,8 +124,8 @@ else:
 d=config.d
 epsilon=config.epsilon
 
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')
     os.mkdir(config.log_dir)
 raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
 if not os.path.exists(raw_logs_path):

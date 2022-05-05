@@ -19,8 +19,8 @@ method_name="smc_pyt"
 #gaussian_linear
 class config:
     dataset='imagenet'
-    log_dir="../../logs/imagenet_tests"
-    model_dir="../../models/imagenet"
+    log_dir=ROOT_DIR+"/logs/imagenet_tests"
+    model_dir=ROOT_DIR+"/models/imagenet"
     N=100
     N_range=[]
     T=1
@@ -129,7 +129,7 @@ class config:
     load_batch_size=100 
     nb_epochs= 10
     adversarial_every=1
-    data_dir="../../data/ImageNet/"
+    data_dir=ROOT_DIR+"/data/ImageNet/"
     p_ref_compute=False
     input_start=0
     input_stop=None
@@ -236,7 +236,7 @@ for k,v in vars(args).items():
     setattr(config, k, v)
 
 if config.model_dir is None:
-    config.model_dir=os.path.join("../../models/",config.dataset)
+    config.model_dir=os.path.join(ROOT_DIR+"/models/",config.dataset)
     if not os.path.exists(config.model_dir):
         os.mkdir(config.model_dir)
 
@@ -316,9 +316,9 @@ d=config.d
 #epsilon=config.epsilon
 
 if config.log_dir is None:
-    config.log_dir=os.path.join('../../logs',config.dataset+'_tests')
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')  
+    config.log_dir=os.path.join(ROOT_DIR+'/logs',config.dataset+'_tests')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')  
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 

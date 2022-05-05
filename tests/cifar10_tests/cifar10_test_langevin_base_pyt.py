@@ -30,8 +30,8 @@ low_str=lambda x: str(x).lower()
 method_name="langevin_base_pyt"
 
 class config:
-    log_dir="../../logs/cifar10_tests"
-    model_dir="../../models/cifar10"
+    log_dir=ROOT_DIR+"/logs/cifar10_tests"
+    model_dir=ROOT_DIR+"/models/cifar10"
     n_rep=10
     N=40
     N_list=[]
@@ -179,8 +179,8 @@ d=config.d
 #epsilon=config.epsilon
 
 
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 

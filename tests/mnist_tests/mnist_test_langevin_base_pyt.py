@@ -32,7 +32,7 @@ low_str=lambda x: str(x).lower()
 method_name="langevin_base_pyt"
 
 class config:
-    log_dir="../../logs/mnist_tests"
+    log_dir=ROOT_DIR+"/logs/mnist_tests"
     n_rep=10
     N=40
     N_list=[]
@@ -180,8 +180,8 @@ d=config.d
 #epsilon=config.epsilon
 
 
-if not os.path.exists('../../logs'):
-    os.mkdir('../../logs')
+if not os.path.exists(ROOT_DIR+'/logs'):
+    os.mkdir(ROOT_DIR+'/logs')
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
 
@@ -220,7 +220,7 @@ test_loader = DataLoader(mnist_test, batch_size = 100, shuffle=False)
 if config.model_path is None:
     model = CNN_custom()
     model=model.to(device)
-    model_path="../../models/mnist/model_CNN_custom.pt"
+    model_path=ROOT_DIR+"/models/mnist/model_CNN_custom.pt"
 else: 
     raise NotImplementedError("Testing of custom models is not yet implemented.")
 
