@@ -115,7 +115,7 @@ class config:
 
     adapt_func='ESS'
     M_opt = False
-    adapt_step=False
+    adapt_step=True
     FT=False
     sig_dt=0.015
 
@@ -140,6 +140,7 @@ class config:
     GV_opt=False
     g_target=0.8
     skip_mh=False
+    force_train=False
 
 
 parser=argparse.ArgumentParser()
@@ -224,6 +225,7 @@ parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
 parser.add_argument('--g_target',type=float,default=config.g_target)
 parser.add_argument('--kappa_opt',type=str2bool,default=config.kappa_opt)
 parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
+parser.add_argument('--force_train',type=str2bool,default=config.force_train)
 parser.add_argument('--dataset',type=str, default=config.dataset)
 args=parser.parse_args()
 
@@ -370,31 +372,21 @@ test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=confi
 
 model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
     nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
-    download=config.download,dataset=config.dataset)
+    download=config.download,dataset=config.dataset, force_train=config.force_train)
 X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
 if config.verbose>=2:
     print(f"model accuracy on test batch:{accuracy}")
 
 config.x_mean=t_u.datasets_means[config.dataset]
 config.x_std=t_u.datasets_stds[config.dataset]
-if color_dataset:
-    x_min,x_max=t_u.correct_min_max(x_min=config.x_min,x_max=config.x_max,
-                                x_mean=np.array(config.x_mean),x_std=np.array(config.x_std))
-else:
-    x_min,x_max=t_u.correct_min_max(x_min=config.x_min,x_max=config.x_max,
-                                x_mean=config.x_mean,x_std=config.x_std)
-
+x_min=0
+x_max=1
 if config.use_attack:
-    pre_mean=config.x_mean if color_dataset else np.array(config.x_mean).reshape((1,))
-    pre_std=config.x_std if color_dataset else np.array(config.x_std).reshape((1,))
-    preprocessing = dict(mean=pre_mean, std=pre_std, axis=-3)
-    fmodel = fb.PyTorchModel(model, bounds=(0,1),device=device,preprocessing=preprocessing)
+
+    fmodel = fb.PyTorchModel(model, bounds=(0,1),device=device)
     attack=fb.attacks.LinfPGD()
     #un-normalize data before performing attack
-    if color_dataset:
-        X_correct_un=X_correct*torch.tensor(config.x_std).to(device).view((1,3,1,1))-torch.tensor(config.x_mean).to(device).view((1,3,1,1))
-    #epsilons= np.array([0.0, 0.001, 0.01, 0.03,0.04,0.05,0.07,0.08,0.0825,0.085,0.086,0.087,0.09, 0.1, 0.3, 0.5, 1.0])
-    _, advs, success = attack(fmodel, X_correct_un[config.input_start:config.input_stop], 
+    _, advs, success = attack(fmodel, X_correct[config.input_start:config.input_stop], 
     label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
 
 
@@ -404,13 +396,8 @@ normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 run_nb=0
 iterator= tqdm(range(config.n_rep))
 exp_res=[]
-if color_dataset:
-            clip_min=torch.tensor(x_min).to(device).view((1,3,1,1)).float()
-            clip_max=torch.tensor(x_max).to(device).view((1,3,1,1)).float()
-else:
-    clip_min=torch.tensor(x_min).to(device)
-    
-    clip_max=torch.tensor(x_max).to(device)
+clip_min=0
+clip_max=1
 for l in inp_indices:
     with torch.no_grad():
     
@@ -512,6 +499,14 @@ for l in inp_indices:
                             ests = np.array(ests)
                             calls=np.array(calls)
                         
+                            mean_calls=calls.mean()
+                            std_est=ests.std()
+                            mean_est=ests.mean()
+                            std_rel=std_est/mean_est
+                            print(f"mean est:{ests.mean()}, std est:{ests.std()}")
+                            print(f"mean calls:{calls.mean()}")
+                            print(f"std. rel.:{std_rel}")
+                            print(f"std. rel. adj.:{std_rel*mean_calls}")
                             
 
                             times=np.array(times)  
@@ -539,7 +534,7 @@ for l in inp_indices:
                             'mean_calls':calls.mean(),'std_calls':calls.std()
                             ,'mean time':times.mean(),'std time':times.std()
                             ,'mean est':ests.mean(),'std est':ests.std(), 
-                            "v_min_opt":config.v_min_opt
+                            "v_min_opt":config.v_min_opt,"std_rel":std_rel,"std adj":std_rel*mean_calls
                             ,'adapt_dt_mcmc':config.adapt_dt_mcmc,"adapt_dt":config.adapt_dt,
                             "adapt_dt_mcmc":config.adapt_dt_mcmc,"dt_decay":config.dt_decay,"dt_gain":config.dt_gain,
                             "target_accept":config.target_accept,"accept_spread":config.accept_spread, 

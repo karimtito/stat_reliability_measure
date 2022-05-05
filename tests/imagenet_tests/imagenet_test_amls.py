@@ -1,7 +1,6 @@
-from operator import mod
 import torch
 
-import foolbox as fb
+
 import pandas as pd
 
 import numpy as np
@@ -11,7 +10,7 @@ from scipy.special import betainc
 import GPUtil
 import matplotlib.pyplot as plt
 import cpuinfo
-from torch import optim
+
 import argparse
 import os
 
@@ -291,6 +290,7 @@ normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 x_min=0
 x_max=1 
 if config.use_attack:
+    import foolbox as fb
     fmodel = fb.PyTorchModel(model, bounds=(x_min,x_max))
     attack=fb.attacks.LinfPGD()
     

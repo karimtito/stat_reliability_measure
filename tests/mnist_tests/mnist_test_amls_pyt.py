@@ -56,10 +56,10 @@ class config:
     allow_zero_est=True
     
     N=40
-    N_list=[]
+    N_range=[]
 
     T=1
-    T_list=[]
+    T_range=[]
 
     ratio=0.6
     ratio_list=[]
@@ -120,6 +120,7 @@ class config:
     adversarial_every=1
     data_dir="../../data"
     p_ref_compute=False
+    force_train=False
 
 
 parser=argparse.ArgumentParser()
@@ -160,8 +161,8 @@ parser.add_argument('--train_model',type=str2bool,default=config.train_model)
 parser.add_argument('--noise_dist',type=str, default=config.noise_dist)
 parser.add_argument('--data_dir',type=str, default=config.data_dir)
 parser.add_argument('--a',type=float, default=config.a)
-parser.add_argument('--N_list',type=str2intList,default=config.N_list)
-parser.add_argument('--T_list',type=str2intList,default=config.T_list)
+parser.add_argument('--N_range',type=str2intList,default=config.N_range)
+parser.add_argument('--T_range',type=str2intList,default=config.T_range)
 parser.add_argument('--download',type=str2bool, default=config.download)
 parser.add_argument('--model_path',type=str,default=config.model_path)
 parser.add_argument('--ratio',type=float,default=config.ratio)
@@ -175,6 +176,7 @@ parser.add_argument('--model_arch',type=str,default = config.model_arch)
 parser.add_argument('--robust_model',type=str2bool, default=config.robust_model)
 parser.add_argument('--nb_epochs',type=int,default=config.nb_epochs)
 parser.add_argument('--adversarial_every',type=int,default=config.adversarial_every)
+parser.add_argument('--force_train',type=str2bool,default=config.force_train)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -208,10 +210,10 @@ if config.torch_seed is None:
     config.torch_seed=int(time.time())
 torch.manual_seed(seed=config.torch_seed)
 
-if len(config.T_list)<1:
-    config.T_list=[config.T]
-if len(config.N_list)<1:
-    config.N_list=[config.N]
+if len(config.T_range)<1:
+    config.T_range=[config.T]
+if len(config.N_range)<1:
+    config.N_range=[config.N]
 if len(config.s_list)<1:
     config.s_list=[config.s]
 if len(config.ratio_list)<1:
@@ -269,9 +271,8 @@ if config.print_config:
     print(', '.join("%s: %s" % item for item in config.json.items()))
 
 #loading data
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
-dim=784
+
+
 num_classes=10
 test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
 ,dataset=config.dataset,batch_size=config.load_batch_size,
@@ -279,7 +280,7 @@ test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=confi
 
 model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
     nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
-    download=config.download,dataset=config.dataset)
+    download=config.download,dataset=config.dataset,force_train=config.force_train)
 X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
 if config.verbose>=2:
     print(f"model accuracy on test batch:{accuracy}")
@@ -297,19 +298,10 @@ normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 
 #inf=float('inf')
 
-if config.x_min is None or config.x_max is None: 
-    if config.x_min is None:
-        x_min=0
-    if config.x_max is None:
-        x_max=1
-    if config.x_mean!=0 or config.x_std!=1:
-        x_min=(x_min-config.x_mean)/config.x_std
-        x_max=(x_max-config.x_mean)/config.x_std
-else:
-    x_min=config.x_min
-    x_max=config.x_max
+x_min=0
+x_max=1
 if config.use_attack:
-    fmodel = fb.PyTorchModel(model, bounds=(0,1))
+    fmodel = fb.PyTorchModel(model, bounds=(x_min,x_max))
     attack=fb.attacks.LinfPGD()
     
    
@@ -319,7 +311,7 @@ if config.use_attack:
 
 inp_indices=np.arange(start=config.input_start,stop=config.input_stop)
 i_exp=0
-param_lists= [ inp_indices,config.T_list,config.N_list,config.s_list ,config.ratio_list,config.epsilons]
+param_lists= [ inp_indices,config.T_range,config.N_range,config.s_list ,config.ratio_list,config.epsilons]
 lenghts=np.array([len(L) for L in param_lists])
 nb_exps= np.prod(lenghts)
 
@@ -358,7 +350,7 @@ for l in range(len(inp_indices)):
         def h(x,gaussian_latent=config.gaussian_latent,eps=epsilon,x_min=x_min,x_max=x_max):
             x_m=x.reshape((x.shape[0],)+input_shape)
             if gaussian_latent:
-                2*normal_dist.cdf(x_m)-1
+                x_m=2*normal_dist.cdf(x_m)-1
             with torch.no_grad():
 
                 input_m=torch.clamp(x_0+eps*x_m, min=x_min,max=x_max)
@@ -369,9 +361,8 @@ for l in range(len(inp_indices)):
             return y_diff #.max(dim=1)
         h_batch_pyt= lambda x: h(x).reshape((x.shape[0],1))
         
-        
-        for T in config.T_list:
-            for N in config.N_list: 
+        for T in config.T_range:
+            for N in config.N_range: 
                 for s in config.s_list :
                     for ratio in config.ratio_list: 
                         loc_time= datetime.today().isoformat().split('.')[0]
@@ -397,13 +388,13 @@ for l in range(len(inp_indices)):
                             t=time()
                             if config.batch_opt:
                                 amls_res=amls_pyt.ImportanceSplittingPytBatch(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_batch_pyt, 
-                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , 
+                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                             s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                             device=config.device,track_accept=config.track_accept)
 
                             else:
                                 amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_batch_pyt, 
-                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , 
+                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                             s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                             device=config.device,)
                             t=time()-t
@@ -438,7 +429,16 @@ for l in range(len(inp_indices)):
         
                         times=np.array(times)
                         estimates = np.array(ests)
+                        mean_est=estimates.mean()
                         calls=np.array(calls)
+                        mean_calls=calls.mean()
+                        std_est=estimates.std()
+                        std_rel=std_est/mean_est
+                        print(f"mean est:{estimates.mean()}, std est:{estimates.std()}")
+                        print(f"mean calls:{calls.mean()}")
+                        print(f"std. re.:{std_rel}")
+                        print(f"std. rel. adj.:{std_rel*mean_calls}")
+                        
                         if config.track_finish:
                             finish_flags=np.array(finish_flags)
                             freq_finished=finish_flags.mean()
@@ -453,7 +453,8 @@ for l in range(len(inp_indices)):
                             unfinished_mean_time=unfinish_times.mean()
                         else:
                             unfinished_mean_est,unfinished_mean_time=None,None
-                        
+                        if os.path.exists(log_path):
+                            log_path=log_path+'_rand_'+str(np.random.randint(low=0,high=9))
                         os.mkdir(log_path)
                         np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
                         np.savetxt(fname=os.path.join(log_path,'estimates.txt'),X=estimates)
@@ -470,10 +471,10 @@ for l in range(len(inp_indices)):
                         #with open(os.path.join(log_path,'results.txt'),'w'):
                         results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),'image_idx':l,
                             'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
-                        'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),
+                        'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std adj":std_rel*mean_calls,
                         'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
                         'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
-                        'cores_number':config.cores_number,'g_target':config.g_target,
+                        'cores_number':config.cores_number,'g_target':config.g_target,"std_rel":std_rel, 
                         'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
                         'unfinished_mean_est':unfinished_mean_est
                         ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
