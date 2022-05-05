@@ -1044,7 +1044,7 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
         q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
         
-        nb_calls+=2*ind_L.sum().item() # for each particle each vertlet integration step requires two oracle calls (gradients)
+        nb_calls+=4*ind_L.sum().item()-N # for each particle each vertlet integration step requires two oracle calls (gradients)
         H_trial= Hamiltonian(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
         nb_calls+=N # N new potentials are computed 
         delta_H=torch.clamp(-(H_trial-H_old),max=0)
