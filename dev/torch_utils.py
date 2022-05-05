@@ -314,23 +314,23 @@ def compute_h_pyt(model, input_, target_class):
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 
 def V_pyt(x_,x_0,model,target_class,epsilon=0.05,gaussian_latent=True,clipping=True, clip_min=0, clip_max=1,reshape=True,input_shape=None):
-    if input_shape is None:
-        input_shape=x_0.shape
-    if gaussian_latent:
-        u=epsilon*(2*normal_dist.cdf(x_)-1)
-    else:
-        u=x_
-    if reshape:
-        u=torch.reshape(u,(u.shape[0],)+input_shape)
-    if not clipping:
-        x_p = x_0+u 
-    else:
-        x_p=torch.min(torch.max(x_0+u,other=clip_min),other=clip_max)
-    #x_p = x_0+u if not clipping else torch.clamp(x_0+u,min=clip_min,max=clip_max)
+    with torch.no_grad():
+        if input_shape is None:
+            input_shape=x_0.shape
+        if gaussian_latent:
+            u=epsilon*(2*normal_dist.cdf(x_)-1)
+        else:
+            u=x_
+        if reshape:
+            u=torch.reshape(u,(u.shape[0],)+input_shape)
+
+        
+        x_p = torch.clamp(x_0+u,min=clip_min,max=clip_max) if clipping else x_0+u
     v = compute_V_pyt(model=model,input_=x_p,target_class=target_class)
     return v
 
 def gradV_pyt(x_,x_0,model,target_class,epsilon=0.05,gaussian_latent=True,clipping=True, clip_min=0, clip_max=1,reshape=True,input_shape=None):
+   
     if input_shape is None:
         input_shape=x_0.shape
     if gaussian_latent:
@@ -339,11 +339,8 @@ def gradV_pyt(x_,x_0,model,target_class,epsilon=0.05,gaussian_latent=True,clippi
         u=x_
     if reshape:
         u=torch.reshape(u,(u.shape[0],)+input_shape)
-    if not clipping:
-        x_p = x_0+u 
-    else:
-        x_p=torch.min(torch.max(x_0+u,other=clip_min),other=clip_max)
-
+    
+    x_p = torch.clamp(x_0+u,min=clip_min,max=clip_max) if clipping else x_0+u
     _,grad_u = compute_V_grad_pyt(model=model,input_=x_p,target_class=target_class)
     grad_u=torch.reshape(grad_u,x_.shape)
     if gaussian_latent:
@@ -378,7 +375,7 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
         
             transform_=transforms.Compose([
                                 transforms.ToTensor(),
-                                transforms.Normalize((x_mean,), (x_std,))
+                                #transforms.Normalize((x_mean,), (x_std,)) we perform normalization at the model level
                             ])
         else: 
             transform_ =transforms.ToTensor()
@@ -391,14 +388,13 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
                 #transforms.RandomCrop(32, padding=4),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
-                transforms.Normalize(mean=datasets_stds['cifar10'],
-                 std=datasets_stds['cifar10']),
+                #we perform normalization at the model level
+                #transforms.Normalize(mean=datasets_stds['cifar10'], std=datasets_stds['cifar10']),
             ])
         else:
             data_transform=transforms.Compose([
                             transforms.ToTensor(),
-                            transforms.Normalize(mean=datasets_stds['cifar10'],
-                 std=datasets_stds['cifar10'])
+                        #transforms.Normalize(mean=datasets_stds['cifar10'],std=datasets_stds['cifar10'])
                         ])
         cifar10_dataset = datasets.CIFAR10("../data", train=train, download=download, transform=data_transform)
         data_loader = DataLoader(cifar10_dataset , batch_size = batch_size, shuffle=train)  
@@ -462,11 +458,17 @@ download,force_train=False,dataset='mnist',batch_size=100):
     c_model_path=model_name+'.pt'
     model_path=os.path.join(model_dir,c_model_path)
     assert model_arch.lower() in supported_arch.keys(),f"/!\\Architecture supported for {dataset} are:{list(supported_arch.keys())}"
-    model=supported_arch[model_arch.lower()](dataset=dataset)
+    network=supported_arch[model_arch.lower()](dataset=dataset)
+    normalizer=transforms.Normalize(mean=datasets_means[dataset], std=datasets_stds[dataset])
     if not os.path.exists(model_path) or force_train: 
         #if the model doesn't exist we retrain a model from scratch
+        model=torch.nn.Sequential(normalizer, network)
         model.to(device)
-        print("Model not found: it will be trained from scratch.")
+        if force_train:
+            print("Retraining model from scratch")
+            os.remove(model_path)
+        else:
+            print("Model not found: it will be trained from scratch.")
         train_loader=get_loader(train=True, data_dir=data_dir, download=download,dataset=dataset,batch_size=batch_size)
         opt = optim.SGD(model.parameters(), lr=1e-1)
 
@@ -477,11 +479,9 @@ download,force_train=False,dataset='mnist',batch_size=100):
                 train_err, train_loss = epoch_adversarial(train_loader, model, opt, device=device)
             test_err, test_loss = epoch(test_loader, model, device=device)
             print(*("{:.6f}".format(i) for i in (train_err, train_loss, test_err, test_loss)), sep="\t")
-        torch.save(model.state_dict(), model_path)
-    
-        
-        
-    model.load_state_dict(torch.load(model_path))
+        torch.save(network.state_dict(), model_path)
+    network.load_state_dict(torch.load(model_path))
+    model=torch.nn.Sequential(normalizer, network)
     model.eval()
     model.to(device)
     return model, input_shape, model_name
