@@ -279,16 +279,16 @@ for p_t in config.p_range:
                     mean_calls=calls.mean()
                     std_calls=calls.std()
                     MSE=np.mean(abs_errors**2)
-                    MSE_adj=(abs_errors**2*calls).mean()
+                    MSE_adj=MSE*mean_calls
                     MSE_rel=MSE/p_t**2
                     MSE_rel_adj=MSE_rel*mean_calls
+                    
                     print(f"mean est:{ests.mean()}, std est:{ests.std()}")
                     print(f"mean rel error:{rel_errors.mean()}")
                     print(f"MSE rel:{MSE/p_t**2}")
                     print(f"MSE adj.:{MSE_adj}")
-                    print(f"MSE rel. adj.:{MSE_adj/p_t**2}")
+                    print(f"MSE rel. adj.:{MSE_rel_adj}")
                     print(f"mean calls:{calls.mean()}")
-                    #fin = np.array(finished_flags)
 
 
                     np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
