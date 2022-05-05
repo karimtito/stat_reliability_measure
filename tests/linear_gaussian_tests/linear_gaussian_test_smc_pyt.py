@@ -41,7 +41,7 @@ class config:
     verbose=0
     log_dir=ROOT_DIR+'/logs/linear_gaussian_tests'
     aggr_res_path = None
-    update_agg_res=False
+    update_agg_res=True
     sigma=1
     v1_kernel=True
     torch_seed=None

@@ -98,7 +98,7 @@ class config:
     torch_seed=0
     np_seed=0
     tf_seed=None
-    model_arch='CNN_custom'
+    model_arch='torchvision_resenet18'
     model_path=None
     export_to_onnx=False
     use_attack=True
