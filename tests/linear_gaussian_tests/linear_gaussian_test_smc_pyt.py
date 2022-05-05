@@ -383,11 +383,22 @@ for p_t in config.p_range:
                             calls.append(res_dict['calls'])
                         times=np.array(times)
                         ests = np.array(ests)
+                        
                         calls=np.array(calls)
+                        mean_calls=calls.mean()
                     
                         abs_errors=np.abs(ests-p_t)
                         rel_errors=abs_errors/p_t
                         bias=np.mean(ests)-p_t
+                        MSE=np.mean(abs_errors**2)
+                        MSE_adj=(abs_errors**2*calls).mean()
+                        MSE_rel=MSE/p_t**2
+                        MSE_rel_adj=MSE_rel*mean_calls
+                        
+                        print(f"mean est:{ests.mean()}, std est:{ests.std()}")
+                        print(f"mean rel error:{rel_errors.mean()}")
+                        print(f"MSE rel. adj.:{MSE_rel_adj}")
+                        print(f"mean calls:{calls.mean()}")
 
                         times=np.array(times)  
                         ests=np.array(ests)
@@ -429,7 +440,8 @@ for p_t in config.p_range:
                         "ess_opt":config.ess_opt, "linear":config.linear,
                         "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
                         "M_opt":config.M_opt,"adapt_step":config.adapt_step,"sig_dt":config.sig_dt,
-                        "L_min":config.L_min,"kappa_opt":config.kappa_opt,"skip_mh":config.skip_mh}
+                        "L_min":config.L_min,"kappa_opt":config.kappa_opt,"skip_mh":config.skip_mh,
+                        "MSE":MSE,"MSE adj":MSE_adj,"MSE_rel_adj":MSE_rel_adj}
                         exp_res.append(results)
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
