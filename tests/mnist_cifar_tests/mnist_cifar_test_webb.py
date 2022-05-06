@@ -364,11 +364,13 @@ for l in range(len(inp_indices)):
                             finish_flags=[]
                         for i in tqdm(range(config.n_rep)):
                             t=time()
-                            lg_p,nb_calls=amls_webb.multilevel_uniform(prop=prop,
+                            lg_p,nb_calls,max_val,x,levels=amls_webb.multilevel_uniform(prop=prop,
                             count_particles=N,count_mh_steps=T,x_min=x_min,x_max=x_max,
-                            x_sample=x_0,sigma=epsilon,rho=1-ratio,CUDA=(device=='cuda:0'))
+                            x_sample=x_0,sigma=epsilon,rho=1-ratio,CUDA=True,debug=(config.verbose>=1))
                             t=time()-t
-                            
+                            # we don't need adversarial examples and highest score
+                            del x
+                            del max_val
                             est=np.exp(lg_p)
                             print(f"Est:{est}")
                             # dict_out=amls_res[1]
@@ -390,8 +392,8 @@ for l in range(len(inp_indices)):
                             #     plt.close()
                             #     np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
                             #     ,X=accept_rates_mcmc)
-                            # if config.track_finish:
-                            #     finish_flags.append(dict_out['finish_flag'])
+                            if config.track_finish:
+                                finish_flags.append(levels[-1]>=0)
                             times.append(t)
                             ests.append(est)
                             calls.append(nb_calls)
