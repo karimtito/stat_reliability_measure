@@ -30,7 +30,7 @@ class config:
     
     alpha=0.2
     alpha_range=[]
-    ess_alpha=0.9
+    ess_alpha=0.875
     e_range=[]
    
     n_rep=10
@@ -365,7 +365,7 @@ method=method_name+'_'+mh_str
 save_every = 1
 #adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBetaPyt
 num_classes=t_u.datasets_num_c[config.dataset.lower()]
-print(f"Running reliability experiments on architecture {config.model_arch} trained on  {config.dataset}.")
+print(f"Running reliability experiments on architecture {config.model_arch} trained on {config.dataset}.")
 print(f"Testing uniform noise pertubatin with epsilon in {config.epsilons}")
 test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
 ,dataset=config.dataset,batch_size=config.load_batch_size,
