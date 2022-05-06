@@ -430,10 +430,11 @@ for l in inp_indices:
             gen = lambda N: torch.randn(size=(N,d),device=config.device)
         else:
             gen= lambda N: (2*torch.rand(size=(N,d), device=device )-1)
-        V_ = lambda X: t_u.V_pyt(X,x_0=x_0,model=model,epsilon=epsilon, target_class=y_0,gaussian_latent=config.gaussian_latent,clip_min=clip_min,
-        clip_max=clip_max)
-        gradV_ = lambda X: t_u.gradV_pyt(X,x_0=x_0,model=model, target_class=y_0,epsilon=epsilon, gaussian_latent=config.gaussian_latent,
-        clip_min=clip_min,clip_max=clip_max)
+        low=torch.max(x_0-epsilon, torch.tensor([x_min]).cuda())
+        high=torch.min(x_0+epsilon, torch.tensor([x_max]).cuda())  
+        V_ = lambda X: t_u.V_pyt(X,x_0=x_0,model=model,low=low,high=high,target_class=y_0,gaussian_latent=config.gaussian_latent)
+        gradV_ = lambda X: t_u.gradV_pyt(X,x_0=x_0,model=model,low=low,high=high, target_class=y_0,gaussian_latent=config.gaussian_latent)
+        
         for ess_t in config.e_range:
             if config.adapt_func.lower()=='ess':
                 adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=ess_t,max_beta=1e6)

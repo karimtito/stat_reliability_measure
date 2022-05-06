@@ -330,28 +330,25 @@ for l in range(len(inp_indices)):
             amls_gen = lambda N: torch.randn(size=(N,d),device=config.device)
         else:
             amls_gen= lambda N: (2*torch.rand(size=(N,d), device=device )-1)
-        
-        
-        
-        
-        normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 
+     
         
             
-        def h(x,gaussian_latent=config.gaussian_latent,eps=epsilon,x_min=x_min,x_max=x_max):
+        normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 
+        low=torch.max(x_0-epsilon, torch.tensor([x_min]).cuda())
+        high=torch.min(x_0+epsilon, torch.tensor([x_max]).cuda())            
+        def h(x,gaussian_latent=config.gaussian_latent,low=low,high=high):
             x_m=x.reshape((x.shape[0],)+input_shape)
             if gaussian_latent:
-                x_m=2*normal_dist.cdf(x_m)-1
+                x_m=normal_dist.cdf(x_m)
             with torch.no_grad():
 
-                input_m=torch.clamp(x_0+eps*x_m, min=x_min,max=x_max)
+                x_m=low+(high-low)*x_m
                 
-                y = model(input_m)
+                y = model(x_m)
                 y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)
                 y_diff, _ = y_diff.max(dim=1)
             return y_diff #.max(dim=1)
         h_batch_pyt= lambda x: h(x).reshape((x.shape[0],1))
-        
-        
         for T in config.T_list:
             for N in config.N_list: 
                 for s in config.s_list :

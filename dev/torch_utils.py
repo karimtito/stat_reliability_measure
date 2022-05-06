@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from stat_reliability_measure.dev.utils import float_to_file_float
-from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet
+from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,ConvNet
 from torchvision import transforms,datasets,models as tv_models
 from torch.utils.data import DataLoader
 import timm
@@ -313,40 +313,40 @@ def compute_h_pyt(model, input_, target_class):
 
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 
-def V_pyt(x_,x_0,model,target_class,epsilon=0.05,gaussian_latent=True,clipping=True, clip_min=0, clip_max=1,reshape=True,input_shape=None):
+def V_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None):
     with torch.no_grad():
         if input_shape is None:
             input_shape=x_0.shape
         if gaussian_latent:
-            u=epsilon*(2*normal_dist.cdf(x_)-1)
+            u=normal_dist.cdf(x_)
         else:
             u=x_
         if reshape:
             u=torch.reshape(u,(u.shape[0],)+input_shape)
 
         
-        x_p = torch.clamp(x_0+u,min=clip_min,max=clip_max) if clipping else x_0+u
+        x_p = low+(high-low)*u
     v = compute_V_pyt(model=model,input_=x_p,target_class=target_class)
     return v
 
-def gradV_pyt(x_,x_0,model,target_class,epsilon=0.05,gaussian_latent=True,clipping=True, clip_min=0, clip_max=1,reshape=True,input_shape=None):
+def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None):
    
     if input_shape is None:
         input_shape=x_0.shape
     if gaussian_latent:
-        u=epsilon*(2*normal_dist.cdf(x_)-1)
+        u=normal_dist.cdf(x_)
     else:
         u=x_
     if reshape:
         u=torch.reshape(u,(u.shape[0],)+input_shape)
     
-    x_p = torch.clamp(x_0+u,min=clip_min,max=clip_max) if clipping else x_0+u
+    x_p = low+(high-low)*u
     _,grad_u = compute_V_grad_pyt(model=model,input_=x_p,target_class=target_class)
     grad_u=torch.reshape(grad_u,x_.shape)
     if gaussian_latent:
-        grad_x=torch.exp(normal_dist.log_prob(x_))*grad_u*(2*epsilon)
+        grad_x=torch.exp(normal_dist.log_prob(x_))*(high-low)*grad_u
     else:
-        grad_x=grad_u
+        grad_x=(high-low)*grad_u
     return grad_x
 
 def correct_min_max(x_min,x_max,x_mean,x_std):

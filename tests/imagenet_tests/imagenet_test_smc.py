@@ -376,11 +376,11 @@ X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,dev
 if config.verbose>=2:
     print(f"model accuracy on test batch:{accuracy}")
 
-x_min=torch.tensor(0)
-x_max=torch.tensor(1)
+x_min=0
+x_max=1
 
 if config.use_attack:
-    fmodel = fb.PyTorchModel(model, bounds=(0,1),device=device)
+    fmodel = fb.PyTorchModel(model, bounds=(x_min,x_max),device=device)
     attack=fb.attacks.LinfPGD()
     #un-normalize data before performing attack
     #epsilons= np.array([0.0, 0.001, 0.01, 0.03,0.04,0.05,0.07,0.08,0.0825,0.085,0.086,0.087,0.09, 0.1, 0.3, 0.5, 1.0])
@@ -395,9 +395,6 @@ run_nb=0
 iterator= tqdm(range(config.n_rep))
 exp_res=[]
 model_name=config.model_arch
-clip_min=torch.tensor(x_min).to(device)
-
-clip_max=torch.tensor(x_max).to(device)
 for l in inp_indices:
     with torch.no_grad():
     
@@ -429,10 +426,10 @@ for l in inp_indices:
             gen = lambda N: torch.randn(size=(N,d),device=config.device)
         else:
             gen= lambda N: (2*torch.rand(size=(N,d), device=device )-1)
-        V_ = lambda X: t_u.V_pyt(X,x_0=x_0,model=model,epsilon=epsilon, target_class=y_0,gaussian_latent=config.gaussian_latent,clip_min=clip_min,
-        clip_max=clip_max)
-        gradV_ = lambda X: t_u.gradV_pyt(X,x_0=x_0,model=model, target_class=y_0,epsilon=epsilon, gaussian_latent=config.gaussian_latent,
-        clip_min=clip_min,clip_max=clip_max)
+        low=torch.max(x_0-epsilon, torch.tensor([x_min]).cuda())
+        high=torch.min(x_0+epsilon, torch.tensor([x_max]).cuda())  
+        V_ = lambda X: t_u.V_pyt(X,x_0=x_0,model=model,low=low,high=high,target_class=y_0,gaussian_latent=config.gaussian_latent)
+        gradV_ = lambda X: t_u.gradV_pyt(X,x_0=x_0,model=model,low=low,high=high, target_class=y_0,gaussian_latent=config.gaussian_latent)
         for ess_t in config.e_range:
             if config.adapt_func.lower()=='ess':
                 adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=ess_t,max_beta=1e6)
