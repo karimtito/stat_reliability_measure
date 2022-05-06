@@ -140,29 +140,46 @@ def multilevel_uniform(
 
         for mh_idx in range(count_mh_steps):
             # Propose new sample
-            g_bottom = dist.Uniform(low=torch.max(x - width_proposal.unsqueeze(-1), prior.low), high=torch.min(x + width_proposal.unsqueeze(-1), prior.high))
-            #g_bottom = dist.Normal(x, width_proposal.unsqueeze(-1))
+            # g_bottom = dist.Uniform(low=torch.max(x - width_proposal.unsqueeze(-1), prior.low), high=torch.min(x + width_proposal.unsqueeze(-1), prior.high))
+            # #g_bottom = dist.Normal(x, width_proposal.unsqueeze(-1))
+
+            # x_maybe = g_bottom.sample()
+            # s_x = prop(x_maybe).squeeze(-1)
+            # count_calls+=count_particles
+            # # Calculate log-acceptance ratio
+            # g_top = dist.Uniform(low=torch.max(x_maybe - width_proposal.unsqueeze(-1), prior.low), high=torch.min(x_maybe + width_proposal.unsqueeze(-1), prior.high)
+            # ,validate_args=False)
+            # #g_top = dist.Normal(x_maybe, width_proposal.unsqueeze(-1))
+            # lg_alpha_1 = prior.log_prob(x_maybe) 
+            # lg_alpha_2= g_top.log_prob(x)
+            # lg_alpha_3=   - prior.log_prob(x)
+            # lg_alpha_4 =- g_bottom.log_prob(x_maybe)
+            # lg_alpha=  (lg_alpha_1+lg_alpha_2+lg_alpha_3+lg_alpha_4).sum(dim=1)
+            # acceptance = torch.min(lg_alpha, torch.zeros_like(lg_alpha))
+
+            # # Work out which ones to accept
+            # log_u = torch.log(torch.rand_like(acceptance))
+            # acc_idx = (log_u <= acceptance) & (s_x >= L) #& (x_maybe >= x_min).all(dim=1) & (x_maybe <= x_max).all(dim=1)
+            # acc_ratio += acc_idx.float()
+            # x = torch.where(acc_idx.unsqueeze(-1), x_maybe, x)
+            g_bottom = dist.Uniform(low=torch.max(x - width_proposal.view(-1,1,1,1)*(x_max-x_min), prior.low), high=torch.min(x + width_proposal.view(-1,1,1,1)*(x_max-x_min), prior.high),
+            validate_args=False)
 
             x_maybe = g_bottom.sample()
             s_x = prop(x_maybe).squeeze(-1)
             count_calls+=count_particles
             # Calculate log-acceptance ratio
-            g_top = dist.Uniform(low=torch.max(x_maybe - width_proposal.unsqueeze(-1), prior.low), high=torch.min(x_maybe + width_proposal.unsqueeze(-1), prior.high)
-            ,validate_args=False)
-            #g_top = dist.Normal(x_maybe, width_proposal.unsqueeze(-1))
-            lg_alpha_1 = prior.log_prob(x_maybe) 
-            lg_alpha_2= g_top.log_prob(x)
-            lg_alpha_3=   - prior.log_prob(x)
-            lg_alpha_4 =- g_bottom.log_prob(x_maybe)
-            lg_alpha=  (lg_alpha_1+lg_alpha_2+lg_alpha_3+lg_alpha_4).sum(dim=1)
+            g_top = dist.Uniform(low=torch.max(x_maybe - width_proposal.view(-1,1,1,1)*(x_max-x_min), prior.low), high=torch.min(x_maybe + width_proposal.view(-1,1,1,1)*(x_max-x_min), prior.high),
+            validate_args=False)
+            lg_alpha = (prior.log_prob(x_maybe) + g_top.log_prob(x) - prior.log_prob(x) - g_bottom.log_prob(x_maybe)).view(count_particles,-1).sum(dim=1)
             acceptance = torch.min(lg_alpha, torch.zeros_like(lg_alpha))
 
             # Work out which ones to accept
             log_u = torch.log(torch.rand_like(acceptance))
-            acc_idx = (log_u <= acceptance) & (s_x >= L) #& (x_maybe >= x_min).all(dim=1) & (x_maybe <= x_max).all(dim=1)
+            acc_idx = (log_u <= acceptance) & (s_x >= L)
             acc_ratio += acc_idx.float()
-            x = torch.where(acc_idx.unsqueeze(-1), x_maybe, x)
-            
+            x = torch.where(acc_idx.view(-1,1,1,1), x_maybe, x)
+                    
         # Adapt the width proposal *for each chain individually*
         acc_ratio /= count_mh_steps
 
@@ -184,4 +201,4 @@ def multilevel_uniform(
     #count_calls+=count_particles
     #max_val = max(max_val, x.max().item())
     max_val = s_x.max().item()
-    return lg_p,count_particles,max_val, x, levels, #, code modification: we add a counter of calls to score function
+    return lg_p,count_calls,max_val, x, levels, #, code modification: we add a counter of calls to score function
