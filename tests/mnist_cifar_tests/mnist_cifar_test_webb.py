@@ -26,7 +26,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #setting PRNG seeds for reproducibility
 
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, dichotomic_search, str2list
-import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
+import stat_reliability_measure.dev.webb_amls.amls_uniform as amls_webb
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
 str2intList=lambda x: str2list(in_str=x, type_out=int)
@@ -364,35 +364,37 @@ for l in range(len(inp_indices)):
                             finish_flags=[]
                         for i in tqdm(range(config.n_rep)):
                             t=time()
-                            log_p,ma
+                            lg_p,nb_calls=amls_webb.multilevel_uniform(prop=prop,
+                            count_particles=N,count_mh_steps=T,x_min=x_min,x_max=x_max,
+                            x_sample=x_0,sigma=epsilon,rho=1-ratio,CUDA=(device=='cuda:0'))
                             t=time()-t
                             
-                            est=amls_res[0]
+                            est=np.exp(lg_p)
                             print(f"Est:{est}")
-                            dict_out=amls_res[1]
-                            if config.track_accept:
-                                accept_logs=os.path.join(log_path,'accept_logs')
-                                if not os.path.exists(accept_logs):
-                                    os.mkdir(path=accept_logs)
-                                accept_rates=dict_out['accept_rates']
-                                np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
-                                ,X=accept_rates)
-                                x_T=np.arange(len(accept_rates))
-                                plt.plot(x_T,accept_rates)
-                                plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
-                                plt.close()
-                                accept_rates_mcmc=dict_out['accept_rates_mcmc']
-                                x_T=np.arange(len(accept_rates_mcmc))
-                                plt.plot(x_T,accept_rates_mcmc)
-                                plt.savefig(os.path.join(accept_logs,f'accept_rates_mcmc_{i}.png'))
-                                plt.close()
-                                np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
-                                ,X=accept_rates_mcmc)
-                            if config.track_finish:
-                                finish_flags.append(dict_out['finish_flag'])
+                            # dict_out=amls_res[1]
+                            # if config.track_accept:
+                            #     accept_logs=os.path.join(log_path,'accept_logs')
+                            #     if not os.path.exists(accept_logs):
+                            #         os.mkdir(path=accept_logs)
+                            #     accept_rates=dict_out['accept_rates']
+                            #     np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
+                            #     ,X=accept_rates)
+                            #     x_T=np.arange(len(accept_rates))
+                            #     plt.plot(x_T,accept_rates)
+                            #     plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
+                            #     plt.close()
+                            #     accept_rates_mcmc=dict_out['accept_rates_mcmc']
+                            #     x_T=np.arange(len(accept_rates_mcmc))
+                            #     plt.plot(x_T,accept_rates_mcmc)
+                            #     plt.savefig(os.path.join(accept_logs,f'accept_rates_mcmc_{i}.png'))
+                            #     plt.close()
+                            #     np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
+                            #     ,X=accept_rates_mcmc)
+                            # if config.track_finish:
+                            #     finish_flags.append(dict_out['finish_flag'])
                             times.append(t)
                             ests.append(est)
-                            calls.append(dict_out['Count_h'])
+                            calls.append(nb_calls)
             
         
                         times=np.array(times)
@@ -401,7 +403,7 @@ for l in range(len(inp_indices)):
                         calls=np.array(calls)
                         mean_calls=calls.mean()
                         std_est=estimates.std()
-                        std_rel=std_est/mean_est
+                        std_rel=std_est/mean_est**2
                         print(f"mean est:{estimates.mean()}, std est:{estimates.std()}")
                         print(f"mean calls:{calls.mean()}")
                         print(f"std. re.:{std_rel}")
@@ -424,8 +426,10 @@ for l in range(len(inp_indices)):
                         if os.path.exists(log_path):
                             log_path=log_path+'_rand_'+str(np.random.randint(low=0,high=9))
                         os.mkdir(log_path)
-                        np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
-                        np.savetxt(fname=os.path.join(log_path,'estimates.txt'),X=estimates)
+                        times_path=os.path.join(log_path,'times.txt')
+                        np.savetxt(fname=times_path,X=times)
+                        est_path=os.path.join(log_path,'estimates.txt')
+                        np.savetxt(fname=est_path,X=estimates)
 
                         
 

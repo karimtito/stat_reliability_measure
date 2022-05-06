@@ -98,6 +98,7 @@ def multilevel_uniform(
 
         # Calculate current level
         s_x = prop(x).squeeze(-1)
+
         count_calls+=count_particles
         max_val = max(max_val, s_x.max().item())
         s_sorted, s_idx = torch.sort(s_x)
@@ -144,7 +145,7 @@ def multilevel_uniform(
 
             x_maybe = g_bottom.sample()
             s_x = prop(x_maybe).squeeze(-1)
-
+            count_calls+=count_particles
             # Calculate log-acceptance ratio
             g_top = dist.Uniform(low=torch.max(x_maybe - width_proposal.unsqueeze(-1), prior.low), high=torch.min(x_maybe + width_proposal.unsqueeze(-1), prior.high)
             ,validate_args=False)
@@ -179,6 +180,8 @@ def multilevel_uniform(
 
     # We return both the estimate of the log-probability of the integral and the set of adversarial examples
     s_x = prop(x).squeeze(-1)
+    #we dont' count this computations since they are not used for estimation
+    #count_calls+=count_particles
     #max_val = max(max_val, x.max().item())
     max_val = s_x.max().item()
-    return lg_p, max_val, x, levels #, l_inf_min
+    return lg_p,count_particles,max_val, x, levels, #, code modification: we add a counter of calls to score function

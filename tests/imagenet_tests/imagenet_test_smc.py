@@ -14,12 +14,13 @@ import cpuinfo
 import pandas as pd
 import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
-from stat_reliability_measure.home import ROOT_DIR
 method_name="smc_pyt"
-
+from stat_reliability_measure.home import ROOT_DIR
 #gaussian_linear
 class config:
-    dataset='mnist'
+    dataset='imagenet'
+    log_dir=ROOT_DIR+"/logs/imagenet_tests"
+    model_dir=ROOT_DIR+"/models/imagenet"
     N=100
     N_range=[]
     T=1
@@ -45,9 +46,9 @@ class config:
 
     epsilons = None
     eps_max=0.3
-    eps_min=0.2
+    eps_min=0.1 
     eps_num=5
-    model_arch='CNN_custom'
+    model_arch='torchvision_resnet18'
     model_path=None
     export_to_onnx=False
     use_attack=True
@@ -117,8 +118,8 @@ class config:
     adapt_func='ESS'
     M_opt = False
     adapt_step=True
-    FT=True
-    sig_dt=0.02
+    FT=False
+    sig_dt=0.015
 
     batch_opt=True
     track_finish=False
@@ -128,7 +129,7 @@ class config:
     load_batch_size=100 
     nb_epochs= 10
     adversarial_every=1
-    data_dir=ROOT_DIR+"/data"
+    data_dir=ROOT_DIR+"/data/ImageNet/"
     p_ref_compute=False
     input_start=0
     input_stop=None
@@ -139,13 +140,14 @@ class config:
     L_min=1
     GK_opt=False
     GV_opt=False
+    mala=False
     g_target=0.8
     skip_mh=False
-    force_train=False
 
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--log_dir',default=config.log_dir)
+parser.add_argument('--log_dir',type=str,default=config.log_dir)
+parser.add_argument('--data_dir',type=str,default=config.data_dir)
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
@@ -225,8 +227,8 @@ parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
 parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
 parser.add_argument('--g_target',type=float,default=config.g_target)
 parser.add_argument('--kappa_opt',type=str2bool,default=config.kappa_opt)
+parser.add_argument('--lirpa_cert',type=str2bool,default=config.lirpa_cert)
 parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
-parser.add_argument('--force_train',type=str2bool,default=config.force_train)
 parser.add_argument('--dataset',type=str, default=config.dataset)
 args=parser.parse_args()
 
@@ -239,7 +241,7 @@ if config.model_dir is None:
         os.mkdir(config.model_dir)
 
 config.d = t_u.datasets_dims[config.dataset]
-color_dataset=config.dataset in ('cifar10','cifar100','imagenet') 
+
 #assert config.adapt_func.lower() in smc_pyt.supported_beta_adapt.keys(),f"select adaptive function in {smc_pyt.supported_beta_adapt.keys}"
 #adapt_func=smc_pyt.supported_beta_adapt[config.adapt_func.lower()]
 
@@ -340,7 +342,7 @@ os.mkdir(path=exp_log_path)
 config.json=vars(args)
 
 # if config.aggr_res_path is None:
-#     aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
+#     aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
 # else:
 #     aggr_res_path=config.aggr_res_path
 
@@ -366,27 +368,22 @@ save_every = 1
 #adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBetaPyt
 num_classes=t_u.datasets_num_c[config.dataset.lower()]
 print(f"Running reliability experiments on architecture {config.model_arch} trained on  {config.dataset}.")
-print(f"Testing uniform noise pertubatin with epsilon in {config.epsilons}")
+print(f"Testing uniform noise perturbation with epsilon in {config.epsilons}")
 test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
-,dataset=config.dataset,batch_size=config.load_batch_size,
-           x_mean=None,x_std=None)
-
-model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
-    nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
-    download=config.download,dataset=config.dataset, force_train=config.force_train)
+,dataset=config.dataset,batch_size=config.load_batch_size,)
+model,mean,std=t_u.get_model_imagenet(config.model_arch,model_dir=config.model_dir)
 X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
 if config.verbose>=2:
     print(f"model accuracy on test batch:{accuracy}")
 
-config.x_mean=t_u.datasets_means[config.dataset]
-config.x_std=t_u.datasets_stds[config.dataset]
-x_min=0
-x_max=1
-if config.use_attack:
+x_min=torch.tensor(0)
+x_max=torch.tensor(1)
 
+if config.use_attack:
     fmodel = fb.PyTorchModel(model, bounds=(0,1),device=device)
     attack=fb.attacks.LinfPGD()
     #un-normalize data before performing attack
+    #epsilons= np.array([0.0, 0.001, 0.01, 0.03,0.04,0.05,0.07,0.08,0.0825,0.085,0.086,0.087,0.09, 0.1, 0.3, 0.5, 1.0])
     _, advs, success = attack(fmodel, X_correct[config.input_start:config.input_stop], 
     label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
 
@@ -397,8 +394,10 @@ normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 run_nb=0
 iterator= tqdm(range(config.n_rep))
 exp_res=[]
-clip_min=0
-clip_max=1
+model_name=config.model_arch
+clip_min=torch.tensor(x_min).to(device)
+
+clip_max=torch.tensor(x_max).to(device)
 for l in inp_indices:
     with torch.no_grad():
     
@@ -498,16 +497,9 @@ for l in inp_indices:
                                 calls.append(res_dict['calls'])
                             times=np.array(times)
                             ests = np.array(ests)
+                            q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                             calls=np.array(calls)
                         
-                            mean_calls=calls.mean()
-                            std_est=ests.std()
-                            mean_est=ests.mean()
-                            std_rel=std_est/mean_est
-                            print(f"mean est:{ests.mean()}, std est:{ests.std()}")
-                            print(f"mean calls:{calls.mean()}")
-                            print(f"std. rel.:{std_rel}")
-                            print(f"std. rel. adj.:{std_rel*mean_calls}")
                             
 
                             times=np.array(times)  
@@ -531,12 +523,11 @@ for l in inp_indices:
                             #with open(os.path.join(log_path,'results.txt'),'w'):
                             results={"method":method_name,'T':T,'N':N,'L':L,
                             "ess_alpha":ess_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
-                            "method":method,'adapt_dt':config.adapt_dt,"epsilon":epsilon,
-                            "model_name":model_name,"image_idx":l, 
+                            "method":method,'adapt_dt':config.adapt_dt,
                             'mean_calls':calls.mean(),'std_calls':calls.std()
                             ,'mean time':times.mean(),'std time':times.std()
                             ,'mean est':ests.mean(),'std est':ests.std(), 
-                            "v_min_opt":config.v_min_opt,"std_rel":std_rel,"std adj":std_rel*mean_calls
+                            "v_min_opt":config.v_min_opt
                             ,'adapt_dt_mcmc':config.adapt_dt_mcmc,"adapt_dt":config.adapt_dt,
                             "adapt_dt_mcmc":config.adapt_dt_mcmc,"dt_decay":config.dt_decay,"dt_gain":config.dt_gain,
                             "target_accept":config.target_accept,"accept_spread":config.accept_spread, 
@@ -548,12 +539,12 @@ for l in inp_indices:
                             "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
                             "M_opt":config.M_opt,"adapt_step":config.adapt_step,
                             "noise_dist":config.noise_dist,"lirpa_safe":lirpa_safe,"L_min":config.L_min,
-                            "skip_mh":config.skip_mh,"GV_opt":config.GV_opt}
+                            "skip_mh":config.skip_mh,"GV_opt":config.GV_opt,"mala":config.mala}
                             exp_res.append(results)
                             results_df=pd.DataFrame([results])
                             results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
                             if config.aggr_res_path is None:
-                                aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
+                                aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                             else:
                                 aggr_res_path=config.aggr_res_path
                             if config.update_agg_res:

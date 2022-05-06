@@ -275,7 +275,7 @@ for p_t in config.p_range:
                     ests=np.array(ests)
                     calls=np.array(calls)
                     errs=np.abs(ests-p_t)
-                    
+                    q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                     mean_calls=calls.mean()
                     std_calls=calls.std()
                     MSE=np.mean(abs_errors**2)

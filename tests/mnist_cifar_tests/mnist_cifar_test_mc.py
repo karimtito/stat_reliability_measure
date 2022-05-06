@@ -350,13 +350,13 @@ for i in range(len(config.epsilons)):
 
 
                 times=np.array(times)
-                estimates = np.array(ests)
+                ests = np.array(ests)
                 
                 freq_finished=1
                 
                 #finished=np.array(finish_flag)
                 if freq_finished<1:
-                    unfinish_est=estimates[~finish_flags]
+                    unfinish_est=ests[~finish_flags]
                     unfinish_times=times[~finish_flags]
                     unfinished_mean_est=unfinish_est.mean()
                     unfinished_mean_time=unfinish_times.mean()
@@ -368,14 +368,17 @@ for i in range(len(config.epsilons)):
                 log_path=os.path.join(raw_logs_path,log_name)
                 os.mkdir(log_path)
                 np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
-                np.savetxt(fname=os.path.join(log_path,'estimates.txt'),X=estimates)
-
-                
+                np.savetxt(fname=os.path.join(log_path,'ests.txt'),X=ests)
+                times_path=os.path.join(log_path,'times.txt')
+                np.savetxt(fname=times_path,X=times)
+                est_path=os.path.join(log_path,'ests.txt')
+                np.savetxt(fname=est_path,X=ests)
+        
 
                 plt.hist(times, bins=10)
                 plt.savefig(os.path.join(log_path,'times_hist.png'))
-                plt.hist(estimates,bins=10)
-                plt.savefig(os.path.join(log_path,'estimates_hist.png'))
+                plt.hist(ests,bins=10)
+                plt.savefig(os.path.join(log_path,'ests_hist.png'))
                 
                 
 
@@ -383,11 +386,11 @@ for i in range(len(config.epsilons)):
                 results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),
                 'N':N,'N_b':N_b,'epsilon':config.epsilons[i],'n_rep':config.n_rep,
                 'mean_calls':N,'std_calls':0,
-                'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
-                'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
+                'mean time':times.mean(),'std time':times.std(),'mean est':ests.mean(),
+                'std est':ests.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
                 'cores_number':config.cores_number,'g_target':config.g_target,
                 'freq_finished':freq_finished,'unfinished_mean_time':unfinished_mean_time,
-                'unfinished_mean_est':unfinished_mean_est
+                'unfinished_mean_est':unfinished_mean_est,'est_path':est_path,'times_path':times_path
                 ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
                 'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time}
                 results_df=pd.DataFrame([results])

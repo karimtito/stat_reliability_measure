@@ -419,17 +419,19 @@ for l in range(len(inp_indices)):
             
         
                         times=np.array(times)
-                        estimates = np.array(ests)
+                        ests = np.array(ests)
+                        q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                        iq_dist=q_3-q_1
                         calls=np.array(calls)
                         if config.track_finish:
                             finish_flags=np.array(finish_flags)
                             freq_finished=finish_flags.mean()
-                            freq_zero_est=(estimates==0).mean()
+                            freq_zero_est=(ests==0).mean()
                         else:
                             freq_zero_est,freq_finished=None,None
                         #finished=np.array(finish_flag)
                         if config.track_finish and freq_finished<1:
-                            unfinish_est=estimates[~finish_flags]
+                            unfinish_est=ests[~finish_flags]
                             unfinish_times=times[~finish_flags]
                             unfinished_mean_est=unfinish_est.mean()
                             unfinished_mean_time=unfinish_times.mean()
@@ -437,15 +439,17 @@ for l in range(len(inp_indices)):
                             unfinished_mean_est,unfinished_mean_time=None,None
                         
                         os.mkdir(log_path)
-                        np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
-                        np.savetxt(fname=os.path.join(log_path,'estimates.txt'),X=estimates)
+                        times_path=os.path.join(log_path,'times.txt')
+                        np.savetxt(fname=times_path,X=times)
+                        ests_path=os.path.join(log_path,'ests.txt')
+                        np.savetxt(fname=ests_path,X=ests)
 
                         
 
                         plt.hist(times, bins=10)
                         plt.savefig(os.path.join(log_path,'times_hist.png'))
-                        plt.hist(estimates,bins=10)
-                        plt.savefig(os.path.join(log_path,'estimates_hist.png'))
+                        plt.hist(ests,bins=10)
+                        plt.savefig(os.path.join(log_path,'ests_hist.png'))
                     
                         
 
@@ -453,13 +457,14 @@ for l in range(len(inp_indices)):
                         results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),'image_idx':l,
                             'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
                         'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),
-                        'mean time':times.mean(),'std time':times.std(),'mean est':estimates.mean(),
-                        'std est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
+                        'mean time':times.mean(),'std time':times.std(),'mean est':ests.mean(),
+                        'std est':ests.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
                         'cores_number':config.cores_number,'g_target':config.g_target,
                         'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
                         'unfinished_mean_est':unfinished_mean_est
                         ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
-                        'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time}
+                        'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time,
+                        'q_1':q_1,'q_3':q_3,'med_est':med_est,"times_path":times_path,"est_path":ests_path}
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),)
                         if config.aggr_res_path is None:

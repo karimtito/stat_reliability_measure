@@ -21,6 +21,6 @@ EXECUTABLE=/srv/tempdd/ktit/stat_reliability_measure/tests/linear_gaussian_tests
 LOGDIR=/srv/tempdd/ktit/stat_reliability_measure/logs/linear_gaussian_tests/
 echo "=============== RUN ${OAR_JOB_ID}  ==============="
 echo "Running ..."
-python -u ${EXECUTABLE} --log_dir ${LOGDIR} --N_range 20,50,100,200,500 --T_range 2,5,10,20 --L_range 1,5,10 --p_range 1e-6 --update_agg_res True
+python -u ${EXECUTABLE} --N_range 32,64,128,256,512 --T_range 2,5,10,20 --L_range 1,5,10 --p_range 1e-6 --update_agg_res True
 echo "Done"
 echo "==================================="

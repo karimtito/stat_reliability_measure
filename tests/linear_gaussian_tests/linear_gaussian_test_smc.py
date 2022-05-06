@@ -404,6 +404,7 @@ for p_t in config.p_range:
 
                         times=np.array(times)  
                         ests=np.array(ests)
+                        q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                         errs=np.abs(ests-p_t)
                         #fin = np.array(finished_flags)
 
