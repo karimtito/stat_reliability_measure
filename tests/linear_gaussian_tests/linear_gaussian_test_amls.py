@@ -74,6 +74,7 @@ class config:
     cpu_name=None
     cores_number=None
     correct_T=False
+    last_particle=False
 
 parser=argparse.ArgumentParser()
 
@@ -117,6 +118,7 @@ parser.add_argument('--torch_seed',type=int,default=config.torch_seed)
 parser.add_argument('--decay',type=float,default=config.decay)
 parser.add_argument('--gain_rate',type=float,default=config.gain_rate)
 parser.add_argument('--correct_T',type=str2bool,default=config.correct_T)
+parser.add_argument('--last_particle',type=str2bool,default=config.last_particle)
 args=parser.parse_args()
 for k,v in vars(args).items():
     setattr(config, k, v)
@@ -213,8 +215,8 @@ for p_t in config.p_range:
                     os.mkdir(path=log_path)
                     i_run+=1
                     
-
-                    K=int(N*ratio)
+                    
+                    K=int(N*ratio) if not config.last_particle else N-1
                     print(f"Starting run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},s={s}")
                     if config.verbose>3:
                         print(f"K/N:{K/N}")
@@ -310,7 +312,7 @@ for p_t in config.p_range:
                     ,'min_rate':config.min_rate,'mean est':ests.mean()
                     ,'mean time':times.mean()
                     ,'std time':times.std(),
-                    'mean_calls':mean_calls,
+                    'mean_calls':mean_calls,'last_particle':config.last_particle,
                     'std_calls':std_calls
                     ,'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
                     'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean()
