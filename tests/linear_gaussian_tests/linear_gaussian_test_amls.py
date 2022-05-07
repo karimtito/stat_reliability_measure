@@ -164,9 +164,11 @@ if not os.path.exists(ROOT_DIR+'/logs'):
     os.mkdir(ROOT_DIR+'/logs')
     os.mkdir(config.log_dir)
 elif not os.path.exists(config.log_dir):
-    os.mkdir(config.log_dir
-    )
-raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
+    os.mkdir(config.log_dir)
+raw_logs=os.path.join(config.log_dir,'raw_logs/')
+if not os.path.exists(raw_logs):
+    os.mkdir(raw_logs)
+raw_logs_path=os.path.join(raw_logs,method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 

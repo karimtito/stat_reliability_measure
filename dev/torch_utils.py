@@ -341,12 +341,12 @@ def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=Tr
         u=torch.reshape(u,(u.shape[0],)+input_shape)
     
     x_p = low+(high-low)*u
-    _,grad_u = compute_V_grad_pyt(model=model,input_=x_p,target_class=target_class)
-    grad_u=torch.reshape(grad_u,x_.shape)
+    _,grad_x_p = compute_V_grad_pyt(model=model,input_=x_p,target_class=target_class)
+    grad_u=torch.reshape((high-low)*grad_x_p,x_.shape)
     if gaussian_latent:
-        grad_x=torch.exp(normal_dist.log_prob(x_))*(high-low)*grad_u
+        grad_x=torch.exp(normal_dist.log_prob(x_))*grad_u
     else:
-        grad_x=(high-low)*grad_u
+        grad_x=grad_u
     return grad_x
 
 def correct_min_max(x_min,x_max,x_mean,x_std):

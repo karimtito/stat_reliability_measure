@@ -6,8 +6,6 @@ import pandas as pd
 
 import numpy as np
 from tqdm import tqdm
-
-from scipy.special import betainc
 import GPUtil
 import matplotlib.pyplot as plt
 import cpuinfo
@@ -276,8 +274,8 @@ if config.print_config:
 
 num_classes=10
 test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
-,dataset=config.dataset,batch_size=config.load_batch_size,
-           x_mean=None,x_std=None)
+                ,dataset=config.dataset,batch_size=config.load_batch_size,
+            x_mean=None,x_std=None)
 
 model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
     nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
@@ -366,7 +364,7 @@ for l in range(len(inp_indices)):
                             t=time()
                             lg_p,nb_calls,max_val,x,levels=amls_webb.multilevel_uniform(prop=prop,
                             count_particles=N,count_mh_steps=T,x_min=x_min,x_max=x_max,
-                            x_sample=x_0,sigma=epsilon,rho=1-ratio,CUDA=True,debug=(config.verbose>=1))
+                            x_sample=x_0,sigma=epsilon,rho=ratio,CUDA=True,debug=(config.verbose>=1))
                             t=time()-t
                             # we don't need adversarial examples and highest score
                             del x

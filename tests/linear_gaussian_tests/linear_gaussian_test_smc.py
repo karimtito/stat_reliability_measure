@@ -29,7 +29,7 @@ class config:
     
     alpha=0.2
     alpha_range=[]
-    ess_alpha=0.9
+    ess_alpha=0.8
     e_range=[]
     p_range=[]
     p_t=1e-6
