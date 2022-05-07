@@ -17,10 +17,11 @@ from datetime import datetime
 
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList
 import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
+
 method_name="amls_pyt"
 
 class config:
-    n_rep=10
+    n_rep=100
     verbose=0
     min_rate=0.40
     clip_s=True
@@ -90,7 +91,7 @@ parser.add_argument('--N_range',type=str2intList,default=config.N_range)
 parser.add_argument('--T',type=int,default=config.T)
 parser.add_argument('--T_range',type=str2intList,default=config.T_range)
 parser.add_argument('--ratio',type=float,default=config.ratio)
-parser.add_argument('--ratio_range',type=float,default=config.ratio_range)
+parser.add_argument('--ratio_range',type=str2floatList,default=config.ratio_range)
 parser.add_argument('--s',type=float,default=config.s)
 parser.add_argument('--s_range',type=str2floatList,default=config.s_range)
 parser.add_argument('--p_t',type=float,default=config.p_t)
