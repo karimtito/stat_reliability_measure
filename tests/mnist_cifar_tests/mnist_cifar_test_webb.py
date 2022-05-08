@@ -58,10 +58,10 @@ class config:
     T_range=[]
 
     ratio=0.6
-    ratio_list=[]
+    ratio_range=[]
 
     s=1
-    s_list = []
+    s_range = []
 
     track_accept=False
     
@@ -162,9 +162,9 @@ parser.add_argument('--T_range',type=str2intList,default=config.T_range)
 parser.add_argument('--download',type=str2bool, default=config.download)
 parser.add_argument('--model_path',type=str,default=config.model_path)
 parser.add_argument('--ratio',type=float,default=config.ratio)
-parser.add_argument('--ratio_list',type=float,default=config.ratio_list)
+parser.add_argument('--ratio_range',type=float,default=config.ratio_range)
 parser.add_argument('--s',type=float,default=config.s)
-parser.add_argument('--s_list ',type=str2floatList,default=config.s_list )
+parser.add_argument('--s_range ',type=str2floatList,default=config.s_range )
 parser.add_argument('--track_finish',type=str2bool,default=config.track_finish)
 parser.add_argument('--lirpa_cert',type=str2bool,default=config.lirpa_cert)
 parser.add_argument('--load_batch_size',type=int,default=config.load_batch_size)
@@ -211,10 +211,10 @@ if len(config.T_range)<1:
     config.T_range=[config.T]
 if len(config.N_range)<1:
     config.N_range=[config.N]
-if len(config.s_list)<1:
-    config.s_list=[config.s]
-if len(config.ratio_list)<1:
-    config.ratio_list=[config.ratio]
+if len(config.s_range)<1:
+    config.s_range=[config.s]
+if len(config.ratio_range)<1:
+    config.ratio_range=[config.ratio]
 
 
 if config.track_gpu:
@@ -310,8 +310,8 @@ if config.use_attack:
 
 inp_indices=np.arange(start=config.input_start,stop=config.input_stop)
 i_exp=0
-param_lists= [ inp_indices,config.T_range,config.N_range,config.s_list ,config.ratio_list,config.epsilons]
-lenghts=np.array([len(L) for L in param_lists])
+param_ranges= [ inp_indices,config.T_range,config.N_range,config.s_range ,config.ratio_range,config.epsilons]
+lenghts=np.array([len(L) for L in param_ranges])
 nb_exps= np.prod(lenghts)
 
 for l in range(len(inp_indices)):
@@ -339,8 +339,8 @@ for l in range(len(inp_indices)):
             
         for T in config.T_range:
             for N in config.N_range: 
-                for s in config.s_list :
-                    for ratio in config.ratio_list: 
+                for s in config.s_range :
+                    for ratio in config.ratio_range: 
                         loc_time= datetime.today().isoformat().split('.')[0]
                         log_name=method_name+'_e_'+float_to_file_float(config.epsilons[idx])+'_N_'+str(N)+'_T_'+str(T)+'_s_'+float_to_file_float(s)
                         log_name=log_name+'_r_'+float_to_file_float(ratio)+'_'+'_'+loc_time

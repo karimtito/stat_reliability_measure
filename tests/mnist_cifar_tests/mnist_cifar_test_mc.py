@@ -37,9 +37,9 @@ class config:
     data_dir=ROOT_DIR+"/data"
     n_rep=10
     N=int(1e5)
-    N_list=[]
+    N_range=[]
     N_batch=int(1e3)
-    N_b_list=[]
+    N_b_range=[]
     verbose=0
     
     x_min=0
@@ -115,8 +115,8 @@ parser.add_argument('--eps_num',type=int,default=config.eps_num)
 parser.add_argument('--train_model',type=str2bool,default=config.train_model)
 parser.add_argument('--noise_dist',type=str, default=config.noise_dist)
 parser.add_argument('--a',type=float, default=config.a)
-parser.add_argument('--N_list',type=str2intList,default=config.N_list)
-parser.add_argument('--N_b_list',type=str2intList,default=config.N_b_list)
+parser.add_argument('--N_range',type=str2intList,default=config.N_range)
+parser.add_argument('--N_b_range',type=str2intList,default=config.N_b_range)
 parser.add_argument('--x_min',type=float,default=config.x_min)
 parser.add_argument('--x_max',type=float,default=config.x_max)
 parser.add_argument('--download',type=str2bool, default=config.download)
@@ -147,10 +147,10 @@ if len(config.epsilons)==0:
     log_eps=np.linspace(start=np.log(config.eps_min),stop=np.log(config.eps_max),num=config.eps_num)
     config.epsilons=np.exp(log_eps)
 
-if len(config.N_list)<1:
-    config.N_list=[config.N]
-if len(config.N_b_list)<1:
-    config.N_b_list=[config.N_batch]
+if len(config.N_range)<1:
+    config.N_range=[config.N]
+if len(config.N_b_range)<1:
+    config.N_b_range=[config.N_batch]
 
 
 
@@ -323,8 +323,8 @@ for i in range(len(config.epsilons)):
     
     x_0.requires_grad=True
     
-    for N in config.N_list: 
-        for N_b in config.N_b_list:
+    for N in config.N_range: 
+        for N_b in config.N_b_range:
                 print(f"Starting experiment with epsilon={epsilon}, N={N},N_b={N_b}")
                 ests,times,finish_flags = [],[],[]
                 iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
