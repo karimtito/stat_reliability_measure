@@ -100,6 +100,7 @@ class config:
     sig_dt=0.02
     L_min=1
     skip_mh=False
+    GV_opt=False
     
 
 
@@ -170,6 +171,7 @@ parser.add_argument('--kappa_opt',type=str2bool,default=config.kappa_opt)
 parser.add_argument('--sig_dt', type=float,default=config.sig_dt)
 parser.add_argument('--L_min',type=int,default=config.L_min)
 parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
+parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -351,7 +353,8 @@ for p_t in config.p_range:
                             dt_gain=config.dt_gain,dt_min=config.dt_min,dt_max=config.dt_max,
                             v_min_opt=config.v_min_opt, lambda_0= config.lambda_0,
                             track_dt=config.track_dt,M_opt=config.M_opt,adapt_step=config.adapt_step,FT=config.FT,
-                            sig_dt=config.sig_dt,L_min=config.L_min,skip_mh=config.skip_mh
+                            sig_dt=config.sig_dt,L_min=config.L_min,skip_mh=config.skip_mh,
+                            GV_opt=config.GV_opt
                             )
                             t1=time()-t
 
@@ -432,7 +435,7 @@ for p_t in config.p_range:
                         ,'mean_time':times.mean(),'std_time':times.std()
                         ,'mean_est':ests.mean(),'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
                         'mean_rel_error':rel_errors.mean(),'std_est':ests.std(),'freq underest':(ests<p_t).mean(), 
-                        "v_min_opt":config.v_min_opt
+                        "v_min_opt":config.v_min_opt,'GV_opt':config.GV_opt
                         ,'adapt_dt_mcmc':config.adapt_dt_mcmc,"adapt_dt":config.adapt_dt,
                         "adapt_dt_mcmc":config.adapt_dt_mcmc,"dt_decay":config.dt_decay,"dt_gain":config.dt_gain,
                         "target_accept":config.target_accept,"accept_spread":config.accept_spread, 
