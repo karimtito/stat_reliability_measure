@@ -1,6 +1,5 @@
 import stat_reliability_measure.dev.torch_utils as t_u
 import stat_reliability_measure.dev.smc.smc_pyt as smc_pyt
-import scipy.stats as stat
 import numpy as np
 from tqdm import tqdm
 from time import time
@@ -522,8 +521,8 @@ for l in inp_indices:
                             "ess_alpha":ess_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
                             "method":method,'adapt_dt':config.adapt_dt,
                             'mean_calls':calls.mean(),'std_calls':calls.std()
-                            ,'mean time':times.mean(),'std time':times.std()
-                            ,'mean est':ests.mean(),'std est':ests.std(), 
+                            ,'mean_time':times.mean(),'std_time':times.std()
+                            ,'mean_est':ests.mean(),'std_est':ests.std(), 
                             "v_min_opt":config.v_min_opt
                             ,'adapt_dt_mcmc':config.adapt_dt_mcmc,"adapt_dt":config.adapt_dt,
                             "adapt_dt_mcmc":config.adapt_dt_mcmc,"dt_decay":config.dt_decay,"dt_gain":config.dt_gain,
@@ -546,8 +545,8 @@ for l in inp_indices:
                                 aggr_res_path=config.aggr_res_path
                             if config.update_agg_res:
                                 if not os.path.exists(aggr_res_path):
-                                    cols=['method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est',
-                                    'bias','mean abs error','mean rel error','std est','freq underest','gpu_name','cpu_name']
+                                    cols=['method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est',
+                                    'bias','mean abs error','mean_rel_error','std_est','freq underest','gpu_name','cpu_name']
                                     aggr_res_df= pd.DataFrame(columns=cols)
                                 else:
                                     aggr_res_df=pd.read_csv(aggr_res_path)

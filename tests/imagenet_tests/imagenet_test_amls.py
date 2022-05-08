@@ -454,8 +454,8 @@ for l in range(len(inp_indices)):
                         results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),'image_idx':l,
                             'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
                         'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),
-                        'mean time':times.mean(),'std time':times.std(),'mean est':ests.mean(),
-                        'std est':ests.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
+                        'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),
+                        'std_est':ests.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
                         'cores_number':config.cores_number,'g_target':config.g_target,
                         'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
                         'unfinished_mean_est':unfinished_mean_est
@@ -472,8 +472,8 @@ for l in range(len(inp_indices)):
                         if config.update_agg_res:
                             if not os.path.exists(aggr_res_path):
                                 print(f'aggregate results csv file not found /n it will be build at {aggr_res_path}')
-                                cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean time','std time','mean est',
-                                'std est','freq underest','g_target']
+                                cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
+                                'std_est','freq underest','g_target']
                                 cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
                                 cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist','datetime']
                                 agg_res_df= pd.DataFrame(columns=cols)

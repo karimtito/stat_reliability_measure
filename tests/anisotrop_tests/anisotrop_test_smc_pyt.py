@@ -441,9 +441,9 @@ for p_s in config.p_range:
                         "ess_alpha":ess_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
                         "method":method,"kernel":kernel_str,'adapt_dt':config.adapt_dt,
                         'mean_calls':calls.mean(),'std_calls':calls.std()
-                        ,'mean time':times.mean(),'std time':times.std()
-                        ,'mean est':ests.mean(),'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
-                        'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean(), 
+                        ,'mean_time':times.mean(),'std_time':times.std()
+                        ,'mean_est':ests.mean(),'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
+                        'mean_rel_error':rel_errors.mean(),'std_est':ests.std(),'freq underest':(ests<p_t).mean(), 
                         "v_min_opt":config.v_min_opt
                         ,'adapt_dt_mcmc':config.adapt_dt_mcmc,"adapt_dt":config.adapt_dt,
                         "adapt_dt_mcmc":config.adapt_dt_mcmc,"dt_decay":config.dt_decay,"dt_gain":config.dt_gain,
@@ -465,8 +465,8 @@ for p_s in config.p_range:
                             aggr_res_path=config.aggr_res_path
                         if config.update_agg_res:
                             if not os.path.exists(aggr_res_path):
-                                cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est',
-                                'bias','mean abs error','mean rel error','std est','freq underest','gpu_name','cpu_name']
+                                cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est',
+                                'bias','mean abs error','mean_rel_error','std_est','freq underest','gpu_name','cpu_name']
                                 aggr_res_df= pd.DataFrame(columns=cols)
                             else:
                                 aggr_res_df=pd.read_csv(aggr_res_path)

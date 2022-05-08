@@ -86,10 +86,10 @@ class config:
     dt_decay=0.999
     dt_gain=None
     dt_min=1e-5
-    dt_max=1e-1
-    v_min_opt=False
+    dt_max=0.7
+    v_min_opt=True
     ess_opt=False
-    only_duplicated=False
+    only_duplicated=True
     np_seed=None
     lambda_0=0.5
     test2=False
@@ -505,6 +505,7 @@ for l in inp_indices:
                             std_est=ests.std()
                             mean_est=ests.mean()
                             std_rel=std_est/mean_est
+                            std_rel_adj=std_rel*mean_calls
                             print(f"mean est:{ests.mean()}, std est:{ests.std()}")
                             print(f"mean calls:{calls.mean()}")
                             print(f"std. rel.:{std_rel}")
@@ -536,9 +537,9 @@ for l in inp_indices:
                             "method":method,'adapt_dt':config.adapt_dt,"epsilon":epsilon,
                             "model_name":model_name,"image_idx":l, 
                             'mean_calls':calls.mean(),'std_calls':calls.std()
-                            ,'mean time':times.mean(),'std time':times.std()
-                            ,'mean est':ests.mean(),'std est':ests.std(), 'est_path':est_path,'times_path':times_path,
-                            "v_min_opt":config.v_min_opt,"std_rel":std_rel,"std adj":std_rel*mean_calls
+                            ,'mean_time':times.mean(),'std_time':times.std()
+                            ,'mean_est':ests.mean(),'std_est':ests.std(), 'est_path':est_path,'times_path':times_path,
+                            "v_min_opt":config.v_min_opt,"std_rel":std_rel,"std_rel_adj":std_rel*mean_calls
                             ,'adapt_dt_mcmc':config.adapt_dt_mcmc,"adapt_dt":config.adapt_dt,
                             "adapt_dt_mcmc":config.adapt_dt_mcmc,"dt_decay":config.dt_decay,"dt_gain":config.dt_gain,
                             "target_accept":config.target_accept,"accept_spread":config.accept_spread, 
@@ -560,8 +561,8 @@ for l in inp_indices:
                                 aggr_res_path=config.aggr_res_path
                             if config.update_agg_res:
                                 if not os.path.exists(aggr_res_path):
-                                    cols=['method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est',
-                                    'bias','mean abs error','mean rel error','std est','freq underest','gpu_name','cpu_name']
+                                    cols=['method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est',
+                                    'bias','mean abs error','mean_rel_error','std_est','freq underest','gpu_name','cpu_name']
                                     aggr_res_df= pd.DataFrame(columns=cols)
                                 else:
                                     aggr_res_df=pd.read_csv(aggr_res_path)

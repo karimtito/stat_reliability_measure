@@ -309,13 +309,13 @@ for p_s in config.p_range:
                     #with open(os.path.join(log_path,'results.txt'),'w'):
                     results={'p_t':p_t,'method':method_name,
                     'N':N,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s
-                    ,'min_rate':config.min_rate,'mean est':ests.mean()
-                    ,'mean time':times.mean()
-                    ,'std time':times.std(),
+                    ,'min_rate':config.min_rate,'mean_est':ests.mean()
+                    ,'mean_time':times.mean()
+                    ,'std_time':times.std(),
                     'mean_calls':mean_calls,
                     'std_calls':std_calls
                     ,'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
-                    'mean rel error':rel_errors.mean(),'std est':ests.std(),'freq underest':(ests<p_t).mean()
+                    'mean_rel_error':rel_errors.mean(),'std_est':ests.std(),'freq underest':(ests<p_t).mean()
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
                     'batch_opt':config.batch_opt,"d":d, "correct_T":config.correct_T,
                     "np_seed":config.np_seed,"torch_seed":config.torch_seed,
@@ -329,9 +329,9 @@ for p_s in config.p_range:
                         aggr_res_path=config.aggr_res_path
                     if config.update_agg_res:
                         if not os.path.exists(aggr_res_path):
-                            cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean time','std time','mean est',
+                            cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est',
                             'mean_calls','std_calls',
-                            'bias','mean abs error','mean rel error','std est','freq underest','gpu_name','cpu_name']
+                            'bias','mean abs error','mean_rel_error','std_est','freq underest','gpu_name','cpu_name']
                             aggr_res_df= pd.DataFrame(columns=cols)
                         else:
                             aggr_res_df=pd.read_csv(aggr_res_path)
