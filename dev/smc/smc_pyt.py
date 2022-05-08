@@ -131,7 +131,7 @@ def nextBetaESS(beta_old,v,ess_alpha,max_beta=1e6,verbose=0,thresh=1e-3,debug=Fa
 supported_beta_adapt={'ess':nextBetaESS,'simp_ess':nextBetaSimpESS,'simp':ESSAdaptBetaPyt}
 
 
-def SamplerSMC(gen,  V, gradV,adapt_func,min_rate=0.8,alpha =0.1,N=300,T = 1,L=1,n_max=500, 
+def SamplerSMC(gen,  V, gradV,adapt_func,min_rate=0.8,alpha =0.1,N=300,T = 1,L=1,n_max=5000, 
 max_beta=1e6, verbose=False,device=None,
 track_accept=False,track_beta=False,return_log_p=False,gaussian=False,
 adapt_dt=False,
@@ -208,7 +208,9 @@ debug=False,kappa_opt=False,
     while not reach_beta_inf:
         n += 1
         if n >n_max:
-            raise RuntimeError('The estimator failed. Increase n_max?')
+            print('/!\ The estimator failed. Increase n_max?')
+            break
+
 
         if n==1:
             X=gen(N)
