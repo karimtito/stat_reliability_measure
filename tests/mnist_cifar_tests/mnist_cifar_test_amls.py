@@ -182,8 +182,8 @@ for k,v in vars(args).items():
     setattr(config, k, v)
 
 if config.dataset!='mnist':
-    config.log_dir=config.log_dir.repalce('mnist',config.dataset)
-    config.model_dir=config.model_dir.repalce('mnist',config.dataset)
+    config.log_dir=config.log_dir.replace('mnist',config.dataset)
+    config.model_dir=config.model_dir.replace('mnist',config.dataset)
 
 if len(config.epsilons)==0:
     log_eps=np.linspace(start=np.log(config.eps_min),stop=np.log(config.eps_max),num=config.eps_num)
