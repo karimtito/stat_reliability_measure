@@ -444,7 +444,8 @@ for p_t in config.p_range:
                         "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
                         "M_opt":config.M_opt,"adapt_step":config.adapt_step,"sig_dt":config.sig_dt,
                         "L_min":config.L_min,"kappa_opt":config.kappa_opt,"skip_mh":config.skip_mh,
-                        "MSE":MSE,"MSE adj":MSE_adj,"MSE_rel_adj":MSE_rel_adj}
+                        "MSE":MSE,"MSE adj":MSE_adj,"MSE_rel_adj":MSE_rel_adj,
+                        'q_1':q_1,'q_3':q_3,'med_est':med_est}
                         exp_res.append(results)
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)

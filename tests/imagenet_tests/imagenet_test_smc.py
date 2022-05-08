@@ -535,7 +535,8 @@ for l in inp_indices:
                             "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
                             "M_opt":config.M_opt,"adapt_step":config.adapt_step,
                             "noise_dist":config.noise_dist,"lirpa_safe":lirpa_safe,"L_min":config.L_min,
-                            "skip_mh":config.skip_mh,"GV_opt":config.GV_opt,"mala":config.mala}
+                            "skip_mh":config.skip_mh,"GV_opt":config.GV_opt,"mala":config.mala,
+                            'q_1':q_1,'q_3':q_3,'med_est':med_est}
                             exp_res.append(results)
                             results_df=pd.DataFrame([results])
                             results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)

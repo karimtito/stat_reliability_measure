@@ -477,7 +477,8 @@ for l in range(len(inp_indices)):
                         'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
                         'unfinished_mean_est':unfinished_mean_est,'est_path':est_path,'times_path':times_path
                         ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
-                        'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time}
+                        'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time,
+                        'q_1':q_1,'q_3':q_3,'med_est':med_est}
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),)
                         if config.aggr_res_path is None:

@@ -311,14 +311,15 @@ for p_t in config.p_range:
                     'N':N,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s
                     ,'min_rate':config.min_rate,'mean_est':ests.mean()
                     ,'mean_time':times.mean()
-                    ,'std_time':times.std(),
+                    ,'std_time':times.std(),'MSE':MSE,'MSE_rel_adj':MSE_rel_adj,'MSE_rel':MSE_rel,
                     'mean_calls':mean_calls,'last_particle':config.last_particle,
                     'std_calls':std_calls
                     ,'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
                     'mean_rel_error':rel_errors.mean(),'std_est':ests.std(),'freq underest':(ests<p_t).mean()
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
                     'batch_opt':config.batch_opt,"d":d, "correct_T":config.correct_T,
-                    "np_seed":config.np_seed,"torch_seed":config.torch_seed}
+                    "np_seed":config.np_seed,"torch_seed":config.torch_seed,
+                        'q_1':q_1,'q_3':q_3,'med_est':med_est}
                     exp_res.append(results)
                     results_df=pd.DataFrame([results])
                     results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)

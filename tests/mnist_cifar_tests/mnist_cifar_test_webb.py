@@ -396,16 +396,16 @@ for l in range(len(inp_indices)):
                             ests.append(est)
                             calls.append(nb_calls)
             
-        
                         times=np.array(times)
-                        estimates = np.array(ests)
-                        mean_est=estimates.mean()
+                        ests = np.array(ests)
+                        mean_est=ests.mean()
                         calls=np.array(calls)
                         mean_calls=calls.mean()
-                        std_est=estimates.std()
+                        std_est=ests.std()
+                        q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                         std_rel=std_est/mean_est**2
                         std_rel_adj=std_rel*mean_calls
-                        print(f"mean est:{estimates.mean()}, std est:{estimates.std()}")
+                        print(f"mean est:{ests.mean()}, std est:{ests.std()}")
                         print(f"mean calls:{calls.mean()}")
                         print(f"std. re.:{std_rel}")
                         print(f"std. rel. adj.:{std_rel_adj}")
@@ -413,12 +413,12 @@ for l in range(len(inp_indices)):
                         if config.track_finish:
                             finish_flags=np.array(finish_flags)
                             freq_finished=finish_flags.mean()
-                            freq_zero_est=(estimates==0).mean()
+                            freq_zero_est=(ests==0).mean()
                         else:
                             freq_zero_est,freq_finished=None,None
                         #finished=np.array(finish_flag)
                         if config.track_finish and freq_finished<1:
-                            unfinish_est=estimates[~finish_flags]
+                            unfinish_est=ests[~finish_flags]
                             unfinish_times=times[~finish_flags]
                             unfinished_mean_est=unfinish_est.mean()
                             unfinished_mean_time=unfinish_times.mean()
@@ -429,29 +429,30 @@ for l in range(len(inp_indices)):
                         os.mkdir(log_path)
                         times_path=os.path.join(log_path,'times.txt')
                         np.savetxt(fname=times_path,X=times)
-                        est_path=os.path.join(log_path,'estimates.txt')
-                        np.savetxt(fname=est_path,X=estimates)
+                        est_path=os.path.join(log_path,'ests.txt')
+                        np.savetxt(fname=est_path,X=ests)
 
                         
 
                         plt.hist(times, bins=10)
                         plt.savefig(os.path.join(log_path,'times_hist.png'))
-                        plt.hist(estimates,bins=10)
-                        plt.savefig(os.path.join(log_path,'estimates_hist.png'))
+                        plt.hist(ests,bins=10)
+                        plt.savefig(os.path.join(log_path,'ests_hist.png'))
                     
                         
 
                         #with open(os.path.join(log_path,'results.txt'),'w'):
                         results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),'image_idx':l,
                             'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
-                        'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std_adj":estimates.std()*mean_calls,
-                        'mean_time':times.mean(),'std_time':times.std(),'mean_est':estimates.mean(),
-                        'std_est':estimates.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
+                        'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std_adj":ests.std()*mean_calls,
+                        'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),
+                        'std_est':ests.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
                         'cores_number':config.cores_number,'g_target':config.g_target,"std_rel":std_rel, "std_rel_adj":std_rel_adj,
                         'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
                         'unfinished_mean_est':unfinished_mean_est
                         ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
-                        'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time}
+                        'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time,
+                        'q_1':q_1,'q_3':q_3,'med_est':med_est}
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),)
                         if config.aggr_res_path is None:
