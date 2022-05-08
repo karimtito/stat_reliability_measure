@@ -59,7 +59,7 @@ class config:
     
     noise_dist='uniform'
     d=None
-    verbose=1
+    verbose=0
     log_dir=None
     aggr_res_path = None
     update_agg_res=False
