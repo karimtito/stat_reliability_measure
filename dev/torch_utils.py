@@ -361,12 +361,14 @@ def correct_min_max(x_min,x_max,x_mean,x_std):
     return x_min,x_max
 
 supported_datasets=['mnist','cifar10','cifar100','imagenet']
-datasets_idx={'mnist':0,'cifar10':1}
 datasets_in_shape={'mnist':(1,28,28),'cifar10':(3,32,32),'cifar100':(3,32,32),'imagenet':(3,224,224)}
 datasets_dims={'mnist':784,'cifar10':3*1024,'cifar100':3*1024,'imagenet':3*224**2}
 datasets_num_c={'mnist':10,'cifar10':10,'imagenet':1000}
-datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465)}
-datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010)}
+datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465),'cifar100':[125.3/255.0, 123.0/255.0, 113.9/255.0]}
+datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010),'cifar100':[63.0/255.0, 62.1/255.0, 66.7/255.0]}
+datasets_supp_archs={'mnist':['dnn2','dnn4','cnn_custom'],
+                    'cifar10':['lenet','convnet'],
+                    'cifar100':['densenet']}
 def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=None,x_std=None): 
     assert dataset in supported_datasets,f"support datasets are in {supported_datasets}"
     if dataset=='mnist':
@@ -398,6 +400,24 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
                         ])
         cifar10_dataset = datasets.CIFAR10("../data", train=train, download=download, transform=data_transform)
         data_loader = DataLoader(cifar10_dataset , batch_size = batch_size, shuffle=train)  
+    elif dataset=='cifar100':
+        if train:
+            data_transform = transforms.Compose([
+                #transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                #we perform normalization at the model level
+                #transforms.Normalize(mean=datasets_stds['cifar10'], std=datasets_stds['cifar10']),
+            ])
+        else:
+            data_transform=transforms.Compose([
+                            transforms.ToTensor(),
+                        #transforms.Normalize(mean=datasets_stds['cifar10'],std=datasets_stds['cifar10'])
+                        ])
+        cifar100_dataset = datasets.CIFAR100("../data", train=train, download=download, transform=data_transform)
+        data_loader = DataLoader(cifar100_dataset , batch_size = batch_size, shuffle=train)  
+   
+
     elif dataset=='imagenet':
         assert train==False,"Only validation data can be loaded for the ImageNet dataset."
         data_transform=transforms.Compose([
