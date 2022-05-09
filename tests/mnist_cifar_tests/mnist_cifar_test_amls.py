@@ -46,7 +46,7 @@ class config:
    
     s_min=8e-3
     s_max=3
-    n_max=2000
+    n_max=3000
     x_min=None
     x_max=None
     x_mean=0
