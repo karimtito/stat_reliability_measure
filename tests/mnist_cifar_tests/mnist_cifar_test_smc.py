@@ -228,6 +228,8 @@ parser.add_argument('--kappa_opt',type=str2bool,default=config.kappa_opt)
 parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
 parser.add_argument('--force_train',type=str2bool,default=config.force_train)
 parser.add_argument('--dataset',type=str, default=config.dataset)
+parser.add_argument('--input_start',type=int, default=config.input_start)
+parser.add_argument('--input_stopt',type=int, default=config.input_stop)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -257,7 +259,8 @@ if len(config.e_range)==0:
 
 if config.input_stop is None:
     config.input_stop=config.input_start+1
-
+else:
+    assert config.input_start<config.input_stop,"/!\ input start must be strictly lower than input stop"
 if len(config.N_range)==0:
     config.N_range= [config.N]
 
