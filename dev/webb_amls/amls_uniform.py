@@ -200,5 +200,5 @@ def multilevel_uniform(
     #we dont' count this computations since they are not used for estimation
     #count_calls+=count_particles
     #max_val = max(max_val, x.max().item())
-    max_val = s_x.max().item()
+    max_val = s_x.max().item() 
     return lg_p,count_calls,max_val, x, levels, #, code modification: we add a counter of calls to score function
