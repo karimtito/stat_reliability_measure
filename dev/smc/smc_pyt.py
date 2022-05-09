@@ -286,7 +286,7 @@ debug=False,kappa_opt=False,
                     print(f"New mean dt:{dt.mean().item()}")
             if track_dt:
                 dt_s.append(dt.mean().item())
-            if only_duplicated:
+            if only_duplicated and nb_to_renew>0:
                 X[to_renew]=Y
                 v[to_renew]=v_y
             else:
