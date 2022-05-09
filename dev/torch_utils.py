@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from stat_reliability_measure.dev.utils import float_to_file_float
-from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,ConvNet
+from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,ConvNet,DenseNet3
 from torchvision import transforms,datasets,models as tv_models
 from torch.utils.data import DataLoader
 import timm
@@ -366,9 +366,9 @@ datasets_dims={'mnist':784,'cifar10':3*1024,'cifar100':3*1024,'imagenet':3*224**
 datasets_num_c={'mnist':10,'cifar10':10,'imagenet':1000}
 datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465),'cifar100':[125.3/255.0, 123.0/255.0, 113.9/255.0]}
 datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010),'cifar100':[63.0/255.0, 62.1/255.0, 66.7/255.0]}
-datasets_supp_archs={'mnist':['dnn2','dnn4','cnn_custom'],
-                    'cifar10':['lenet','convnet'],
-                    'cifar100':['densenet']}
+datasets_supp_archs={'mnist':{'dnn2':dnn2,'dnn4':dnn4,'cnn_custom':CNN_custom},
+                    'cifar10':{'lenet':LeNet,'convnet':ConvNet},
+                    'cifar100':{'densenet':DenseNet3}}
 def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=None,x_std=None): 
     assert dataset in supported_datasets,f"support datasets are in {supported_datasets}"
     if dataset=='mnist':
@@ -477,8 +477,9 @@ download,force_train=False,dataset='mnist',batch_size=100):
     
     c_model_path=model_name+'.pt'
     model_path=os.path.join(model_dir,c_model_path)
-    assert model_arch.lower() in supported_arch.keys(),f"/!\\Architecture supported for {dataset} are:{list(supported_arch.keys())}"
-    network=supported_arch[model_arch.lower()](dataset=dataset)
+    support_arch=datasets_supp_archs[dataset]
+    assert model_arch.lower() in support_arch,f"/!\\Architectures supported for {dataset}:{list(support_arch.keys())}"
+    network=support_arch[model_arch.lower()](dataset=dataset)
     normalizer=transforms.Normalize(mean=datasets_means[dataset], std=datasets_stds[dataset])
     if not os.path.exists(model_path) or force_train: 
         #if the model doesn't exist we retrain a model from scratch
