@@ -431,6 +431,7 @@ for l in range(len(inp_indices)):
                         np.savetxt(fname=times_path,X=times)
                         est_path=os.path.join(log_path,'ests.txt')
                         np.savetxt(fname=est_path,X=ests)
+                      
 
                         
 
@@ -445,7 +446,7 @@ for l in range(len(inp_indices)):
                         results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),'image_idx':l,
                             'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
                         'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std_adj":ests.std()*mean_calls,
-                        'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),
+                        'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),'est_path':est_path,'times_path':times_path,
                         'std_est':ests.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
                         'cores_number':config.cores_number,'g_target':config.g_target,"std_rel":std_rel, "std_rel_adj":std_rel_adj,
                         'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,

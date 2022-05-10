@@ -26,7 +26,7 @@ class config:
     T_range=[]
     L=1
     L_range=[]
-    min_rate=0.51
+    min_rate=0.2
     
     alpha=0.2
     alpha_range=[]
