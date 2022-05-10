@@ -292,7 +292,7 @@ config.x_std=t_u.datasets_stds[config.dataset]
 #X.requires_grad=True
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 
-
+model_name=config.model_arch
 #inf=float('inf')
 
 x_min=0
