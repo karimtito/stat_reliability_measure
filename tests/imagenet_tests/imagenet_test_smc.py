@@ -26,7 +26,7 @@ class config:
     T_range=[]
     L=1
     L_range=[]
-    min_rate=0.51
+    min_rate=0.2
     
     alpha=0.2
     alpha_range=[]
@@ -86,7 +86,7 @@ class config:
     dt_decay=0.999
     dt_gain=None
     dt_min=1e-5
-    dt_max=1e-1
+    dt_max=0.65
     v_min_opt=False
     ess_opt=False
     only_duplicated=False
@@ -117,8 +117,8 @@ class config:
     adapt_func='ESS'
     M_opt = False
     adapt_step=True
-    FT=False
-    sig_dt=0.015
+    FT=True
+    sig_dt=0.02
 
     batch_opt=True
     track_finish=False
@@ -496,16 +496,23 @@ for l in inp_indices:
                             q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                             calls=np.array(calls)
                         
-                            
-
-                            times=np.array(times)  
-                            ests=np.array(ests)
+                            mean_calls=calls.mean()
+                            std_est=ests.std()
+                            mean_est=ests.mean()
+                            std_rel=std_est/mean_est
+                            std_rel_adj=std_rel*mean_calls
+                            print(f"mean est:{ests.mean()}, std est:{ests.std()}")
+                            print(f"mean calls:{calls.mean()}")
+                            print(f"std. rel.:{std_rel}")
+                            print(f"std. rel. adj.:{std_rel*mean_calls}")
+                            q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                             
                             #fin = np.array(finished_flags)
 
-
-                            np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
-                            np.savetxt(fname=os.path.join(log_path,'ests.txt'),X=ests)
+                            times_path=os.path.join(log_path,'times.txt')
+                            np.savetxt(fname=times_path,X=times)
+                            est_path=os.path.join(log_path,'ests.txt')
+                            np.savetxt(fname=est_path,X=ests)
 
                             plt.hist(times, bins=20)
                             plt.savefig(os.path.join(log_path,'times_hist.png'))
@@ -514,17 +521,19 @@ for l in inp_indices:
                             plt.hist(times, bins=20)
                             plt.savefig(os.path.join(log_path,'times_hist.png'))
                             plt.close()
+
+                      
 
                           
                             #with open(os.path.join(log_path,'results.txt'),'w'):
                             results={"method":method_name,'T':T,'N':N,'L':L,
                             "ess_alpha":ess_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
-                            "method":method,'adapt_dt':config.adapt_dt,
+                            "method":method,'adapt_dt':config.adapt_dt,"std_rel_adj":std_rel*mean_calls,
                             'mean_calls':calls.mean(),'std_calls':calls.std()
                             ,'mean_time':times.mean(),'std_time':times.std()
                             ,'mean_est':ests.mean(),'std_est':ests.std(), 
-                            "v_min_opt":config.v_min_opt
-                            ,'adapt_dt_mcmc':config.adapt_dt_mcmc,"adapt_dt":config.adapt_dt,
+                            "v_min_opt":config.v_min_opt,"est_path":est_path,"times_path":times_path,
+                            'adapt_dt_mcmc':config.adapt_dt_mcmc,"adapt_dt":config.adapt_dt,
                             "adapt_dt_mcmc":config.adapt_dt_mcmc,"dt_decay":config.dt_decay,"dt_gain":config.dt_gain,
                             "target_accept":config.target_accept,"accept_spread":config.accept_spread, 
                             "mh_opt":config.mh_opt,'only_duplicated':config.only_duplicated,
