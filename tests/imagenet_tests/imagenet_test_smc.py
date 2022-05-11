@@ -501,6 +501,14 @@ for l in inp_indices:
                             mean_est=ests.mean()
                             std_rel=std_est/mean_est
                             std_rel_adj=std_rel*mean_calls
+                            log_ests=np.log(np.max(ests,1e-250))
+                            std_log_est=log_ests.std()
+                            mean_log_est=log_ests.mean()
+                            lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                            lg_est_path=os.path.join(log_path,'lg_ests.txt')
+                            np.savetxt(fname=lg_est_path,X=ests)
+                            calls=np.array(calls)
+                            mean_calls=calls.mean()
                             print(f"mean est:{ests.mean()}, std est:{ests.std()}")
                             print(f"mean calls:{calls.mean()}")
                             print(f"std. rel.:{std_rel}")
@@ -529,8 +537,10 @@ for l in inp_indices:
                             results={"method":method_name,'T':T,'N':N,'L':L,
                             "ess_alpha":ess_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
                             "method":method,'adapt_dt':config.adapt_dt,"std_rel_adj":std_rel*mean_calls,
-                            'mean_calls':calls.mean(),'std_calls':calls.std()
-                            ,'mean_time':times.mean(),'std_time':times.std()
+                            'mean_calls':calls.mean(),'std_calls':calls.std(),"lg_est_path":lg_est_path,
+                            "mean_log_est":mean_log_est,"std_log_est":std_log_est,
+                            "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
+                            'mean_time':times.mean(),'std_time':times.std()
                             ,'mean_est':ests.mean(),'std_est':ests.std(), 
                             "v_min_opt":config.v_min_opt,"est_path":est_path,"times_path":times_path,
                             'adapt_dt_mcmc':config.adapt_dt_mcmc,"adapt_dt":config.adapt_dt,

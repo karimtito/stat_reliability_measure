@@ -357,6 +357,7 @@ for l in range(len(inp_indices)):
                         times= []
                         rel_error= []
                         ests = [] 
+                        log_ests=[]
                         calls=[]
                         if config.track_finish:
                             finish_flags=[]

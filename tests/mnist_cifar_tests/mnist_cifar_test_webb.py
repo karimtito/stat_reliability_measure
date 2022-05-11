@@ -357,6 +357,7 @@ for l in range(len(inp_indices)):
                         times= []
                         rel_error= []
                         ests = [] 
+                        log_ests=[]
                         calls=[]
                         if config.track_finish:
                             finish_flags=[]
@@ -369,6 +370,7 @@ for l in range(len(inp_indices)):
                             # we don't need adversarial examples and highest score
                             del x
                             del max_val
+                            log_ests.append(lg_p)
                             est=np.exp(lg_p)
                             print(f"Est:{est}")
                             # dict_out=amls_res[1]
@@ -398,10 +400,12 @@ for l in range(len(inp_indices)):
             
                         times=np.array(times)
                         ests = np.array(ests)
+                        log_ests=np.array(log_ests)
                         mean_est=ests.mean()
                         calls=np.array(calls)
                         mean_calls=calls.mean()
                         std_est=ests.std()
+                        
                         q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                         std_rel=std_est/mean_est**2
                         std_rel_adj=std_rel*mean_calls
@@ -431,7 +435,12 @@ for l in range(len(inp_indices)):
                         np.savetxt(fname=times_path,X=times)
                         est_path=os.path.join(log_path,'ests.txt')
                         np.savetxt(fname=est_path,X=ests)
-                      
+
+                        std_log_est=log_ests.std()
+                        mean_log_est=log_ests.mean()
+                        lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                        lg_est_path=os.path.join(log_path,'lg_ests.txt')
+                        np.savetxt(fname=lg_est_path,X=ests)
 
                         
 
@@ -450,8 +459,10 @@ for l in range(len(inp_indices)):
                         'std_est':ests.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
                         'cores_number':config.cores_number,'g_target':config.g_target,"std_rel":std_rel, "std_rel_adj":std_rel_adj,
                         'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
-                        'unfinished_mean_est':unfinished_mean_est
-                        ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
+                        'unfinished_mean_est':unfinished_mean_est,"lg_est_path":lg_est_path,
+                            "mean_log_est":mean_log_est,"std_log_est":std_log_est,
+                            "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
+                        'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
                         'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time,
                         'q_1':q_1,'q_3':q_3,'med_est':med_est}
                         results_df=pd.DataFrame([results])

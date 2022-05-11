@@ -517,8 +517,13 @@ for l in inp_indices:
 
                             times=np.array(times)  
                             ests=np.array(ests)
-                            
-                            #fin = np.array(finished_flags)
+                            log_ests=np.log(np.max(ests,1e-250))
+                            std_log_est=log_ests.std()
+                            mean_log_est=log_ests.mean()
+                            lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                            lg_est_path=os.path.join(log_path,'lg_ests.txt')
+                            np.savetxt(fname=lg_est_path,X=ests)
+                                #fin = np.array(finished_flags)
 
                             times_path=os.path.join(log_path,'times.txt')
                             np.savetxt(fname=times_path,X=times)
@@ -555,7 +560,9 @@ for l in inp_indices:
                             "M_opt":config.M_opt,"adapt_step":config.adapt_step,
                             "noise_dist":config.noise_dist,"lirpa_safe":lirpa_safe,"L_min":config.L_min,
                             "skip_mh":config.skip_mh,"GV_opt":config.GV_opt,
-                            'q_1':q_1,'q_3':q_3,'med_est':med_est}
+                            'q_1':q_1,'q_3':q_3,'med_est':med_est,"lg_est_path":lg_est_path,
+                            "mean_log_est":mean_log_est,"std_log_est":std_log_est,
+                            "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,}
                             exp_res.append(results)
                             results_df=pd.DataFrame([results])
                             results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)

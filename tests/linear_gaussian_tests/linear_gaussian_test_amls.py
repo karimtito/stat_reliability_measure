@@ -271,6 +271,12 @@ for p_t in config.p_range:
 
                     times=np.array(times)
                     ests = np.array(ests)
+                    log_ests=np.log(np.max(ests,1e-250))
+                    std_log_est=log_ests.std()
+                    mean_log_est=log_ests.mean()
+                    lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                    lg_est_path=os.path.join(log_path,'lg_ests.txt')
+                    np.savetxt(fname=lg_est_path,X=ests)
                 
                     abs_errors=np.abs(ests-p_t)
                     rel_errors=abs_errors/p_t
@@ -308,8 +314,9 @@ for p_t in config.p_range:
 
                     #with open(os.path.join(log_path,'results.txt'),'w'):
                     results={'p_t':p_t,'method':method_name,
-                    'N':N,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s
-                    ,'min_rate':config.min_rate,'mean_est':ests.mean()
+                    'N':N,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,'lg_est_path':lg_est_path
+                    ,'min_rate':config.min_rate,'mean_est':ests.mean(),'std_log_est':log_ests.std(),'mean_log_est':mean_log_est,
+                    'lg_q_1':lg_q_1,'lg_q_3':lg_q_3,"lg_med_est":lg_med_est
                     ,'mean_time':times.mean()
                     ,'std_time':times.std(),'MSE':MSE,'MSE_rel_adj':MSE_rel_adj,'MSE_rel':MSE_rel,
                     'mean_calls':mean_calls,'last_particle':config.last_particle,

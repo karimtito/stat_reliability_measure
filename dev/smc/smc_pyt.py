@@ -349,9 +349,10 @@ debug=False,kappa_opt=False,
    
 
     finished_flag=(v<=0).float().mean().item() >=min_rate
+    
     if verbose>=1.:
         print(f"finished flag:{finished_flag}")
-    P_est = g_prod.item()
+    P_est = max(g_prod.item(),1e-250)
     if verbose>=0.5:
             print(f"g_iter_final:{g_iter},g_final:{P_est}")
     dic_out = {'p_est':P_est,'X':X,'v':v,'finished':finished_flag}

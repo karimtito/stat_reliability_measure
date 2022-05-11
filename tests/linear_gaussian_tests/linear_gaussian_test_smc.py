@@ -386,7 +386,12 @@ for p_t in config.p_range:
                             calls.append(res_dict['calls'])
                         times=np.array(times)
                         ests = np.array(ests)
-                        
+                        log_ests=np.log(np.max(ests,1e-250))
+                        std_log_est=log_ests.std()
+                        mean_log_est=log_ests.mean()
+                        lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                        lg_est_path=os.path.join(log_path,'lg_ests.txt')
+                        np.savetxt(fname=lg_est_path,X=ests)
                         calls=np.array(calls)
                         mean_calls=calls.mean()
                     
@@ -448,7 +453,9 @@ for p_t in config.p_range:
                         "M_opt":config.M_opt,"adapt_step":config.adapt_step,"sig_dt":config.sig_dt,
                         "L_min":config.L_min,"kappa_opt":config.kappa_opt,"skip_mh":config.skip_mh,
                         "MSE":MSE,"MSE adj":MSE_adj,"MSE_rel_adj":MSE_rel_adj,
-                        'q_1':q_1,'q_3':q_3,'med_est':med_est}
+                        'q_1':q_1,'q_3':q_3,'med_est':med_est,"lg_est_path":lg_est_path,
+                            "mean_log_est":mean_log_est,"std_log_est":std_log_est,
+                            "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,}
                         exp_res.append(results)
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
