@@ -271,7 +271,7 @@ for p_t in config.p_range:
 
                     times=np.array(times)
                     ests = np.array(ests)
-                    log_ests=np.log(np.max(ests,1e-250))
+                    log_ests=np.log(np.clip(ests,a_min=1e-250))
                     std_log_est=log_ests.std()
                     mean_log_est=log_ests.mean()
                     lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
