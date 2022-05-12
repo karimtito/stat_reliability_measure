@@ -367,6 +367,7 @@ for l in range(len(inp_indices)):
                             count_particles=N,count_mh_steps=T,x_min=x_min,x_max=x_max,
                             x_sample=x_0,sigma=epsilon,rho=ratio,CUDA=True,debug=(config.verbose>=1))
                             t=time()-t
+                            log_ests.append(lg_p)
                             # we don't need adversarial examples and highest score
                             del x
                             del max_val
@@ -432,7 +433,11 @@ for l in range(len(inp_indices)):
                         np.savetxt(fname=times_path,X=times)
                         est_path=os.path.join(log_path,'ests.txt')
                         np.savetxt(fname=est_path,X=ests)
-                      
+                        std_log_est=log_ests.std()
+                        mean_log_est=log_ests.mean()
+                        lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                        lg_est_path=os.path.join(log_path,'lg_ests.txt')
+                        np.savetxt(fname=lg_est_path,X=ests)
 
                         
 
@@ -454,7 +459,9 @@ for l in range(len(inp_indices)):
                         'unfinished_mean_est':unfinished_mean_est
                         ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
                         'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time,
-                        'q_1':q_1,'q_3':q_3,'med_est':med_est}
+                        'q_1':q_1,'q_3':q_3,'med_est':med_est,"lg_est_path":lg_est_path,
+                            "mean_log_est":mean_log_est,"std_log_est":std_log_est,
+                            "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,}
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),)
                         if config.aggr_res_path is None:
