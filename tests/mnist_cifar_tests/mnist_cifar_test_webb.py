@@ -28,7 +28,7 @@ str2floatList=lambda x: str2list(in_str=x, type_out=float)
 str2intList=lambda x: str2list(in_str=x, type_out=int)
 low_str=lambda x: str(x).lower()
 
-method_name="amls_pyt"
+method_name="webb_ams"
 
 
 class config:
