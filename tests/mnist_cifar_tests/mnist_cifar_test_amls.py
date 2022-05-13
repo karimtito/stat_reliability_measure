@@ -1,6 +1,6 @@
 import torch
 
-
+import foolbox as fb
 import pandas as pd
 
 import numpy as np
@@ -10,14 +10,13 @@ from scipy.special import betainc
 import GPUtil
 import matplotlib.pyplot as plt
 import cpuinfo
-
+from torch import optim
 import argparse
 import os
 
 from time import time
 from datetime import datetime
-
-#from stat_reliability_measure.dev.torch_utils import get_model
+from stat_reliability_measure.home import ROOT_DIR
 import stat_reliability_measure.dev.torch_utils as t_u
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
@@ -32,12 +31,12 @@ str2intList=lambda x: str2list(in_str=x, type_out=int)
 low_str=lambda x: str(x).lower()
 
 method_name="amls_pyt"
-from stat_reliability_measure.home import ROOT_DIR
+
 
 class config:
-    dataset="imagenet"
-    log_dir=ROOT_DIR+"/logs/imagenet_tests"
-    model_dir=ROOT_DIR+"/models/imagenet"
+    dataset="mnist"
+    log_dir=ROOT_DIR+"/logs/mnist_tests"
+    model_dir=ROOT_DIR+"/models/mnist"
     n_rep=10
     a=0
     verbose=0
@@ -47,7 +46,7 @@ class config:
    
     s_min=8e-3
     s_max=3
-    n_max=2000
+    n_max=3000
     x_min=None
     x_max=None
     x_mean=0
@@ -98,7 +97,7 @@ class config:
     torch_seed=0
     np_seed=0
     tf_seed=None
-    model_arch='torchvision_resenet18'
+    model_arch='CNN_custom'
     model_path=None
     export_to_onnx=False
     use_attack=True
@@ -117,8 +116,10 @@ class config:
     load_batch_size=100 
     nb_epochs= 10
     adversarial_every=1
-    data_dir=ROOT_DIR+"/data/ImageNet/"
+    data_dir=ROOT_DIR+"/data"
     p_ref_compute=False
+    force_train=False
+    last_particle=False
 
 
 parser=argparse.ArgumentParser()
@@ -171,16 +172,20 @@ parser.add_argument('--track_finish',type=str2bool,default=config.track_finish)
 parser.add_argument('--lirpa_cert',type=str2bool,default=config.lirpa_cert)
 parser.add_argument('--load_batch_size',type=int,default=config.load_batch_size)
 parser.add_argument('--model_arch',type=str,default = config.model_arch)
+parser.add_argument('--dataset',type=str,default = config.dataset)
 parser.add_argument('--robust_model',type=str2bool, default=config.robust_model)
 parser.add_argument('--nb_epochs',type=int,default=config.nb_epochs)
 parser.add_argument('--adversarial_every',type=int,default=config.adversarial_every)
+parser.add_argument('--force_train',type=str2bool,default=config.force_train)
+parser.add_argument('--last_particle',type=str2bool,default=config.last_particle)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
     setattr(config, k, v)
 
-
-config.d = t_u.datasets_dims[config.dataset]
+if config.dataset!='mnist':
+    config.log_dir=config.log_dir.replace('mnist',config.dataset)
+    config.model_dir=config.model_dir.replace('mnist',config.dataset)
 
 if len(config.epsilons)==0:
     log_eps=np.linspace(start=np.log(config.eps_min),stop=np.log(config.eps_max),num=config.eps_num)
@@ -240,7 +245,7 @@ d=config.d
 
 
 if not os.path.exists(ROOT_DIR+'/logs'):
-    print('logs folder not found')
+    print('logs not found')
     os.mkdir(ROOT_DIR+'/logs')
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
@@ -256,7 +261,7 @@ if config.epsilons is None:
     config.epsilons=np.exp(log_line)
 
 if config.aggr_res_path is None:
-    aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+    aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
 else:
     aggr_res_path=config.aggr_res_path
 
@@ -267,30 +272,36 @@ if config.print_config:
     print(', '.join("%s: %s" % item for item in config.json.items()))
 
 #loading data
-num_classes=t_u.datasets_num_c[config.dataset.lower()]
-print(f"Running reliability experiments on architecture {config.model_arch} trained on {config.dataset}.")
-print(f"Testing uniform noise perturbation with epsilon in {config.epsilons}")
+
+
+num_classes=10
 test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
 ,dataset=config.dataset,batch_size=config.load_batch_size,
            x_mean=None,x_std=None)
 
-#charging model
-model,mean,std=t_u.get_model_imagenet(config.model_arch,model_dir=config.model_dir)
+model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
+    nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
+    download=config.download,dataset=config.dataset,force_train=config.force_train)
 X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
 if config.verbose>=2:
     print(f"model accuracy on test batch:{accuracy}")
-model_name=config.model_arch
-config.x_mean=mean 
-config.x_std=std
+
+config.x_mean=t_u.datasets_means[config.dataset]
+config.x_std=t_u.datasets_stds[config.dataset]
+
+
+
+
+
 #X.requires_grad=True
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 
 
 #inf=float('inf')
+
 x_min=0
-x_max=1 
+x_max=1
 if config.use_attack:
-    import foolbox as fb
     fmodel = fb.PyTorchModel(model, bounds=(x_min,x_max))
     attack=fb.attacks.LinfPGD()
     
@@ -329,10 +340,7 @@ for l in range(len(inp_indices)):
         if config.gaussian_latent:
             amls_gen = lambda N: torch.randn(size=(N,d),device=config.device)
         else:
-            amls_gen= lambda N: (2*torch.rand(size=(N,d), device=device )-1)
-     
-        
-            
+            amls_gen= lambda N: torch.rand(size=(N,d), device=device )
         normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 
         low=torch.max(x_0-epsilon, torch.tensor([x_min]).cuda())
         high=torch.min(x_0+epsilon, torch.tensor([x_max]).cuda())            
@@ -349,6 +357,7 @@ for l in range(len(inp_indices)):
                 y_diff, _ = y_diff.max(dim=1)
             return y_diff #.max(dim=1)
         h_batch_pyt= lambda x: h(x).reshape((x.shape[0],1))
+        
         for T in config.T_range:
             for N in config.N_range: 
                 for s in config.s_range :
@@ -361,7 +370,7 @@ for l in range(len(inp_indices)):
                         print(f"Starting experiment {i_exp}/{nb_exps}")
                                           
 
-                        K=int(N*ratio)
+                        K=int(N*ratio) if not config.last_particle else N-1
                         if config.verbose>=0:
                             print(f"with model: {model_name}, img_idx:{l},eps:{epsilon},T:{T},N:{N},s:{s},K:{K}")
                         if config.verbose>3:
@@ -376,13 +385,13 @@ for l in range(len(inp_indices)):
                             t=time()
                             if config.batch_opt:
                                 amls_res=amls_pyt.ImportanceSplittingPytBatch(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_batch_pyt, 
-                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , 
+                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                             s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                             device=config.device,track_accept=config.track_accept)
 
                             else:
                                 amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_batch_pyt, 
-                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , 
+                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                             s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                             device=config.device,)
                             t=time()-t
@@ -417,9 +426,18 @@ for l in range(len(inp_indices)):
         
                         times=np.array(times)
                         ests = np.array(ests)
+                        
+                        mean_est=ests.mean()
                         q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
-                        iq_dist=q_3-q_1
                         calls=np.array(calls)
+                        mean_calls=calls.mean()
+                        std_est=ests.std()
+                        std_rel=std_est/mean_est
+                        print(f"mean est:{ests.mean()}, std est:{ests.std()}")
+                        print(f"mean calls:{calls.mean()}")
+                        print(f"std. re.:{std_rel}")
+                        print(f"std. rel. adj.:{std_rel*mean_calls}")
+                        
                         if config.track_finish:
                             finish_flags=np.array(finish_flags)
                             freq_finished=finish_flags.mean()
@@ -434,12 +452,13 @@ for l in range(len(inp_indices)):
                             unfinished_mean_time=unfinish_times.mean()
                         else:
                             unfinished_mean_est,unfinished_mean_time=None,None
-                        
+                        if os.path.exists(log_path):
+                            log_path=log_path+'_rand_'+str(np.random.randint(low=0,high=10))
                         os.mkdir(log_path)
                         times_path=os.path.join(log_path,'times.txt')
                         np.savetxt(fname=times_path,X=times)
-                        ests_path=os.path.join(log_path,'ests.txt')
-                        np.savetxt(fname=ests_path,X=ests)
+                        est_path=os.path.join(log_path,'ests.txt')
+                        np.savetxt(fname=est_path,X=ests)
 
                         
 
@@ -453,19 +472,19 @@ for l in range(len(inp_indices)):
                         #with open(os.path.join(log_path,'results.txt'),'w'):
                         results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),'image_idx':l,
                             'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
-                        'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),
-                        'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),
+                        'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std adj":std_rel*mean_calls,
+                        'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),'last_particle':config.last_particle,
                         'std_est':ests.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
-                        'cores_number':config.cores_number,'g_target':config.g_target,
+                        'cores_number':config.cores_number,'g_target':config.g_target,"std_rel":std_rel, 
                         'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
-                        'unfinished_mean_est':unfinished_mean_est
+                        'unfinished_mean_est':unfinished_mean_est,'est_path':est_path,'times_path':times_path
                         ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
                         'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time,
-                        'q_1':q_1,'q_3':q_3,'med_est':med_est,"times_path":times_path,"est_path":ests_path}
+                        'q_1':q_1,'q_3':q_3,'med_est':med_est}
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),)
                         if config.aggr_res_path is None:
-                            aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                            aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
                         else: 
                             aggr_res_path=config.aggr_res_path
 
