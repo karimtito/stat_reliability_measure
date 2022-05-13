@@ -398,6 +398,7 @@ for l in range(len(inp_indices)):
             
                         times=np.array(times)
                         ests = np.array(ests)
+                        log_ests=np.array(log_ests)
                         mean_est=ests.mean()
                         calls=np.array(calls)
                         mean_calls=calls.mean()
