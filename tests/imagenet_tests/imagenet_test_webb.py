@@ -257,7 +257,7 @@ if config.epsilons is None:
     config.epsilons=np.exp(log_line)
 
 if config.aggr_res_path is None:
-    aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
+    aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
 else:
     aggr_res_path=config.aggr_res_path
 
@@ -464,7 +464,7 @@ for l in range(len(inp_indices)):
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),)
                         if config.aggr_res_path is None:
-                            aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
+                            aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                         else: 
                             aggr_res_path=config.aggr_res_path
 
