@@ -117,7 +117,9 @@ def multilevel_uniform(
 
         # Terminate if change in level is below some threshold
         if count_keep == 0:
-            return -math.inf, max_val, x, levels
+            s_x = prop(x).squeeze(-1)
+            max_val = s_x.max().item() 
+            return -math.inf,count_calls,max_val, x, levels
 
         lg_p += torch.log(count_keep.float()).item() - math.log(count_particles)
         #print('term', torch.log(count_keep.float()).item() - math.log(count_particles))
@@ -201,4 +203,4 @@ def multilevel_uniform(
     #count_calls+=count_particles
     #max_val = max(max_val, x.max().item())
     max_val = s_x.max().item() 
-    return lg_p,count_calls,max_val, x, levels, #, code modification: we add a counter of calls to score function
+    return lg_p,count_calls,max_val, x, levels #, code modification: we add a counter of calls to score function
