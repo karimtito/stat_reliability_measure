@@ -282,8 +282,6 @@ X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,dev
 if config.verbose>=2:
     print(f"model accuracy on test batch:{accuracy}")
 
-config.x_mean=t_u.datasets_means[config.dataset]
-config.x_std=t_u.datasets_stds[config.dataset]
 
 
 
