@@ -419,7 +419,10 @@ for l in range(len(inp_indices)):
         
                         times=np.array(times)
                         ests = np.array(ests)
+                        log_ests=np.log(np.clip(ests,a_min=0,a_max=None))
+
                         q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                        lg_q_1,lg_med_est,lg_q_3=np.quantile(a=log_ests,q=[0.25,0.5,0.75])
                         iq_dist=q_3-q_1
                         calls=np.array(calls)
                         if config.track_finish:
@@ -442,6 +445,8 @@ for l in range(len(inp_indices)):
                         np.savetxt(fname=times_path,X=times)
                         ests_path=os.path.join(log_path,'ests.txt')
                         np.savetxt(fname=ests_path,X=ests)
+                        lg_est_path=os.path.join(log_path,'log_ests.txt')
+                        np.savetxt(fname=ests_path,X=ests)
 
                         
 
@@ -463,7 +468,8 @@ for l in range(len(inp_indices)):
                         'unfinished_mean_est':unfinished_mean_est
                         ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
                         'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time,
-                        'q_1':q_1,'q_3':q_3,'med_est':med_est,"times_path":times_path,"est_path":ests_path}
+                        'q_1':q_1,'q_3':q_3,'med_est':med_est,"times_path":times_path,"est_path":ests_path,
+                        'lg_est_path':lg_est_path}
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),)
                         if config.aggr_res_path is None:

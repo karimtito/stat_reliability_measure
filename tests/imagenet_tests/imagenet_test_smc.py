@@ -540,8 +540,8 @@ for l in inp_indices:
                             'mean_calls':calls.mean(),'std_calls':calls.std(),"lg_est_path":lg_est_path,
                             "mean_log_est":mean_log_est,"std_log_est":std_log_est,
                             "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
-                            'mean_time':times.mean(),'std_time':times.std()
-                            ,'mean_est':ests.mean(),'std_est':ests.std(), 
+                            'mean_time':times.mean(),'std_time':times.std(),'epsilon':epsilon
+                            ,'mean_est':ests.mean(),'std_est':ests.std(),"mean_time":times.mean(),
                             "v_min_opt":config.v_min_opt,"est_path":est_path,"times_path":times_path,
                             'adapt_dt_mcmc':config.adapt_dt_mcmc,"adapt_dt":config.adapt_dt,
                             "adapt_dt_mcmc":config.adapt_dt_mcmc,"dt_decay":config.dt_decay,"dt_gain":config.dt_gain,
