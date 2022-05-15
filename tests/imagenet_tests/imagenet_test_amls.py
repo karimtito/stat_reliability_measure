@@ -466,7 +466,7 @@ for l in range(len(inp_indices)):
                         'std_est':ests.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
                         'cores_number':config.cores_number,'g_target':config.g_target,
                         'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
-                        'unfinished_mean_est':unfinished_mean_est
+                        'unfinished_mean_est':unfinished_mean_est,"last_particle":config.last_particle
                         ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
                         'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time,
                         'q_1':q_1,'q_3':q_3,'med_est':med_est,"times_path":times_path,"est_path":ests_path,
