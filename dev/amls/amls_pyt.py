@@ -70,6 +70,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False)
         Z = torch.zeros((N-K,d),device=device)
         SZ = torch.zeros((N-K,1),device=device)
 
+        
         #ind=torch.multinomial(input=torch.ones(size=(K,)),num_samples=N-K,replacement=True)
 
         #Z=Y[ind,:] 
@@ -241,9 +242,9 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
         #SZ = torch.zeros((N-K,1),device=device)
 
         ind=torch.multinomial(input=torch.ones(size=(K,)),num_samples=N-K,replacement=True).squeeze(-1)
-  
         Z=Y[ind,:] 
-       
+        if N-K==1:
+            Z=Z.unsqueeze(0)
         SZ=SY[ind]
         
         l_accept_rates=[]
