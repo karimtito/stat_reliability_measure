@@ -15,7 +15,7 @@ import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
 from scipy.special import betainc
 from stat_reliability_measure.home import ROOT_DIR
-method_name="smc_pyt"
+method_name="smc_pyt_killing"
 
 #gaussian_linear
 class config:
@@ -101,6 +101,7 @@ class config:
     L_min=1
     skip_mh=False
     GV_opt=False
+    killing=True
     
 
 
@@ -172,6 +173,7 @@ parser.add_argument('--sig_dt', type=float,default=config.sig_dt)
 parser.add_argument('--L_min',type=int,default=config.L_min)
 parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
 parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
+parser.add_argument('--killing',type=str2bool,default=config.killing)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -344,7 +346,8 @@ for p_t in config.p_range:
                         print(f"Starting simulations with p_t:{p_t},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
                         for i in iterator:
                             t=time()
-                            p_est,res_dict,=smc_pyt.SamplerSMC(gen=norm_gen,V= V,gradV=gradV,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,
+                            sampler=smc_pyt.SamplerSMC if config.killing else smc_pyt.SamplerSMC2
+                            p_est,res_dict,=sampler(gen=norm_gen,V= V,gradV=gradV,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,
                             alpha=alpha,n_max=10000,
                             verbose=config.verbose, track_accept=config.track_accept,track_beta=config.track_beta,track_v_means=config.track_v_means,
                             track_ratios=config.track_ratios,track_ess=config.track_ess,kappa_opt=config.kappa_opt
@@ -436,7 +439,7 @@ for p_t in config.p_range:
                         results={"p_t":p_t,"method":method_name,'T':T,'N':N,'L':L,
                         "ess_alpha":ess_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
                         "method":method,"kernel":kernel_str,'adapt_dt':config.adapt_dt,
-                        'mean_calls':calls.mean(),'std_calls':calls.std()
+                        'mean_calls':calls.mean(),'std_calls':calls.std(),"killing":config.killing
                         ,'mean_time':times.mean(),'std_time':times.std()
                         ,'mean_est':ests.mean(),'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
                         'mean_rel_error':rel_errors.mean(),'std_est':ests.std(),'freq underest':(ests<p_t).mean(), 

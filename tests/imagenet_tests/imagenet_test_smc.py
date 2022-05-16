@@ -13,7 +13,7 @@ import cpuinfo
 import pandas as pd
 import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
-method_name="smc_pyt"
+method_name="smc_pyt_killing"
 from stat_reliability_measure.home import ROOT_DIR
 #gaussian_linear
 class config:
@@ -142,6 +142,7 @@ class config:
     mala=False
     g_target=0.8
     skip_mh=False
+    killing=True
 
 
 parser=argparse.ArgumentParser()

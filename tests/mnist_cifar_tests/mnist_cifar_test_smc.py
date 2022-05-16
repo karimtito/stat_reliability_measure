@@ -15,7 +15,7 @@ import pandas as pd
 import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
 from stat_reliability_measure.home import ROOT_DIR
-method_name="smc_pyt"
+method_name="smc_pyt_killing"
 
 #gaussian_linear
 class config:
@@ -142,7 +142,7 @@ class config:
     g_target=0.8
     skip_mh=False
     force_train=False
-
+    killing=True
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
