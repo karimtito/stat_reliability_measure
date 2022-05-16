@@ -332,8 +332,10 @@ debug=False,kappa_opt=False,
             if v_min_opt:
                 G_v_min= torch.exp(-(beta-beta_old)*(v-v.min()))
                 to_renew=(G_v_min<U) 
+                surv_idx=torch.where(G_v_min>=U)[0]
             else:
-                to_renew = (G<U) 
+                to_renew = (G<U)
+                surv_idx=torch.where(G>=U)[0] 
         g_iter=G.mean()
         g_prod*=g_iter
         if verbose>=0.5:
@@ -343,7 +345,7 @@ debug=False,kappa_opt=False,
 
         nb_to_renew=to_renew.int().sum().item()
         if nb_to_renew>0:
-            surv_idx=torch.where(G>=U)[0]
+            
             prenew_idx=torch.randint(low=0,high=len(surv_idx),size=(nb_to_renew,))
             renew_idx=surv_idx[prenew_idx]
         
