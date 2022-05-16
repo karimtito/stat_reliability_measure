@@ -312,20 +312,14 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
     K_last = (SX>=tau).sum().item() # count the nb of score above the target threshold
 
     #Estimation
-    if K_last>0:
-        p = K/N
-        p_last = K_last/N
-        P_est = (p**(n-1))*p_last
-        Var_est = (P_est**2)*((n-1)*(1-p)/p + (1-p_last)/p_last)/N
-        P_bias = P_est*n*(1-p)/p/N
-        CI_est = P_est*np.array([1,1]) + q*np.sqrt(Var_est)*np.array([-1,1])
-        Xrare = X[(SX>=tau).reshape(-1),:]
-    else:
-        P_est=0
-        Var_est=0
-        P_bias = 0
-        CI_est= np.zeros(size=[2,])
-        X_rare =0
+
+    p = K/N
+    p_last = K_last/N
+    P_est = (p**(n-1))*p_last
+    Var_est = (P_est**2)*((n-1)*(1-p)/p + (1-p_last)/p_last)/N if p_last>0 else 0
+    P_bias = P_est*n*(1-p)/p/N
+    CI_est = P_est*np.array([1,1]) + q*np.sqrt(Var_est)*np.array([-1,1])
+    Xrare = X[(SX>=tau).reshape(-1),:] if p_last>0 else None
 
     dic_out = {"Var_est":Var_est,"CI_est": CI_est,"N":N,"K":K,"s":s,"decay":decay,"T":T,"Count_h":Count_h,
     "P_bias":P_bias,"n":n,"Xrare":Xrare}
