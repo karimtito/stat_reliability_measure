@@ -339,6 +339,8 @@ if not os.path.exists(raw_logs_path):
 loc_time= datetime.today().isoformat().split('.')[0]
 log_name=method_name+'_'+'_'+loc_time
 exp_log_path=os.path.join(raw_logs_path,log_name)
+if os.path.exists(path=exp_log_path):
+    exp_log_path = exp_log_path+'_'+str(np.random.randint(low=0,high=9))
 os.mkdir(path=exp_log_path)
 config.json=vars(args)
 
@@ -448,6 +450,8 @@ for l in inp_indices:
                             loc_time= datetime.today().isoformat().split('.')[0]
                             log_name=method_name+f'_N_{N}_T_{T}_L_{L}_a_{float_to_file_float(alpha)}_ess_{float_to_file_float(ess_t)}'+'_'+loc_time.split('_')[0]
                             log_path=os.path.join(exp_log_path,log_name)
+                            if os.path.exists(log_path):
+                                log_path = log_path + '_'+str(np.random.randint(low=0,high =10))
                             
                             
                             os.mkdir(path=log_path)
