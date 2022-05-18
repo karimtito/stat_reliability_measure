@@ -267,7 +267,7 @@ if not os.path.exists(raw_logs_path):
 loc_time= datetime.today().isoformat().split('.')[0]
 log_name=method_name+'_'+'_'+loc_time
 exp_log_path=os.path.join(raw_logs_path,log_name)
-if os.path.exist (exp_log_path):
+if os.path.exists(exp_log_path):
     exp_log_path = exp_log_path +'_'+ str(np.random.randint(low=0,high=9))
 os.mkdir(path=exp_log_path)
 config.json=vars(args)
