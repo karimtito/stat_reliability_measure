@@ -420,7 +420,7 @@ for l in range(len(inp_indices)):
         
                         times=np.array(times)
                         ests = np.array(ests)
-                        log_ests=np.log(np.clip(ests,a_min=0,a_max=None))
+                        log_ests=np.log(np.clip(ests,a_min=1e-250,a_max=None))
 
                         q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                         lg_q_1,lg_med_est,lg_q_3=np.quantile(a=log_ests,q=[0.25,0.5,0.75])
