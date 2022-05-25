@@ -3,20 +3,15 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-import cpuinfo
-from torch import optim
 import argparse
 import os
 from home import ROOT_DIR
 from time import time
 from datetime import datetime
 import dev.torch_utils as t_u
-
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
 
-#setting PRNG seeds for reproducibility
-
-from dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, dichotomic_search, str2list
+from dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, str2list
 import dev.mls.amls_uniform as amls_mls
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
@@ -30,10 +25,13 @@ class config:
     dataset="imagenet"
     log_dir=ROOT_DIR+"/logs/imagenet_tests"
     model_dir=ROOT_DIR+"/models/imagenet"
+    model_arch='torchvision_mobilenet_v2'
+    T_range=[10,20,50,100,200]
+    N_range=[32,64,128,256,]
 
     n_rep=50
-    T_range=[]
-    N_range=[]
+    
+    
     
     ratio_range=[]
     
@@ -78,7 +76,7 @@ class config:
     n_max=2000
     tqdm_opt=True
     
-    epsilons = []
+    
     eps_max=0.3
     eps_min=0.1 
     eps_num=5
@@ -102,7 +100,7 @@ class config:
     torch_seed=0
     np_seed=0
     tf_seed=None
-    model_arch='CNN_custom'
+    
     model_path=None
     export_to_onnx=False
     use_attack=False
@@ -225,12 +223,14 @@ if len(config.ratio_range)<1:
 
 
 if config.track_gpu:
+    import GPUtil
     gpus=GPUtil.getGPUs()
     if len(gpus)>1:
         print("Multi gpus detected, only the first GPU will be tracked.")
     config.gpu_name=gpus[0].name
 
 if config.track_cpu:
+    import cpuinfo
     config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
     config.cores_number=os.cpu_count()
 
