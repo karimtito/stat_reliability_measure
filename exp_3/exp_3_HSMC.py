@@ -93,9 +93,9 @@ class config:
     dt_gain=None
     dt_min=1e-5
     dt_max=0.65
-    v_min_opt=False
+    v_min_opt=True
     ess_opt=False
-    only_duplicated=False
+    only_duplicated=True
     np_seed=None
     lambda_0=0.5
     test2=False
