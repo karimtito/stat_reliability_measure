@@ -18,12 +18,14 @@ ratio_range=[0.1,0.6]
 min_rate_smc=0.2
 min_rate_ams=0.51
 v_min_opt=True
-amls_filtr=(csv_res['method']=='webb_ams') 
-
-smc_filtr=  (csv_res['method']=='smc_pyt_killing_adjusted') 
+amls_filtr= (csv_res['method']=='MLS_SMC')  
+smc_filtr= ((csv_res['method']=='H_SMC') | 
+            csv_res['method']=='MALA_SMC' | 
+            csv_res['method']=='RW_SMC')
 csv_res_webb=csv_res[amls_filtr]
 
 csv_res_smc=csv_res[smc_filtr]
+
 
 ################################################################################
 ####################### Plot HMC-SMC results ######################################

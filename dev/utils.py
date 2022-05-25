@@ -30,6 +30,14 @@ def float_to_file_float(x):
     x=str(x).replace('.','_').replace(',','_')
     return x
 
+def path_to_meanlog10(path):
+    ests=np.loadtxt(path)
+    return np.log10(ests).mean()
+
+def path_to_stdlog10(path):
+    ests=np.loadtxt(path)
+    return np.log10(ests).std()
+
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
