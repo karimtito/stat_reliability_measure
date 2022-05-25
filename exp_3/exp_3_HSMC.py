@@ -20,7 +20,8 @@ class config:
     model_arch="torchvision_mobilenet_v2"
     N_range=[64,128,256,512]
     T_range=[10,20,50]
-    L=10
+    epsilons = [0.13]
+    L=5
     GV_opt=False
     n_rep=10
     
@@ -48,7 +49,7 @@ class config:
     x_mean=0
     x_std=1
 
-    epsilons = None
+    
     eps_max=0.3
     eps_min=0.1 
     eps_num=5
