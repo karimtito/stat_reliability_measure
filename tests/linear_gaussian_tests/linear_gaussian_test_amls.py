@@ -1,22 +1,16 @@
 import numpy as np 
-import numpy.linalg as LA
 from time import time
-from pydantic import conint
-from scipy.special import betainc
 import scipy.stats as stat
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
-import GPUtil
-import cpuinfo
 import argparse
 from tqdm import tqdm
 import torch
-from stat_reliability_measure.home import ROOT_DIR
+from home import ROOT_DIR
 from datetime import datetime
-
-from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList
-import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
+from dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList
+import dev.amls.amls_pyt as amls_pyt
 
 method_name="amls_pyt"
 
@@ -67,8 +61,8 @@ class config:
     log_dir=ROOT_DIR+"/logs/linear_gaussian_tests"
     batch_opt=True
     allow_multi_gpu=False
-    track_gpu=True
-    track_cpu=True
+    track_gpu=False
+    track_cpu=False
     core_numbers=None
     gpu_name=None 
     cpu_name=None
@@ -150,12 +144,14 @@ if not config.allow_multi_gpu:
     os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 if config.track_gpu:
+    import GPUtil
     gpus=GPUtil.getGPUs()
     if len(gpus)>1:
         print("Multi gpus detected, only the first GPU will be tracked.")
     config.gpu_name=gpus[0].name
 
 if config.track_cpu:
+    import cpuinfo
     config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
     config.cores_number=os.cpu_count()
 

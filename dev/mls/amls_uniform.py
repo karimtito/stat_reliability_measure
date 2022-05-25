@@ -38,7 +38,7 @@ import torch.distributions as dist
 # plt.style.use(['seaborn-white', 'seaborn-paper', 'seaborn-ticks'])
 # matplotlib.rc('font', family='Latin Modern Roman')
 
-from stat_reliability_measure.dev.webb_amls import webb_utils
+from dev.mls import mls_utils
 
 def multilevel_uniform(
     prop,
@@ -187,7 +187,7 @@ def multilevel_uniform(
 
         # DEBUG: See what acceptance ratios are doing
         if stats:
-            webb_utils.stats(acc_ratio)
+            mls_utils.stats(acc_ratio)
         #input()
 
         #print(acc_ratio.size())

@@ -1,44 +1,36 @@
 import torch
-
-
 import pandas as pd
-
 import numpy as np
 from tqdm import tqdm
-
-from scipy.special import betainc
-import GPUtil
 import matplotlib.pyplot as plt
-import cpuinfo
-
 import argparse
 import os
-
+from home import ROOT_DIR
 from time import time
 from datetime import datetime
-
-#from dev.torch_utils import get_model
 import dev.torch_utils as t_u
-
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
-
 #setting PRNG seeds for reproducibility
-
-from dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, dichotomic_search, str2list
-import dev.amls.amls_pyt as amls_pyt
+from dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, str2list
+import dev.mls.amls_uniform as amls_mls
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
 str2intList=lambda x: str2list(in_str=x, type_out=int)
 low_str=lambda x: str(x).lower()
 
-method_name="amls_pyt"
-from home import ROOT_DIR
-
+method_name="MLS_SMC"
 class config:
-    dataset="imagenet"
-    log_dir=ROOT_DIR+"/logs/imagenet_tests"
-    model_dir=ROOT_DIR+"/models/imagenet"
-    n_rep=10
+    dataset="mnist"
+    log_dir=ROOT_DIR+"/logs/mnist_tests"
+    model_dir=ROOT_DIR+"/models/mnist"
+    model_arch="dnn2"  
+    epsilons = [0.15]
+    N_range=[32,64,128,256,512,1024]
+    N_range_alt=[10,16,32,64,128,256]
+    T_range=[1,10,20,50,100,200,500,1000]
+    ratio_range=[0.1]
+    n_rep=100
+      
     a=0
     verbose=0
     min_rate=0.51
@@ -55,13 +47,13 @@ class config:
     allow_zero_est=True
     
     N=40
-    N_range=[]
+    
 
     T=1
-    T_range=[]
+    
 
     ratio=0.6
-    ratio_range=[]
+    
 
     s=1
     s_range = []
@@ -74,7 +66,7 @@ class config:
     n_max=2000
     tqdm_opt=True
     
-    epsilons = []
+    
     eps_max=0.3
     eps_min=0.1 
     eps_num=5
@@ -98,7 +90,7 @@ class config:
     torch_seed=0
     np_seed=0
     tf_seed=None
-    model_arch='torchvision_resenet18'
+
     model_path=None
     export_to_onnx=False
     use_attack=False
@@ -117,9 +109,9 @@ class config:
     load_batch_size=100 
     nb_epochs= 10
     adversarial_every=1
-    data_dir=ROOT_DIR+"/data/ImageNet/"
+    data_dir=ROOT_DIR+"/data"
     p_ref_compute=False
-    last_particle=False
+    force_train=False
 
 
 parser=argparse.ArgumentParser()
@@ -161,6 +153,7 @@ parser.add_argument('--noise_dist',type=str, default=config.noise_dist)
 parser.add_argument('--data_dir',type=str, default=config.data_dir)
 parser.add_argument('--a',type=float, default=config.a)
 parser.add_argument('--N_range',type=str2intList,default=config.N_range)
+parser.add_argument('--N_range_alt',type=str2intList,default=config.N_range_alt)
 parser.add_argument('--T_range',type=str2intList,default=config.T_range)
 parser.add_argument('--download',type=str2bool, default=config.download)
 parser.add_argument('--model_path',type=str,default=config.model_path)
@@ -174,16 +167,17 @@ parser.add_argument('--load_batch_size',type=int,default=config.load_batch_size)
 parser.add_argument('--model_arch',type=str,default = config.model_arch)
 parser.add_argument('--dataset',type=str,default = config.dataset)
 parser.add_argument('--robust_model',type=str2bool, default=config.robust_model)
-parser.add_argument('--last_particle',type=str2bool,default=config.last_particle)
 parser.add_argument('--nb_epochs',type=int,default=config.nb_epochs)
 parser.add_argument('--adversarial_every',type=int,default=config.adversarial_every)
+parser.add_argument('--force_train',type=str2bool,default=config.force_train)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
     setattr(config, k, v)
 
-
-config.d = t_u.datasets_dims[config.dataset]
+if config.dataset!='mnist':
+    config.log_dir=config.log_dir.replace('mnist',config.dataset)
+    config.model_dir=config.model_dir.replace('mnist',config.dataset)
 
 if len(config.epsilons)==0:
     log_eps=np.linspace(start=np.log(config.eps_min),stop=np.log(config.eps_max),num=config.eps_num)
@@ -220,12 +214,14 @@ if len(config.ratio_range)<1:
 
 
 if config.track_gpu:
+    import GPUtil
     gpus=GPUtil.getGPUs()
     if len(gpus)>1:
         print("Multi gpus detected, only the first GPU will be tracked.")
     config.gpu_name=gpus[0].name
 
 if config.track_cpu:
+    import cpuinfo
     config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
     config.cores_number=os.cpu_count()
 
@@ -243,7 +239,7 @@ d=config.d
 
 
 if not os.path.exists(ROOT_DIR+'/logs'):
-    print('logs folder not found')
+    print('logs not found')
     os.mkdir(ROOT_DIR+'/logs')
 if not os.path.exists(config.log_dir):
     os.mkdir(config.log_dir)
@@ -259,7 +255,7 @@ if config.epsilons is None:
     config.epsilons=np.exp(log_line)
 
 if config.aggr_res_path is None:
-    aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+    aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
 else:
     aggr_res_path=config.aggr_res_path
 
@@ -270,29 +266,37 @@ if config.print_config:
     print(', '.join("%s: %s" % item for item in config.json.items()))
 
 #loading data
-num_classes=t_u.datasets_num_c[config.dataset.lower()]
-print(f"Running reliability experiments on architecture {config.model_arch} trained on {config.dataset}.")
-print(f"Testing uniform noise perturbation with epsilon in {config.epsilons}")
-test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
-,dataset=config.dataset,batch_size=config.load_batch_size,
-           x_mean=None,x_std=None)
 
-#charging model
-model,mean,std=t_u.get_model_imagenet(config.model_arch,model_dir=config.model_dir)
+
+num_classes=10
+test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
+                ,dataset=config.dataset,batch_size=config.load_batch_size,
+            x_mean=None,x_std=None)
+
+model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
+    nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
+    download=config.download,dataset=config.dataset,force_train=config.force_train)
 X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
 if config.verbose>=2:
     print(f"model accuracy on test batch:{accuracy}")
-model_name=config.model_arch
-config.x_mean=mean 
-config.x_std=std
+
+config.x_mean=t_u.datasets_means[config.dataset]
+config.x_std=t_u.datasets_stds[config.dataset]
+
+
+
+
+
 #X.requires_grad=True
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 
 
 #inf=float('inf')
+
 x_min=0
-x_max=1 
+x_max=1
 if config.use_attack:
+
     import foolbox as fb
     fmodel = fb.PyTorchModel(model, bounds=(x_min,x_max))
     attack=fb.attacks.LinfPGD()
@@ -310,7 +314,6 @@ nb_exps= np.prod(lenghts)
 
 for l in range(len(inp_indices)):
     with torch.no_grad():
-    
         x_0,y_0 = X_correct[l], label_correct[l]
     input_shape=x_0.shape
     x_0.requires_grad=True
@@ -326,34 +329,18 @@ for l in range(len(inp_indices)):
             p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
             num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)
             p_l,p_u=p_l.item(),p_u.item()
-            
-        
-        
-        if config.gaussian_latent:
-            amls_gen = lambda N: torch.randn(size=(N,d),device=config.device)
-        else:
-            amls_gen= lambda N: (2*torch.rand(size=(N,d), device=device )-1)
-     
-        
-            
-        normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 
-        low=torch.max(x_0-epsilon, torch.tensor([x_min]).cuda())
-        high=torch.min(x_0+epsilon, torch.tensor([x_max]).cuda())            
-        def h(x,gaussian_latent=config.gaussian_latent,low=low,high=high):
-            x_m=x.reshape((x.shape[0],)+input_shape)
-            if gaussian_latent:
-                x_m=normal_dist.cdf(x_m)
-            with torch.no_grad():
-
-                x_m=low+(high-low)*x_m
-                
-                y = model(x_m)
-                y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)
-                y_diff, _ = y_diff.max(dim=1)
+        def prop(x):
+            y = model(x)
+            y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)
+            y_diff, _ = y_diff.max(dim=1)
             return y_diff #.max(dim=1)
-        h_batch_pyt= lambda x: h(x).reshape((x.shape[0],1))
+            
         for T in config.T_range:
-            for N in config.N_range: 
+            if T>=200:
+                    N_range=config.N_range_alt
+            else:
+                N_range=config.N_range
+            for N in N_range: 
                 for s in config.s_range :
                     for ratio in config.ratio_range: 
                         loc_time= datetime.today().isoformat().split('.')[0]
@@ -372,60 +359,64 @@ for l in range(len(inp_indices)):
                         times= []
                         rel_error= []
                         ests = [] 
+                        log_ests=[]
                         calls=[]
                         if config.track_finish:
                             finish_flags=[]
                         for i in tqdm(range(config.n_rep)):
                             t=time()
-                            if config.batch_opt:
-                                amls_res=amls_pyt.ImportanceSplittingPytBatch(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_batch_pyt, 
-                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , 
-                            s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
-                            device=config.device,track_accept=config.track_accept)
-
-                            else:
-                                amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_batch_pyt, 
-                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , 
-                            s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
-                            device=config.device,)
+                            lg_p,nb_calls,max_val,x,levels=amls_mls.multilevel_uniform(prop=prop,
+                            count_particles=N,count_mh_steps=T,x_min=x_min,x_max=x_max,
+                            x_sample=x_0,sigma=epsilon,rho=ratio,CUDA=True,debug=(config.verbose>=1))
                             t=time()-t
-                            
-                            est=amls_res[0]
-                            print(f"Est:{est}")
-                            dict_out=amls_res[1]
-                            if config.track_accept:
-                                accept_logs=os.path.join(log_path,'accept_logs')
-                                if not os.path.exists(accept_logs):
-                                    os.mkdir(path=accept_logs)
-                                accept_rates=dict_out['accept_rates']
-                                np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
-                                ,X=accept_rates)
-                                x_T=np.arange(len(accept_rates))
-                                plt.plot(x_T,accept_rates)
-                                plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
-                                plt.close()
-                                accept_rates_mcmc=dict_out['accept_rates_mcmc']
-                                x_T=np.arange(len(accept_rates_mcmc))
-                                plt.plot(x_T,accept_rates_mcmc)
-                                plt.savefig(os.path.join(accept_logs,f'accept_rates_mcmc_{i}.png'))
-                                plt.close()
-                                np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
-                                ,X=accept_rates_mcmc)
+                            # we don't need adversarial examples and highest score
+                            del x
+                            del max_val
+                            log_ests.append(lg_p)
+                            est=np.exp(lg_p)
+                            if config.verbose:
+                                print(f"Est:{est}")
+                            # dict_out=amls_res[1]
+                            # if config.track_accept:
+                            #     accept_logs=os.path.join(log_path,'accept_logs')
+                            #     if not os.path.exists(accept_logs):
+                            #         os.mkdir(path=accept_logs)
+                            #     accept_rates=dict_out['accept_rates']
+                            #     np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
+                            #     ,X=accept_rates)
+                            #     x_T=np.arange(len(accept_rates))
+                            #     plt.plot(x_T,accept_rates)
+                            #     plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
+                            #     plt.close()
+                            #     accept_rates_mcmc=dict_out['accept_rates_mcmc']
+                            #     x_T=np.arange(len(accept_rates_mcmc))
+                            #     plt.plot(x_T,accept_rates_mcmc)
+                            #     plt.savefig(os.path.join(accept_logs,f'accept_rates_mcmc_{i}.png'))
+                            #     plt.close()
+                            #     np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
+                            #     ,X=accept_rates_mcmc)
                             if config.track_finish:
-                                finish_flags.append(dict_out['finish_flag'])
+                                finish_flags.append(levels[-1]>=0)
                             times.append(t)
                             ests.append(est)
-                            calls.append(dict_out['Count_h'])
+                            calls.append(nb_calls)
             
-        
                         times=np.array(times)
                         ests = np.array(ests)
-                        log_ests=np.log(np.clip(ests,a_min=1e-250,a_max=None))
-
-                        q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
-                        lg_q_1,lg_med_est,lg_q_3=np.quantile(a=log_ests,q=[0.25,0.5,0.75])
-                        iq_dist=q_3-q_1
+                        log_ests=np.array(log_ests)
+                        mean_est=ests.mean()
                         calls=np.array(calls)
+                        mean_calls=calls.mean()
+                        std_est=ests.std()
+                        
+                        q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                        std_rel=std_est/mean_est**2 if mean_est >0 else 0
+                        std_rel_adj=std_rel*mean_calls
+                        print(f"mean est:{ests.mean()}, std est:{ests.std()}")
+                        print(f"mean calls:{calls.mean()}")
+                        print(f"std. re.:{std_rel}")
+                        print(f"std. rel. adj.:{std_rel_adj}")
+                        
                         if config.track_finish:
                             finish_flags=np.array(finish_flags)
                             freq_finished=finish_flags.mean()
@@ -440,14 +431,19 @@ for l in range(len(inp_indices)):
                             unfinished_mean_time=unfinish_times.mean()
                         else:
                             unfinished_mean_est,unfinished_mean_time=None,None
-                        
+                        if os.path.exists(log_path):
+                            log_path=log_path+'_rand_'+str(np.random.randint(low=0,high=9))
                         os.mkdir(log_path)
                         times_path=os.path.join(log_path,'times.txt')
                         np.savetxt(fname=times_path,X=times)
-                        ests_path=os.path.join(log_path,'ests.txt')
-                        np.savetxt(fname=ests_path,X=ests)
-                        lg_est_path=os.path.join(log_path,'log_ests.txt')
-                        np.savetxt(fname=ests_path,X=ests)
+                        est_path=os.path.join(log_path,'ests.txt')
+                        np.savetxt(fname=est_path,X=ests)
+
+                        std_log_est=log_ests.std()
+                        mean_log_est=log_ests.mean()
+                        lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                        lg_est_path=os.path.join(log_path,'lg_ests.txt')
+                        np.savetxt(fname=lg_est_path,X=ests)
 
                         
 
@@ -461,20 +457,21 @@ for l in range(len(inp_indices)):
                         #with open(os.path.join(log_path,'results.txt'),'w'):
                         results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),'image_idx':l,
                             'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
-                        'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),
-                        'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),
+                        'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std_adj":ests.std()*mean_calls,
+                        'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),'est_path':est_path,'times_path':times_path,
                         'std_est':ests.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
-                        'cores_number':config.cores_number,'g_target':config.g_target,
+                        'cores_number':config.cores_number,'g_target':config.g_target,"std_rel":std_rel, "std_rel_adj":std_rel_adj,
                         'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
-                        'unfinished_mean_est':unfinished_mean_est,"last_particle":config.last_particle
-                        ,'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
+                        'unfinished_mean_est':unfinished_mean_est,"lg_est_path":lg_est_path,
+                            "mean_log_est":mean_log_est,"std_log_est":std_log_est,
+                            "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
+                        'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
                         'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time,
-                        'q_1':q_1,'q_3':q_3,'med_est':med_est,"times_path":times_path,"est_path":ests_path,
-                        'lg_est_path':lg_est_path}
+                        'q_1':q_1,'q_3':q_3,'med_est':med_est}
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),)
                         if config.aggr_res_path is None:
-                            aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                            aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
                         else: 
                             aggr_res_path=config.aggr_res_path
 

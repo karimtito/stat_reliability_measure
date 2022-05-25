@@ -1,29 +1,38 @@
 import numpy as np 
-import numpy.linalg as LA
 from time import time
-from pydantic import conint
-from scipy.special import betainc
-import scipy.stats as stat
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import GPUtil
 import cpuinfo
+import scipy.stats as stat
 import argparse
 from tqdm import tqdm
 import torch
-
+from home import ROOT_DIR
 from datetime import datetime
 
 from dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList
 import dev.amls.amls_pyt as amls_pyt
-from home import ROOT_DIR
-method_name="amls_pyt"
 
+
+method_name="MLS_SMC"
 class config:
-    n_rep=10
+    
+
+    n_rep=200
+    T_range=[10,20,50]
+    N_range=[32,64,128,256,512,1024]
+    ratio_range=[0.1]
+    p_range=[1e-6,1e-12]
+    
+    
+    
+    
+    
+    
     verbose=0
-    min_rate=0.40
+    min_rate=0.3
     clip_s=True
     s_min=8e-3
     s_max=3
@@ -33,25 +42,20 @@ class config:
     allow_zero_est=True
     
     N=40
-    N_range=[]
+    
 
     T=1
-    T_range=[]
+    
 
     ratio=0.6
-    ratio_range=[]
 
     s=1
     s_range= []
 
-    p_s=1e-4
-    p_range=[]
-    
-    p_w=1e-1
+    p_t=1e-15
 
+    
     d = 1024
-    d_w=2
-    d_s=1
     epsilon = 1
     
     
@@ -68,7 +72,7 @@ class config:
     torch_seed=0
     np_seed=0
 
-    log_dir=ROOT_DIR+"/logs/anisotrop_tests"
+    log_dir=ROOT_DIR+"/logs/linear_gaussian_tests"
     batch_opt=True
     allow_multi_gpu=False
     track_gpu=False
@@ -78,6 +82,8 @@ class config:
     cpu_name=None
     cores_number=None
     correct_T=False
+    last_particle=False
+
 parser=argparse.ArgumentParser()
 
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
@@ -97,13 +103,10 @@ parser.add_argument('--ratio',type=float,default=config.ratio)
 parser.add_argument('--ratio_range',type=str2floatList,default=config.ratio_range)
 parser.add_argument('--s',type=float,default=config.s)
 parser.add_argument('--s_range',type=str2floatList,default=config.s_range)
-parser.add_argument('--p_w',type=float,default=config.p_w)
-parser.add_argument('--p_s',type=float,default=config.p_s)
+parser.add_argument('--p_t',type=float,default=config.p_t)
 parser.add_argument('--p_range',type=str2floatList,default=config.p_range)
 
 parser.add_argument('--d',type=int,default=config.d)
-parser.add_argument('--d_w',type=int,default=config.d_w)
-parser.add_argument('--d_s',type=int,default=config.d_s)
 parser.add_argument('--epsilon',type=float, default=config.epsilon)
 parser.add_argument('--tqdm_opt',type=bool,default=config.tqdm_opt)
 parser.add_argument('--save_config', type=bool, default=config.save_config)
@@ -118,11 +121,12 @@ parser.add_argument('--allow_multi_gpu',type=str2bool,default=config.allow_multi
 parser.add_argument('--batch_opt',type=str2bool,default=config.batch_opt)
 parser.add_argument('--track_accept',type=str2bool,default= config.track_accept)
 parser.add_argument('--track_finish',type=str2bool,default=config.track_finish)
-parser.add_argument('--correct_T',type=str2bool,default=config.correct_T)
 parser.add_argument('--np_seed',type=int,default=config.np_seed)
 parser.add_argument('--torch_seed',type=int,default=config.torch_seed)
 parser.add_argument('--decay',type=float,default=config.decay)
 parser.add_argument('--gain_rate',type=float,default=config.gain_rate)
+parser.add_argument('--correct_T',type=str2bool,default=config.correct_T)
+parser.add_argument('--last_particle',type=str2bool,default=config.last_particle)
 args=parser.parse_args()
 for k,v in vars(args).items():
     setattr(config, k, v)
@@ -143,7 +147,7 @@ if len(config.s_range)==0:
     config.s_range=[config.s]
 nb_runs*=len(config.s_range)
 if len(config.p_range)==0:
-    config.p_range=[config.p_s]
+    config.p_range=[config.p_t]
 nb_runs*=len(config.p_range)
 
 if config.device is None:
@@ -154,6 +158,7 @@ if not config.allow_multi_gpu:
     os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 if config.track_gpu:
+    import GPUtil
     gpus=GPUtil.getGPUs()
     if len(gpus)>1:
         print("Multi gpus detected, only the first GPU will be tracked.")
@@ -165,27 +170,23 @@ if config.track_cpu:
 
 
 epsilon=config.epsilon
-assert config.d_s+config.d_w<=config.d
 d=config.d
-d_w=config.d_w
-d_s=config.d_s
 
 if not os.path.exists(ROOT_DIR+'/logs'):
     os.mkdir(ROOT_DIR+'/logs')
     os.mkdir(config.log_dir)
 elif not os.path.exists(config.log_dir):
-    os.mkdir(config.log_dir
-    )
-raw_path=os.path.join(config.log_dir,'raw_logs/')
-if not os.path.exists(raw_path):
-    os.mkdir(raw_path)
-raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
+    os.mkdir(config.log_dir)
+raw_logs=os.path.join(config.log_dir,'raw_logs/')
+if not os.path.exists(raw_logs):
+    os.mkdir(raw_logs)
+raw_logs_path=os.path.join(raw_logs,method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
 loc_time= datetime.today().isoformat().split('.')[0]
 
-exp_log_path=os.path.join(raw_logs_path,method_name+'_t_'+loc_time.split('_')[0])
+exp_log_path=os.path.join(config.log_dir,method_name+'_t_'+loc_time.split('_')[0])
 os.mkdir(exp_log_path)
 exp_res = []
 config.json=vars(args)
@@ -197,23 +198,22 @@ if config.print_config:
 #         f.write(config.json)
 
 epsilon=config.epsilon
+e_1 = torch.Tensor([1]+[0]*(d-1),device=config.device)
 get_c_norm= lambda p:stat.norm.isf(p)
-c_w=get_c_norm(config.p_w)
 i_run=0
-for p_s in config.p_range:
-    p_t=p_s**d_s*config.p_w**d_w
-    c_s=get_c_norm(p_s)
-    
-    P_target=p_t
+for p_t in config.p_range:
+    c=get_c_norm(p_t)
+    P_target=stat.norm.sf(c)
     if config.verbose>=5:
         print(f"P_target:{P_target}")
-        print(f"c_w={c_w},c_s={c_s}")
-    arb_thresh=40 #pretty useless a priori but should not hurt results
-    h = lambda X: (torch.clamp(input=X[:,:d_s]-c_s, min=-arb_thresh,max=0).sum(1)+torch.clamp(input=X[:,d_s:d_s+d_w]-c_w, min=-arb_thresh,max=0).sum(1))
+    arbitrary_thresh=40 #pretty useless a priori but should not hurt results
+    def v_batch_pyt(X,c=c):
+        return torch.clamp(input=c-X[:,0],min=-arbitrary_thresh, max = None)
     amls_gen = lambda N: torch.randn(size=(N,d),device=config.device)
+    batch_transform = lambda x: x
     normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 
-    h_batch= lambda x: h(x).unsqueeze(-1)
-    
+    h_V_batch_pyt= lambda x: -v_batch_pyt(batch_transform(x)).reshape((x.shape[0],1))
+
     for T in config.T_range:
         for N in config.N_range: 
             for s in config.s_range:
@@ -224,12 +224,11 @@ for p_s in config.p_range:
                     os.mkdir(path=log_path)
                     i_run+=1
                     
-
-                    K=int(N*ratio)
-                    print(f"Starting run {i_run}/{nb_runs}, with p_t= {p_t},p_s={p_s},p_w={config.p_w},N={N},K={K},T={T},s={s}")
+                    
+                    K=int(N*ratio) if not config.last_particle else N-1
+                    print(f"Starting run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},s={s}")
                     if config.verbose>3:
                         print(f"K/N:{K/N}")
-                    
                     times= []
                     rel_error= []
                     ests = [] 
@@ -239,20 +238,20 @@ for p_s in config.p_range:
                     for i in tqdm(range(config.n_rep)):
                         t=time()
                         if config.batch_opt:
-                            amls_res=amls_pyt.ImportanceSplittingPytBatch(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_batch, 
-                        tau=-1e-15 , n_max=config.n_max,clip_s=config.clip_s , T=T,
+                            amls_res=amls_pyt.ImportanceSplittingPytBatch(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
+                        tau=1e-15 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                         s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                         device=config.device,track_accept=config.track_accept)
 
                         else:
-                            amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_batch, 
+                            amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
                         tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                         s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
-                        device=config.device,)
+                        device=config.device, )
                         t=time()-t
                         
                         est=amls_res[0]
-                        print(f'p_est:{est}')
+                        
                         dict_out=amls_res[1]
                         if config.track_accept:
                             accept_logs=os.path.join(log_path,'accept_logs')
@@ -281,6 +280,12 @@ for p_s in config.p_range:
 
                     times=np.array(times)
                     ests = np.array(ests)
+                    log_ests=np.log(np.clip(ests,a_min=1e-250,a_max=1))
+                    std_log_est=log_ests.std()
+                    mean_log_est=log_ests.mean()
+                    lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                    lg_est_path=os.path.join(log_path,'lg_ests.txt')
+                    np.savetxt(fname=lg_est_path,X=ests)
                 
                     abs_errors=np.abs(ests-p_t)
                     rel_errors=abs_errors/p_t
@@ -290,10 +295,20 @@ for p_s in config.p_range:
                     ests=np.array(ests)
                     calls=np.array(calls)
                     errs=np.abs(ests-p_t)
-
+                    q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                     mean_calls=calls.mean()
                     std_calls=calls.std()
-                    #fin = np.array(finished_flags)
+                    MSE=np.mean(abs_errors**2)
+                    MSE_adj=MSE*mean_calls
+                    MSE_rel=MSE/p_t**2
+                    MSE_rel_adj=MSE_rel*mean_calls
+                    
+                    print(f"mean est:{ests.mean()}, std est:{ests.std()}")
+                    print(f"mean rel error:{rel_errors.mean()}")
+                    print(f"MSE rel:{MSE/p_t**2}")
+                    print(f"MSE adj.:{MSE_adj}")
+                    print(f"MSE rel. adj.:{MSE_rel_adj}")
+                    print(f"mean calls:{calls.mean()}")
 
 
                     np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
@@ -308,18 +323,19 @@ for p_s in config.p_range:
 
                     #with open(os.path.join(log_path,'results.txt'),'w'):
                     results={'p_t':p_t,'method':method_name,
-                    'N':N,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s
-                    ,'min_rate':config.min_rate,'mean_est':ests.mean()
+                    'N':N,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,'lg_est_path':lg_est_path
+                    ,'min_rate':config.min_rate,'mean_est':ests.mean(),'std_log_est':log_ests.std(),'mean_log_est':mean_log_est,
+                    'lg_q_1':lg_q_1,'lg_q_3':lg_q_3,"lg_med_est":lg_med_est
                     ,'mean_time':times.mean()
-                    ,'std_time':times.std(),
-                    'mean_calls':mean_calls,
+                    ,'std_time':times.std(),'MSE':MSE,'MSE_rel_adj':MSE_rel_adj,'MSE_rel':MSE_rel,
+                    'mean_calls':mean_calls,'last_particle':config.last_particle,
                     'std_calls':std_calls
                     ,'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
                     'mean_rel_error':rel_errors.mean(),'std_est':ests.std(),'freq underest':(ests<p_t).mean()
                     ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
                     'batch_opt':config.batch_opt,"d":d, "correct_T":config.correct_T,
                     "np_seed":config.np_seed,"torch_seed":config.torch_seed,
-                    "p_s":p_s,"d_s":config.d_s,"d_w":config.d_w,"p_w":config.p_w}
+                        'q_1':q_1,'q_3':q_3,'med_est':med_est}
                     exp_res.append(results)
                     results_df=pd.DataFrame([results])
                     results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)

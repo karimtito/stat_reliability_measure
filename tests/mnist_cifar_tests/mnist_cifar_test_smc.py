@@ -1,5 +1,5 @@
-import stat_reliability_measure.dev.torch_utils as t_u
-import stat_reliability_measure.dev.smc.smc_pyt as smc_pyt
+import dev.torch_utils as t_u
+import dev.smc.smc_pyt as smc_pyt
 import scipy.stats as stat
 import numpy as np
 from tqdm import tqdm
@@ -13,8 +13,8 @@ import foolbox as fb
 import cpuinfo
 import pandas as pd
 import argparse
-from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
-from stat_reliability_measure.home import ROOT_DIR
+from dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
+from home import ROOT_DIR
 method_name="smc_pyt_killing"
 
 #gaussian_linear
@@ -50,7 +50,7 @@ class config:
     model_arch='CNN_custom'
     model_path=None
     export_to_onnx=False
-    use_attack=True
+    use_attack=False
     attack='PGD'
     lirpa_bounds=False
     download=True
@@ -69,8 +69,8 @@ class config:
     gpu_name=None
     cpu_name=None
     cores_number=None
-    track_gpu=True
-    track_cpu=True
+    track_gpu=False
+    track_cpu=False
     device=None
     n_max=10000 
     allow_multi_gpu=False
@@ -417,7 +417,7 @@ for l in inp_indices:
         pgd_success= (success[idx][l]).item() if config.use_attack else None 
         p_l,p_u=None,None
         if config.lirpa_bounds:
-            from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
+            from dev.lirpa_utils import get_lirpa_bounds
             # Step 2: define perturbation. Here we use a Linf perturbation on input image.
             p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
             num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)
@@ -425,7 +425,7 @@ for l in inp_indices:
         lirpa_safe=None
         if config.lirpa_cert:
             assert config.noise_dist.lower()=='uniform',"Formal certification only makes sense for uniform distributions"
-            from stat_reliability_measure.dev.lirpa_utils import get_lirpa_cert
+            from dev.lirpa_utils import get_lirpa_cert
             lirpa_safe=get_lirpa_cert(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
             num_classes=num_classes,device=config.device)
 

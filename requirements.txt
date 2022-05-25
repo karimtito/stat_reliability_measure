@@ -3,6 +3,5 @@ pandas
 scipy 
 tqdm
 matplotlib
-GPUtil
-py-cpuinfo #psutil
+
 torch>=1.8

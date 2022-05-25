@@ -9,19 +9,20 @@ import matplotlib.pyplot as plt
 import torch
 import pandas as pd
 import argparse
-from dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
+from dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
 method_name="H_SMC"
 from home import ROOT_DIR
-#gaussian_linear
+
 class config:
     dataset='imagenet'
     log_dir=ROOT_DIR+"/logs/imagenet_tests"
     model_dir=ROOT_DIR+"/models/imagenet"
     model_arch="torchvision_mobilenet_v2"
-    N_range=[]
-    T_range=[]
-    L=1
-    
+    N_range=[64,128,256,512]
+    T_range=[10,20,50]
+    L=10
+    GV_opt=False
+    n_rep=10
     
     
     N=100
@@ -37,7 +38,7 @@ class config:
     ess_alpha=0.9
     e_range=[]
    
-    n_rep=10
+    
     
     save_config=False 
     print_config=True
@@ -142,11 +143,11 @@ class config:
     model_dir=None 
     L_min=1
     GK_opt=False
-    GV_opt=False
+    
     mala=False
     g_target=0.8
     skip_mh=False
-    killing=True
+
 
 
 parser=argparse.ArgumentParser()

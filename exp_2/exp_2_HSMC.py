@@ -7,51 +7,49 @@ from datetime import datetime
 import os
 import matplotlib.pyplot as plt
 import torch
+
 import pandas as pd
 import argparse
-from dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
-method_name="H_SMC"
+from dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
 from home import ROOT_DIR
-#gaussian_linear
+
+
+
+method_name="H_SMC"
 class config:
-    dataset='imagenet'
-    log_dir=ROOT_DIR+"/logs/imagenet_tests"
-    model_dir=ROOT_DIR+"/models/imagenet"
-    model_arch="torchvision_mobilenet_v2"
-    N_range=[]
-    T_range=[]
-    L=1
+    dataset='mnist'
+    model_arch="dnn2"  
+    epsilons = [0.15]
+    N_range=[32,64,128,256,512,1024]
+    T_range=[1,5,10,20,50]
+    e_range=[0.85]
+    n_rep=100
+    L=5
+    GV_opt=False
     
-    
-    
-    N=100
-    
-    T=1
-    
-    
-    L_range=[]
-    min_rate=0.2
+    min_rate=0.15
     
     alpha=0.2
     alpha_range=[]
-    ess_alpha=0.9
-    e_range=[]
+    ess_alpha=0.875
+    
    
-    n_rep=10
+    
     
     save_config=False 
     print_config=True
-    
+    T=1
+    N=100
     x_min=0
     x_max=1
     x_mean=0
     x_std=1
+    L_range=[]
 
-    epsilons = None
     eps_max=0.3
-    eps_min=0.1 
+    eps_min=0.2
     eps_num=5
-    model_arch='torchvision_resnet18'
+
     model_path=None
     export_to_onnx=False
     use_attack=False
@@ -66,7 +64,7 @@ class config:
     verbose=0
     log_dir=None
     aggr_res_path = None
-    update_agg_res=True
+    update_agg_res=False
     sigma=1
     v1_kernel=True
     torch_seed=None
@@ -90,10 +88,10 @@ class config:
     dt_decay=0.999
     dt_gain=None
     dt_min=1e-5
-    dt_max=0.65
-    v_min_opt=False
+    dt_max=0.7
+    v_min_opt=True
     ess_opt=False
-    only_duplicated=False
+    only_duplicated=True
     np_seed=None
     lambda_0=0.5
     test2=False
@@ -132,7 +130,7 @@ class config:
     load_batch_size=100 
     nb_epochs= 10
     adversarial_every=1
-    data_dir=ROOT_DIR+"/data/ImageNet/"
+    data_dir=ROOT_DIR+"/data"
     p_ref_compute=False
     input_start=0
     input_stop=None
@@ -143,15 +141,13 @@ class config:
     L_min=1
     GK_opt=False
     GV_opt=False
-    mala=False
     g_target=0.8
     skip_mh=False
+    force_train=False
     killing=True
 
-
 parser=argparse.ArgumentParser()
-parser.add_argument('--log_dir',type=str,default=config.log_dir)
-parser.add_argument('--data_dir',type=str,default=config.data_dir)
+parser.add_argument('--log_dir',default=config.log_dir)
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
@@ -163,9 +159,6 @@ parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
 
 parser.add_argument('--save_config',type=str2bool, default=config.save_config)
-#parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
-#parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
-#parser.add_argument('--rho',type=float,default=config.rho)
 parser.add_argument('--allow_multi_gpu',type=str2bool)
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
 parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
@@ -231,9 +224,11 @@ parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
 parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
 parser.add_argument('--g_target',type=float,default=config.g_target)
 parser.add_argument('--kappa_opt',type=str2bool,default=config.kappa_opt)
-parser.add_argument('--lirpa_cert',type=str2bool,default=config.lirpa_cert)
 parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
+parser.add_argument('--force_train',type=str2bool,default=config.force_train)
 parser.add_argument('--dataset',type=str, default=config.dataset)
+parser.add_argument('--input_start',type=int, default=config.input_start)
+parser.add_argument('--input_stopt',type=int, default=config.input_stop)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -245,7 +240,7 @@ if config.model_dir is None:
         os.mkdir(config.model_dir)
 
 config.d = t_u.datasets_dims[config.dataset]
-
+color_dataset=config.dataset in ('cifar10','cifar100','imagenet') 
 #assert config.adapt_func.lower() in smc_pyt.supported_beta_adapt.keys(),f"select adaptive function in {smc_pyt.supported_beta_adapt.keys}"
 #adapt_func=smc_pyt.supported_beta_adapt[config.adapt_func.lower()]
 
@@ -256,14 +251,20 @@ elif config.adapt_func.lower()=='simp':
 prblm_str=config.dataset
 
 
-
+if config.GV_opt:
+    method_name="RW_SMC"
+elif config.L==1:
+    method_name="MALA_SMC"
+else:
+    method_name="H_SMC"
 
 if len(config.e_range)==0:
     config.e_range= [config.ess_alpha]
 
 if config.input_stop is None:
     config.input_stop=config.input_start+1
-
+else:
+    assert config.input_start<config.input_stop,"/!\ input start must be strictly lower than input stop"
 if len(config.N_range)==0:
     config.N_range= [config.N]
 
@@ -344,13 +345,13 @@ if not os.path.exists(raw_logs_path):
 loc_time= datetime.today().isoformat().split('.')[0]
 log_name=method_name+'_'+'_'+loc_time
 exp_log_path=os.path.join(raw_logs_path,log_name)
-if os.path.exists(exp_log_path):
-    exp_log_path=exp_log_path+str(np.random.randint(10))
+if os.path.exists(path=exp_log_path):
+    exp_log_path = exp_log_path+'_'+str(np.random.randint(low=0,high=9))
 os.mkdir(path=exp_log_path)
 config.json=vars(args)
 
 # if config.aggr_res_path is None:
-#     aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+#     aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
 # else:
 #     aggr_res_path=config.aggr_res_path
 
@@ -375,24 +376,28 @@ method=method_name+'_'+mh_str
 save_every = 1
 #adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBetaPyt
 num_classes=t_u.datasets_num_c[config.dataset.lower()]
-print(f"Running reliability experiments on architecture {config.model_arch} trained on  {config.dataset}.")
-print(f"Testing uniform noise perturbation with epsilon in {config.epsilons}")
+print(f"Running reliability experiments on architecture {config.model_arch} trained on {config.dataset}.")
+print(f"Testing uniform noise pertubatin with epsilon in {config.epsilons}")
 test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
-,dataset=config.dataset,batch_size=config.load_batch_size,)
-model,mean,std=t_u.get_model_imagenet(config.model_arch,model_dir=config.model_dir)
+,dataset=config.dataset,batch_size=config.load_batch_size,
+           x_mean=None,x_std=None)
+
+model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
+    nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
+    download=config.download,dataset=config.dataset, force_train=config.force_train)
 X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
 if config.verbose>=2:
     print(f"model accuracy on test batch:{accuracy}")
 
+config.x_mean=t_u.datasets_means[config.dataset]
+config.x_std=t_u.datasets_stds[config.dataset]
 x_min=0
 x_max=1
-
 if config.use_attack:
     import foolbox as fb
-    fmodel = fb.PyTorchModel(model, bounds=(x_min,x_max),device=device)
+    fmodel = fb.PyTorchModel(model, bounds=(0,1),device=device)
     attack=fb.attacks.LinfPGD()
     #un-normalize data before performing attack
-    #epsilons= np.array([0.0, 0.001, 0.01, 0.03,0.04,0.05,0.07,0.08,0.0825,0.085,0.086,0.087,0.09, 0.1, 0.3, 0.5, 1.0])
     _, advs, success = attack(fmodel, X_correct[config.input_start:config.input_stop], 
     label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
 
@@ -403,7 +408,8 @@ normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 run_nb=0
 iterator= tqdm(range(config.n_rep))
 exp_res=[]
-model_name=config.model_arch
+clip_min=0
+clip_max=1
 for l in inp_indices:
     with torch.no_grad():
     
@@ -439,6 +445,7 @@ for l in inp_indices:
         high=torch.min(x_0+epsilon, torch.tensor([x_max]).cuda())  
         V_ = lambda X: t_u.V_pyt(X,x_0=x_0,model=model,low=low,high=high,target_class=y_0,gaussian_latent=config.gaussian_latent)
         gradV_ = lambda X: t_u.gradV_pyt(X,x_0=x_0,model=model,low=low,high=high, target_class=y_0,gaussian_latent=config.gaussian_latent)
+        
         for ess_t in config.e_range:
             if config.adapt_func.lower()=='ess':
                 adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=ess_t,max_beta=1e6)
@@ -450,8 +457,8 @@ for l in inp_indices:
                             log_name=method_name+f'_N_{N}_T_{T}_L_{L}_a_{float_to_file_float(alpha)}_ess_{float_to_file_float(ess_t)}'+'_'+loc_time.split('_')[0]
                             log_path=os.path.join(exp_log_path,log_name)
                             if os.path.exists(log_path):
-                                log_path=log_path+str(np.random.randint(10))
-                                
+                                log_path = log_path + '_'+str(np.random.randint(low=0,high =10))
+                            
                             
                             os.mkdir(path=log_path)
                             run_nb+=1
@@ -505,7 +512,6 @@ for l in inp_indices:
                                 calls.append(res_dict['calls'])
                             times=np.array(times)
                             ests = np.array(ests)
-                            q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                             calls=np.array(calls)
                         
                             mean_calls=calls.mean()
@@ -513,21 +519,21 @@ for l in inp_indices:
                             mean_est=ests.mean()
                             std_rel=std_est/mean_est
                             std_rel_adj=std_rel*mean_calls
+                            print(f"mean est:{ests.mean()}, std est:{ests.std()}")
+                            print(f"mean calls:{calls.mean()}")
+                            print(f"std. rel.:{std_rel}")
+                            print(f"std. rel. adj.:{std_rel*mean_calls}")
+                            q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+
+                            times=np.array(times)  
+                            ests=np.array(ests)
                             log_ests=np.log(np.clip(ests,a_min=1e-250,a_max=1))
                             std_log_est=log_ests.std()
                             mean_log_est=log_ests.mean()
                             lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                             lg_est_path=os.path.join(log_path,'lg_ests.txt')
                             np.savetxt(fname=lg_est_path,X=ests)
-                            calls=np.array(calls)
-                            mean_calls=calls.mean()
-                            print(f"mean est:{ests.mean()}, std est:{ests.std()}")
-                            print(f"mean calls:{calls.mean()}")
-                            print(f"std. rel.:{std_rel}")
-                            print(f"std. rel. adj.:{std_rel*mean_calls}")
-                            q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
-                            
-                            #fin = np.array(finished_flags)
+                                #fin = np.array(finished_flags)
 
                             times_path=os.path.join(log_path,'times.txt')
                             np.savetxt(fname=times_path,X=times)
@@ -542,21 +548,17 @@ for l in inp_indices:
                             plt.savefig(os.path.join(log_path,'times_hist.png'))
                             plt.close()
 
-                      
-
                           
                             #with open(os.path.join(log_path,'results.txt'),'w'):
                             results={"method":method_name,'T':T,'N':N,'L':L,
                             "ess_alpha":ess_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
-                            "method":method,'adapt_dt':config.adapt_dt,"std_rel_adj":std_rel*mean_calls,
-                            'mean_calls':calls.mean(),'std_calls':calls.std(),"lg_est_path":lg_est_path,
-                            "mean_log_est":mean_log_est,"std_log_est":std_log_est,"image_idx":l, 
-                            "model_name":config.model_arch,
-                            "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
-                            'mean_time':times.mean(),'std_time':times.std(),'epsilon':epsilon
-                            ,'mean_est':ests.mean(),'std_est':ests.std(),"mean_time":times.mean(),
-                            "v_min_opt":config.v_min_opt,"est_path":est_path,"times_path":times_path,
-                            'adapt_dt_mcmc':config.adapt_dt_mcmc,"adapt_dt":config.adapt_dt,
+                            "method":method,'adapt_dt':config.adapt_dt,"epsilon":epsilon,
+                            "model_name":model_name,"image_idx":l, 
+                            'mean_calls':calls.mean(),'std_calls':calls.std()
+                            ,'mean_time':times.mean(),'std_time':times.std()
+                            ,'mean_est':ests.mean(),'std_est':ests.std(), 'est_path':est_path,'times_path':times_path,
+                            "v_min_opt":config.v_min_opt,"std_rel":std_rel,"std_rel_adj":std_rel*mean_calls
+                            ,'adapt_dt_mcmc':config.adapt_dt_mcmc,"adapt_dt":config.adapt_dt,
                             "adapt_dt_mcmc":config.adapt_dt_mcmc,"dt_decay":config.dt_decay,"dt_gain":config.dt_gain,
                             "target_accept":config.target_accept,"accept_spread":config.accept_spread, 
                             "mh_opt":config.mh_opt,'only_duplicated':config.only_duplicated,
@@ -567,13 +569,15 @@ for l in inp_indices:
                             "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
                             "M_opt":config.M_opt,"adapt_step":config.adapt_step,
                             "noise_dist":config.noise_dist,"lirpa_safe":lirpa_safe,"L_min":config.L_min,
-                            "skip_mh":config.skip_mh,"GV_opt":config.GV_opt,"mala":config.mala,
-                            'q_1':q_1,'q_3':q_3,'med_est':med_est}
+                            "skip_mh":config.skip_mh,"GV_opt":config.GV_opt,
+                            'q_1':q_1,'q_3':q_3,'med_est':med_est,"lg_est_path":lg_est_path,
+                            "mean_log_est":mean_log_est,"std_log_est":std_log_est,
+                            "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,}
                             exp_res.append(results)
                             results_df=pd.DataFrame([results])
                             results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
                             if config.aggr_res_path is None:
-                                aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                                aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
                             else:
                                 aggr_res_path=config.aggr_res_path
                             if config.update_agg_res:
