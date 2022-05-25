@@ -20,10 +20,11 @@ class config:
     model_arch="torchvision_mobilenet_v2"
     N_range=[64,128,256,512]
     T_range=[10,20,50]
+    e_range=[0.85]
     epsilons = [0.13]
     L=5
     GV_opt=False
-    n_rep=10
+    n_rep=50
     
     
     N=100
@@ -37,7 +38,7 @@ class config:
     alpha=0.2
     alpha_range=[]
     ess_alpha=0.9
-    e_range=[]
+    
    
     
     
