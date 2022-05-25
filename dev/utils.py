@@ -1,6 +1,6 @@
 
 import argparse
-
+import numpy as np
 def dichotomic_search(f, a, b, thresh=0, n_max =50):
     """Implementation of dichotomic search of minimum solution for an increasing function
         Args:
@@ -43,6 +43,36 @@ def str2list(in_str,split_chr=',',type_out=None):
     if type_out is not None:
         l=[type_out(e) for e in l]
     return l
+
+def get_sel_df(df,cols=None,vals=None,conds=None,triplets=None):
+    cvc_flag=(cols is not None and vals is not None and conds is not None)
+    triplet_flag=triplets is not None
+    assert triplet_flag or cvc_flag,"triplets or (cols,vals,conds) should be not empty"
+    mask=np.ones(len(df))
+    if cvc_flag:
+        iterator=zip(cols,vals,conds)
+        if triplet_flag:
+            iterator=list(iterator)
+            iterator.extend(triplets)
+    else:
+        iterator = triplets
+    for (col,val,cond) in iterator:
+        if cond.lower() in ['eq','equal','same','==','=']:
+            mask*=(df[col]==val).apply(float)
+        elif cond.lower() in ['supeq','superequal','>=']:
+            mask*=(df[col]>=val).apply(float)
+        elif cond.lower() in ['infeq','inferequal','<=']:
+            mask*=(df[col]<=val).apply(float)
+        elif cond.lower() in ['inf','inferior','<']:
+            mask*=(df[col]<val).apply(float)
+        elif cond.lower() in ['sup','superior','>']:
+            mask*=(df[col]>val).apply(float)
+        if cond.lower() in ['neq','nonequal','!=']:
+            mask*=(df[col]!=val).apply(float)
+        elif cond.lower() in ['contains','cont']:
+            mask*=(df[col].apply(lambda x: val in x)).apply(float)
+    mask=mask.apply(bool)
+    return df[mask]
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
 str2intList=lambda x: str2list(in_str=x, type_out=int)
