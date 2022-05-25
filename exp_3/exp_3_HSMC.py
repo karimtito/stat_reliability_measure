@@ -53,7 +53,6 @@ class config:
     eps_max=0.3
     eps_min=0.1 
     eps_num=5
-    model_arch='torchvision_resnet18'
     model_path=None
     export_to_onnx=False
     use_attack=False
