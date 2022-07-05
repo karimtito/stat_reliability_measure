@@ -2,12 +2,12 @@ import torch
 
 import torch.nn as nn
 
-from dev.utils import float_to_file_float
-from dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,ConvNet,DenseNet3
+from stat_reliability_measure.dev.utils import float_to_file_float
+from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,ConvNet,DenseNet3
 from torchvision import transforms,datasets,models as tv_models
 from torch.utils.data import DataLoader
 import timm
-from torch import device, optim
+from torch import optim
 import os
 import math
 import numpy as np
@@ -329,20 +329,20 @@ def V_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,i
     v = compute_V_pyt(model=model,input_=x_p,target_class=target_class)
     return v
 
-def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None):
+def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None,gaussian_prior=False):
    
     if input_shape is None:
         input_shape=x_0.shape
-    if gaussian_latent:
+    if gaussian_latent and not gaussian_prior:
         u=normal_dist.cdf(x_)
     else:
         u=x_
     if reshape:
         u=torch.reshape(u,(u.shape[0],)+input_shape)
     
-    x_p = low+(high-low)*u
+    x_p = u if gaussian_prior else low+(high-low)*u
     _,grad_x_p = compute_V_grad_pyt(model=model,input_=x_p,target_class=target_class)
-    grad_u=torch.reshape((high-low)*grad_x_p,x_.shape)
+    grad_u= torch.reshape(grad_x_p,input_shape) if gaussian_prior else torch.reshape((high-low)*grad_x_p,input_shape)
     if gaussian_latent:
         grad_x=torch.exp(normal_dist.log_prob(x_))*grad_u
     else:

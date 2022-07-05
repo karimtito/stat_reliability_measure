@@ -8,6 +8,7 @@
 logs
 data
 models
+data
 # User-specific files
 *.rsuser
 *.suo
@@ -17,7 +18,8 @@ models
 *.ipynb
 ./data
 ./logs
-
+./models
+./data
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
@@ -360,6 +362,8 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+notebooks
+logs2
 notebooks/gaussian.ipynb
 notebooks/linear_gaussian.ipynb
 notebooks/.ipynb_checkpoints/linear_gaussian-checkpoint.ipynb

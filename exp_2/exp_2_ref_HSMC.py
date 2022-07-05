@@ -1,5 +1,5 @@
-import dev.torch_utils as t_u
-import dev.smc.smc_pyt as smc_pyt
+import stat_reliability_measure.dev.torch_utils as t_u
+import stat_reliability_measure.dev.smc.smc_pyt as smc_pyt
 import numpy as np
 from tqdm import tqdm
 from time import time
@@ -10,7 +10,7 @@ import torch
 
 import pandas as pd
 import argparse
-from dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
+from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
 from home import ROOT_DIR
 
 
@@ -423,7 +423,7 @@ for l in inp_indices:
         pgd_success= (success[idx][l]).item() if config.use_attack else None 
         p_l,p_u=None,None
         if config.lirpa_bounds:
-            from dev.lirpa_utils import get_lirpa_bounds
+            from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
             # Step 2: define perturbation. Here we use a Linf perturbation on input image.
             p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
             num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)
@@ -431,7 +431,7 @@ for l in inp_indices:
         lirpa_safe=None
         if config.lirpa_cert:
             assert config.noise_dist.lower()=='uniform',"Formal certification only makes sense for uniform distributions"
-            from dev.lirpa_utils import get_lirpa_cert
+            from stat_reliability_measure.dev.lirpa_utils import get_lirpa_cert
             lirpa_safe=get_lirpa_cert(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
             num_classes=num_classes,device=config.device)
 

@@ -17,15 +17,15 @@ import os
 from time import time
 from datetime import datetime
 
-#from dev.torch_utils import get_model
-import dev.torch_utils as t_u
+#from stat_reliability_measure.dev.torch_utils import get_model
+import stat_reliability_measure.dev.torch_utils as t_u
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
 
 #setting PRNG seeds for reproducibility
 
-from dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, dichotomic_search, str2list
-import dev.amls.amls_pyt as amls_pyt
+from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, dichotomic_search, str2list
+import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
 str2intList=lambda x: str2list(in_str=x, type_out=int)
@@ -321,7 +321,7 @@ for l in range(len(inp_indices)):
         pgd_success= (success[idx][l]).item() if config.use_attack else None 
         p_l,p_u=None,None
         if config.lirpa_bounds:
-            from dev.lirpa_utils import get_lirpa_bounds
+            from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
             # Step 2: define perturbation. Here we use a Linf perturbation on input image.
             p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
             num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)

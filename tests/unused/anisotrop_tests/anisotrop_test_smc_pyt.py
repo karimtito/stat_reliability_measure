@@ -1,5 +1,5 @@
-import dev.torch_utils as t_u
-import dev.smc.smc_pyt as smc_pyt
+import stat_reliability_measure.dev.torch_utils as t_u
+import stat_reliability_measure.dev.smc.smc_pyt as smc_pyt
 import scipy.stats as stat
 import numpy as np
 from tqdm import tqdm
@@ -12,7 +12,7 @@ import GPUtil
 import cpuinfo
 import pandas as pd
 import argparse
-from dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
+from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
 from scipy.special import betainc
 from home import ROOT_DIR
 method_name="smc_pyt"
