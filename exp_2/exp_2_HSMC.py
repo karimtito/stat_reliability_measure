@@ -24,16 +24,10 @@ class config:
     n_rep=100
     L=5
     GV_opt=False
-    
     min_rate=0.15
-    
     alpha=0.2
     alpha_range=[]
     ess_alpha=0.875
-    
-   
-    
-    
     save_config=False 
     print_config=True
     T=1
@@ -43,11 +37,9 @@ class config:
     x_mean=0
     x_std=1
     L_range=[]
-
     eps_max=0.3
     eps_min=0.2
     eps_num=5
-
     model_path=None
     export_to_onnx=False
     use_attack=False
@@ -55,8 +47,6 @@ class config:
     lirpa_bounds=False
     download=True
     train_model=False
-    
-    
     noise_dist='uniform'
     d=None
     verbose=0

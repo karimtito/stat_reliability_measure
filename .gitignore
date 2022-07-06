@@ -5,10 +5,10 @@
 
 
 #project specific 
-logs
-data
-models
-data
+logs/
+data/
+models/
+
 # User-specific files
 *.rsuser
 *.suo

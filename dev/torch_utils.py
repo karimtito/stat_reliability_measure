@@ -330,7 +330,7 @@ def V_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,i
     return v
 
 def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None,gaussian_prior=False):
-   
+    N=x_.shape[0]
     if input_shape is None:
         input_shape=x_0.shape
     if gaussian_latent and not gaussian_prior:
@@ -342,7 +342,7 @@ def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=Tr
     
     x_p = u if gaussian_prior else low+(high-low)*u
     _,grad_x_p = compute_V_grad_pyt(model=model,input_=x_p,target_class=target_class)
-    grad_u= torch.reshape(grad_x_p,input_shape) if gaussian_prior else torch.reshape((high-low)*grad_x_p,input_shape)
+    grad_u= torch.reshape(grad_x_p,(N,)+input_shape) if gaussian_prior else torch.reshape((high-low)*grad_x_p,(N,)+input_shape)
     if gaussian_latent:
         grad_x=torch.exp(normal_dist.log_prob(x_))*grad_u
     else:
