@@ -11,7 +11,7 @@ from datetime import datetime
 import dev.torch_utils as t_u
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
 
-from dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, str2list
+from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, str2list
 import dev.mls.amls_uniform as amls_mls
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
@@ -331,7 +331,7 @@ for l in range(len(inp_indices)):
         pgd_success= (success[idx][l]).item() if config.use_attack else None 
         p_l,p_u=None,None
         if config.lirpa_bounds:
-            from dev.lirpa_utils import get_lirpa_bounds
+            from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
             # Step 2: define perturbation. Here we use a Linf perturbation on input image.
             p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
             num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)

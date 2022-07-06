@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np 
 import matplotlib.pyplot as plt
 import os
-from dev.utils import get_sel_df
+from stat_reliability_measure.dev.utils import get_sel_df
 from home import ROOT_DIR
 HOME_DIR=ROOT_DIR
 csv_path=os.path.join(HOME_DIR,'logs/linear_gaussian_tests/aggr_res.csv')

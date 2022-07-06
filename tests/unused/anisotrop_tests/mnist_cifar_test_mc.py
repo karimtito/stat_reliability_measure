@@ -17,9 +17,9 @@ import os
 from time import time
 from datetime import datetime
 
-from dev.torch_utils import  epoch
-from dev.torch_arch import CNN_custom#,CNN,dnn2
-from dev.utils import str2bool,str2list,float_to_file_float
+from stat_reliability_measure.dev.torch_utils import  epoch
+from stat_reliability_measure.dev.torch_arch import CNN_custom#,CNN,dnn2
+from stat_reliability_measure.dev.utils import str2bool,str2list,float_to_file_float
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
 import dev.torch_utils as t_u 
 from home import ROOT_DIR
@@ -299,7 +299,7 @@ for i in range(len(config.epsilons)):
     p_l,p_u=None,None
 
     if config.lirpa_bounds:
-        from dev.lirpa_utils import get_lirpa_bounds
+        from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
         # Step 2: define perturbation. Here we use a Linf perturbation on input image.
         p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=config.epsilon,
         num_classes=num_classes,noise_dist=config.noise_dis,a=config.a,device=config.device)

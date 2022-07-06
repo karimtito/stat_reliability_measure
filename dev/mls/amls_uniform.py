@@ -38,7 +38,7 @@ import torch.distributions as dist
 # plt.style.use(['seaborn-white', 'seaborn-paper', 'seaborn-ticks'])
 # matplotlib.rc('font', family='Latin Modern Roman')
 
-from dev.mls import mls_utils
+from stat_reliability_measure.dev.mls import mls_utils
 
 def multilevel_uniform(
     prop,
