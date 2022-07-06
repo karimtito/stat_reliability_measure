@@ -17,7 +17,7 @@ from datetime import datetime
 
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList
 import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
-from home import ROOT_DIR
+from stat_reliability_measure.home import ROOT_DIR
 method_name="amls_pyt"
 
 class config:

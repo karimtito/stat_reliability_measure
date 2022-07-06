@@ -11,7 +11,7 @@ import torch
 import pandas as pd
 import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
-from home import ROOT_DIR
+from stat_reliability_measure.home import ROOT_DIR
 
 
 

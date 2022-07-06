@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 import argparse
 import os
-from home import ROOT_DIR
+from stat_reliability_measure.home import ROOT_DIR
 from time import time
 from datetime import datetime
 

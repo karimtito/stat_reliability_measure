@@ -14,7 +14,7 @@ import cpuinfo
 import pandas as pd
 import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
-from home import ROOT_DIR
+from stat_reliability_measure.home import ROOT_DIR
 method_name="smc_pyt_killing"
 
 #gaussian_linear

@@ -22,7 +22,7 @@ from stat_reliability_measure.dev.torch_arch import CNN_custom#,CNN,dnn2
 from stat_reliability_measure.dev.utils import str2bool,str2list,float_to_file_float
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
 import stat_reliability_measure.dev.torch_utils as t_u 
-from home import ROOT_DIR
+from stat_reliability_measure.home import ROOT_DIR
 #setting PRNG seeds for reproducibility
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)

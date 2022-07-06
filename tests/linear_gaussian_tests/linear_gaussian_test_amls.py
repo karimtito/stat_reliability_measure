@@ -7,7 +7,7 @@ import os
 import argparse
 from tqdm import tqdm
 import torch
-from home import ROOT_DIR
+from stat_reliability_measure.home import ROOT_DIR
 from datetime import datetime
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList
 import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt

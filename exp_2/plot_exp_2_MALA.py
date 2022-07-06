@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from stat_reliability_measure.dev.utils import float_to_file_float,get_sel_df
-from home import ROOT_DIR
+from stat_reliability_measure.home import ROOT_DIR
 csv_path=os.path.join(ROOT_DIR,'logs/mnist_tests/agg_res.csv')
 csv_res=pd.read_csv(csv_path)
 csv_res['mean_log10_est']=csv_res['mean_log_est']/np.log(10)

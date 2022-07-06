@@ -16,7 +16,7 @@ import os
 
 from time import time
 from datetime import datetime
-from home import ROOT_DIR
+from stat_reliability_measure.home import ROOT_DIR
 import stat_reliability_measure.dev.torch_utils as t_u
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
