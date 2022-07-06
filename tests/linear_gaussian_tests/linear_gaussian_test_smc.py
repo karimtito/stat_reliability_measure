@@ -1,5 +1,5 @@
-import dev.torch_utils as t_u
-import dev.smc.smc_pyt as smc_pyt
+import stat_reliability_measure.dev.torch_utils as t_u
+import stat_reliability_measure.dev.smc.smc_pyt as smc_pyt
 import scipy.stats as stat
 import numpy as np
 from tqdm import tqdm

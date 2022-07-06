@@ -7,7 +7,7 @@ from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,C
 from torchvision import transforms,datasets,models as tv_models
 from torch.utils.data import DataLoader
 import timm
-from torch import device, optim
+from torch import optim
 import os
 import math
 import numpy as np
@@ -211,7 +211,7 @@ def verlet_kernel2(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaus
         p_t = p_0
     grad_q=lambda p,dt:dt*(p.data/scale_M)
     if kappa_opt:
-        kappa= 2. / (1 + (1 - delta_t**2)**(1/2)) if scale_M is 1 else 2. / (1 + torch.sqrt(1 - delta_t**2*(1/scale_M)))
+        kappa= 2. / (1 + (1 - delta_t**2)**(1/2)) if scale_M == 1 else 2. / (1 + torch.sqrt(1 - delta_t**2*(1/scale_M)))
     else:
         kappa=1
     k=1
@@ -329,11 +329,11 @@ def V_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,i
     v = compute_V_pyt(model=model,input_=x_p,target_class=target_class)
     return v
 
-def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None):
+def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None,gaussian_prior=False):
    
     if input_shape is None:
         input_shape=x_0.shape
-    if gaussian_latent:
+    if gaussian_latent and not gaussian_prior:
         u=normal_dist.cdf(x_)
     else:
         u=x_

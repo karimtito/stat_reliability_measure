@@ -1,4 +1,4 @@
-import dev.smc.smc_pyt as smc_pyt
+import stat_reliability_measure.dev.smc.smc_pyt as smc_pyt
 import scipy.stats as stat
 import numpy as np
 from tqdm import tqdm

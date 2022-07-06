@@ -21,7 +21,7 @@ from stat_reliability_measure.dev.torch_utils import V_pyt, gradV_pyt, epoch
 from stat_reliability_measure.dev.torch_arch import CNN_custom#,CNN,dnn2
 from stat_reliability_measure.dev.utils import str2bool,str2list,float_to_file_float
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
-import dev.torch_utils as t_u 
+import stat_reliability_measure.dev.torch_utils as t_u 
 from home import ROOT_DIR
 #setting PRNG seeds for reproducibility
 

@@ -15,14 +15,14 @@ from time import time
 from datetime import datetime
 
 from stat_reliability_measure.dev.torch_utils import get_model
-import dev.torch_utils as t_u
+import stat_reliability_measure.dev.torch_utils as t_u
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
 
 #setting PRNG seeds for reproducibility
 
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, dichotomic_search, str2list
-import dev.mls.amls_uniform as amls_mls
+import stat_reliability_measure.dev.mls.amls_uniform as amls_mls
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
 str2intList=lambda x: str2list(in_str=x, type_out=int)
