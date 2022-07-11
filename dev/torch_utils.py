@@ -345,7 +345,7 @@ def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=Tr
         x_p=torch.max(x_p,low.view(low.size()+(1,1)))
         x_p=torch.min(x_p,high.view(high.size()+(1,1)))
     _,grad_x_p = compute_V_grad_pyt(model=model,input_=x_p,target_class=target_class)
-    grad_u=torch.reshape((high-low)*grad_x_p,x_.shape)
+    grad_u=torch.reshape(grad_x_p,x_.shape) if gaussian_prior else torch.reshape((high-low)*grad_x_p,x_.shape)
     if gaussian_latent and not gaussian_prior:
         grad_x=torch.exp(normal_dist.log_prob(x_))*grad_u
     else:
