@@ -132,7 +132,7 @@ class config:
     load_batch_size=100 
     nb_epochs= 10
     adversarial_every=1
-    data_dir=ROOT_DIR+"/data/ImageNet/"
+    data_dir=None
     p_ref_compute=False
     input_start=0
     input_stop=None
@@ -255,7 +255,8 @@ elif config.adapt_func.lower()=='simp':
     adapt_func = lambda beta,v: smc_pyt.SimpAdaptBetaPyt(beta,v,config.g_target,v_min_opt=config.v_min_opt)
 prblm_str=config.dataset
 
-
+if config.data_dir is None:
+    config.data_dir = ROOT_DIR+'/data/ImageNet/'
 
 
 if len(config.e_range)==0:

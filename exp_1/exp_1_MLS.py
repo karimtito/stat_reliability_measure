@@ -49,7 +49,7 @@ class config:
 
     ratio=0.6
 
-    s=1
+    s=1 
     s_range= []
 
     p_t=1e-15

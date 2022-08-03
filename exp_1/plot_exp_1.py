@@ -181,7 +181,7 @@ axes.xaxis.set_ticks(np.arange(x_min,x_max+1,step=20000))
 plt.xlim(right=x_max)
 plt.xlim(left=x_min)
     
-plt.subplot(2,1,2)  
+plt.subplot(1,2,2)  
 p_t = 1e-12
 csv_res_pt=csv_res[csv_res['p_t']==p_t]
 T=20
