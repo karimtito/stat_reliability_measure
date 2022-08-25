@@ -15,7 +15,7 @@ import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
 from scipy.special import betainc
 from stat_reliability_measure.home import ROOT_DIR
-method_name="smc_pyt_killing"
+method_name="smc_pyt_killing_sq"
 
 #gaussian_linear
 class config:
@@ -307,9 +307,9 @@ for p_t in config.p_range:
         if config.verbose>=1.:
             print(f'c:{c}')
         e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
-        V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=None)
+        V = lambda X: 0.5*torch.square(torch.clamp(input=c-X[:,0], min=0, max=None))
         
-        gradV= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
+        gradV= lambda X: -V(X)*torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
         
         norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
     else:
