@@ -309,7 +309,7 @@ for p_t in config.p_range:
         e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
         V = lambda X: 0.5*torch.square(torch.clamp(input=c-X[:,0], min=0, max=None))
         
-        gradV= lambda X: -V(X)*torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
+        gradV= lambda X: -V(X)[:,None]*torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
         
         norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
     else:
@@ -321,7 +321,7 @@ for p_t in config.p_range:
         e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
         V = lambda X: 0.5* torch.square(torch.clamp(input=torch.norm(X,p=2,dim=-1)*c-X[:,0], min=0, max=None))
         
-        gradV= lambda X: V(X)*(c*X/torch.norm(X,p=2,dim=-1)[:,None] -e_1[None,:])*(X[:,0]<c*torch.norm(X,p=2,dim=1))[:,None]
+        gradV= lambda X: V(X)[:,None]*(c*X/torch.norm(X,p=2,dim=-1)[:,None] -e_1[None,:])*(X[:,0]<c*torch.norm(X,p=2,dim=1))[:,None]
         
         norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
 
