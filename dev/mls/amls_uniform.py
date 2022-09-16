@@ -28,9 +28,7 @@ import math
 import torch
 
 import torch.distributions as dist
-import numpy as np
 
-print(f"some random vector {np.random.random(size=(5,5))}")
 
 
 # import matplotlib
@@ -102,7 +100,7 @@ def multilevel_uniform(
         s_x = prop(x).squeeze(-1)
 
         count_calls+=count_particles
-        max_val = max(max_val, s_x.max().item())+
+        max_val = max(max_val, s_x.max().item())
         s_sorted, s_idx = torch.sort(s_x)
         L = min(s_sorted[math.floor((1-rho)*count_particles)].item(), 0)
         if L == L_prev:
