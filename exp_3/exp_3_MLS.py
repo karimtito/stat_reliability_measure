@@ -32,7 +32,7 @@ class config:
     n_rep=50
     
     
-    
+    epsilons=[]
     ratio_range=[]
     
     
