@@ -196,10 +196,13 @@ for p_t in config.p_range:
     arbitrary_thresh=40 #pretty useless a priori but should not hurt results
     def v_batch_pyt(X,c=c):
         return torch.clamp(input=c-X[:,0],min=-arbitrary_thresh, max = None)
+    def v_batch_ep(X, c=c):
+        return (c-X[:,0]).clip(min_ = -arbitrary_thresh, max_ = None)
     amls_gen = lambda N: torch.randn(size=(N,d),device=config.device)
-    batch_transform = lambda x: x
     normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 
-    h_V_batch_pyt= lambda x: -v_batch_pyt(batch_transform(x)).reshape((x.shape[0],1))
+    normal_kernel_ep = lambda x,s : (x + s*x.normal(shaphe=x.shape))/np.sqrt(1+s**2)
+    h_V_batch_pyt= lambda x: -v_batch_pyt(x).reshape((x.shape[0],1))
+    h_V_batch_ep= lambda x: -v_batch_ep(x).reshape((x.shape[0],1))
 
     for T in config.T_range:
         for N in config.N_range: 
@@ -225,13 +228,13 @@ for p_t in config.p_range:
                     for i in tqdm(range(config.n_rep)):
                         t=time()
                         if config.batch_opt:
-                            amls_res=amls_pyt.ImportanceSplittingPytBatch(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
+                            amls_res=amls_pyt.ImportanceSplittingPytBatch(amls_gen, normal_kernel_ep,K=K, N=N,s=s,  h=h_V_batch_ep, 
                         tau=1e-15 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                         s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                         device=config.device,track_accept=config.track_accept)
 
                         else:
-                            amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
+                            amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel_ep,K=K, N=N,s=s,  h=h_V_batch_ep, 
                         tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                         s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                         device=config.device, )
