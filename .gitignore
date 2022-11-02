@@ -8,13 +8,14 @@
 logs
 data
 models
+notebooks
 # User-specific files
 *.rsuser
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
-*.ipynb
+
 ./data
 ./logs
 
