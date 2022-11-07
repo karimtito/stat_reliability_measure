@@ -1,37 +1,11 @@
-import torch 
 import math
 import numpy as np
 import eagerpy as ep
-from stat_reliability_measure.dev.torch_utils import TimeStepPyt, adapt_verlet_mcmc, apply_gaussian_kernel,verlet_mcmc
-from stat_reliability_measure.dev.ep_utils import ep_std
+from stat_reliability_measure.dev.ep_utils import ep_std, time_step_ep, apply_gaussian_kernel_ep, verlet_mcmc_ep, adapt_verlet_mcmc_ep
+from stat_reliability_measure.dev.utils import dichotomic_search_d
 
 
-def dichotomic_search_d(f, a, b, thresh=0, n_max =50):
-    """Implementation of dichotomic search of minimum solution for an decreasing function
-        Args:
-            -f: increasing function
-            -a: lower bound of search space
-            -b: upper bound of search space
-            -thresh: threshold such that if f(x)>=thresh, x is considered to be a solution of the problem
-    
-    """
-    low = a
-    high = b
-     
-    i=0
-    while i<n_max:
-        i+=1
-        if f(low)<=thresh:
-            return low, f(low)
-        mid = 0.5*(low+high)
-        if f(mid)<thresh:
-            high=mid
-        else:
-            low=mid
-
-    return high, f(high)
-
-def SimpAdaptBetaPyt(beta_old,v,g_target,search_method=dichotomic_search_d,max_beta=1e6,verbose=0,multi_output=True,v_min_opt=False):
+def SimpAdaptBetaEp(beta_old,v,g_target,search_method=dichotomic_search_d,max_beta=1e6,verbose=0,multi_output=True,v_min_opt=False):
 
     """ Simple adaptive mechanism to select next inverse temperature
 
@@ -58,7 +32,7 @@ def SimpAdaptBetaPyt(beta_old,v,g_target,search_method=dichotomic_search_d,max_b
         return new_beta
 
 
-def ESSAdaptBetaPyt(beta_old, v,lambda_0=1,max_beta=1e9,g_target=None,v_min_opt=None,multi_output=False):
+def ESSAdaptBetaEp(beta_old, v,lambda_0=1,max_beta=1e9,g_target=None,v_min_opt=None,multi_output=False):
     """Adaptive inverse temperature selection based on an approximation 
     of the ESS critirion 
     v_min_opt and g_target are unused dummy variables for compatibility
@@ -129,7 +103,7 @@ def nextBetaESS(beta_old,v,ess_alpha,max_beta=1e6,verbose=0,thresh=1e-3,debug=Fa
             print(f"New beta:{new_beta}, new ESS:{new_ess}")
         return new_beta,new_ess
     
-supported_beta_adapt={'ess':nextBetaESS,'simp_ess':nextBetaSimpESS,'simp':ESSAdaptBetaPyt}
+supported_beta_adapt={'ess':nextBetaESS,'simp_ess':nextBetaSimpESS,'simp':ESSAdaptBetaEp}
 
 
 def SamplerSMC(gen,  V, gradV,adapt_func,min_rate=0.8,alpha =0.1,N=300,T = 1,L=1,n_max=5000, 
@@ -168,16 +142,11 @@ debug=False,kappa_opt=False,
          P_est: estimated probability
         
     """
-    #cpu/gpu switch
-    if device is None: 
-        device= "cuda:0" if torch.cuda.is_available() else "cpu"
 
-    
     # adaptative parameters
     if adapt_dt and dt_gain is None:
         dt_gain= 1/dt_decay
 
-    mcmc_func=verlet_mcmc if not adapt_step else adapt_verlet_mcmc
     #Initializing failure probability
     g_prod=1
 
@@ -216,12 +185,12 @@ debug=False,kappa_opt=False,
         if n==1:
             X=ep.astensor(gen(N)) #Sampling initial random vectors and converting them to EagerPy
             
-            v=V(X)
+            v=ep.astensor(V(X.raw))
             
 
             d=X.shape[-1]
             assert dt_d==1 or dt_d==d,"dt dimension can be 1 (isotropic diff.) or d (anisotropic diff.)"
-            dt_scalar =alpha*TimeStepPyt(V,X,gradV)
+            dt_scalar =alpha*time_step_ep(V,X,gradV)
             pre_dt = dt_scalar*X.ones(shape=(N,dt_d))+sig_dt*X.normal(shape=(N,dt_d))
             dt= pre_dt.clip(min_=dt_min,max_=dt_max)
             ind_L=np.random.randint(low=L_min,high=L,size=(N,)).astype(float) if L_min<L else L*np.ones(shape=(N,))
@@ -244,12 +213,12 @@ debug=False,kappa_opt=False,
                 if verbose:
                     print(f"Avg. var.:{Y.var(0).mean()}")
             if GK_opt:
-                Y,v_y,nb_calls,dict_out=apply_gaussian_kernel(Y=Y,v_y=v_y,T=T,beta=beta,
+                Y,v_y,nb_calls,dict_out=apply_gaussian_kernel_ep(Y=Y,v_y=v_y,T=T,beta=beta,
                 V=V,)
             else:
                 
                 if adapt_step:
-                    Y,v_y,nb_calls,dict_out=mcmc_func(q=Y,v_q=v_y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
+                    Y,v_y,nb_calls,dict_out=adapt_verlet_mcmc_ep(q=Y,v_q=v_y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
                         V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_y,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
                         alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,L_min=L_min,
                         gaussian_verlet=GV_opt,dt_min=dt_min,skip_mh=skip_mh)
@@ -264,7 +233,7 @@ debug=False,kappa_opt=False,
                             print(f"New dt mean:{dt.mean().item()}, dt std:{ep_std(dt).item()}")
                             print(f"New L mean: {ind_L.mean().item()}, L std:{ep_std(ind_L).item()}")
                 else:
-                    Y,v_y,nb_calls,dict_out=verlet_mcmc(q=Y,beta=beta,gaussian=gaussian,
+                    Y,v_y,nb_calls,dict_out=verlet_mcmc_ep(q=Y,beta=beta,gaussian=gaussian,
                                         V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
                                         scale_M=scale_M)
                     if track_H:
@@ -317,17 +286,17 @@ debug=False,kappa_opt=False,
             if verbose:
                 print(f'next ESS:{ess}')
         reach_beta_inf=beta==max_beta
-        reach_rate=(v<=0).float().mean().item()
+        reach_rate=(v<=0).float32().mean().item()
         if reach_beta_inf or reach_rate>=min_rate:
             beta=math.inf
             G= v<=0
-            g_iter=G.float().mean()
+            g_iter=G.float32().mean()
             g_prod*=g_iter
             break
         else:
             G = ep.exp(-(beta-beta_old)*v) #computes current value fonction
             
-            U = X.rand(size=(N,))
+            U = X.uniform(shape=(N,))
             
             
             if v_min_opt:
@@ -337,7 +306,7 @@ debug=False,kappa_opt=False,
                 
             else:
                 to_renew = (G<U)
-        to_surv = ep.logical_not(to_renew)       
+        surv_idx = ep.logical_not(to_renew)       
         g_iter=G.mean()
         g_prod*=g_iter
         if verbose>=0.5:
@@ -345,16 +314,17 @@ debug=False,kappa_opt=False,
         if track_ratios:
             g_s.append(g_iter)
         
-        nb_to_renew=to_renew.float32().round().sum().item()
+        nb_to_renew= int(to_renew.float32().sum().item())
         nb_surv = N - nb_to_renew
         if nb_to_renew>0:
             
-            prenew_idx=np.random.randint(low=0,high=nb_surv,size=(nb_to_renew,))
-            X = X.where(to_surv,X[to_surv],X[to_surv][prenew_idx])
+            renew_idx=np.random.randint(low=0,high=nb_surv,size=(N,))
+            X = (surv_idx.reshape((-1,1))).where(X,X[surv_idx][renew_idx])
    
      
-    finished_flag=(v<=0).float().mean().item() >=min_rate
+    finished_flag=(v<=0).float32().mean().item() >=min_rate
     
+
     if verbose>=1.:
         print(f"finished flag:{finished_flag}")
     P_est = max(g_prod.item(),1e-250)
