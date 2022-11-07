@@ -111,12 +111,10 @@ parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--d',type=int,default=config.d)
-
 parser.add_argument('--min_rate',type=float,default=config.min_rate)
 parser.add_argument('--alpha',type=float,default=config.alpha)
 parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
-
 parser.add_argument('--save_config',type=str2bool, default=config.save_config)
 #parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
 #parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
