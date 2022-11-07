@@ -1110,6 +1110,7 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
             mu_new,sig_new=o_new.mean(0),o_new.std(0)
             correl=((o_new-mu_new)*(o_old-mu_old)).mean(0)/(sig_old*sig_new)
             prod_correl*=correl
+            mu_old, sig_old, o_old = mu_new, sig_new, o_new
     
         p = torch.randn_like(q)
         if scale_M is not None:
@@ -1253,6 +1254,7 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
             mu_new,sig_new=o_new.mean(0),o_new.std(0)
             correl=((o_new-mu_new)*(o_old-mu_old)).mean(0)/(sig_old*sig_new)
             prod_correl*=correl
+
     
         
         
