@@ -185,7 +185,7 @@ debug=False,kappa_opt=False,
         if n==1:
             X=ep.astensor(gen(N)) #Sampling initial random vectors and converting them to EagerPy
             
-            v=ep.astensor(V(X.raw))
+            v=V(X)
             
 
             d=X.shape[-1]
