@@ -30,7 +30,7 @@ def time_step_ep(V,X:ep.Tensor,gradV,p:int=1):
         ep.Tensor: _description_
     """
     V_mean= ep.astensor(V(X.raw)).mean()
-    grads_ep = ep.astensor(gradV(X.raw))
+    grads_ep = ep.astensor(gradV(X))
     V_grad_norm_mean = ((ep.norms.l2(grads_ep,axis=1)**p).mean())**(1/p)
     
     time_step=V_mean/V_grad_norm_mean
@@ -136,7 +136,7 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussia
     if save_func is not None:
         saved=[save_func(q,p)]
     for i  in range(T):
-        q_trial,p_trial=verleternel_ep(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=0,L=L,kappa_opt=kappa_opt,
+        q_trial,p_trial=verlet_kernel_ep(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=0,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M,ind_L=ind_L,GV=gaussian_verlet)
         nb_calls+=ind_L.sum().item()
         H_trial= hamiltonian_nat_ep(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian)
@@ -219,16 +219,16 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     i=0
  
     while (prod_correl>alpha_p).sum()>=prop_d*d and i<T_max:
-        q_trial,p_trial=verleternel_ep(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
+        q_trial,p_trial=verlet_kernel_ep(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
         
-        nb_calls+=4*ind_L.sum().item()-N # for each particle each vertlet integration step requires two oracle calls (gradients)
+        nb_calls+=4*ind_L.sum()-N # for each particle each vertlet integration step requires two oracle calls (gradients)
         H_trial= hamiltonian_nat_ep(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
         nb_calls+=N # N new potentials are computed 
         delta_H= ep.clip(-(H_trial-H_old), min_=None,max_=0)
         if FT:
             exp_weight = ep.exp(ep.clip(delta_H,min_=None,max_=0))
-            m_distances= maha_dist(x=q,y=q_trial)/ind_L.float().to(device)
+            m_distances= maha_dist(x=q,y=q_trial)/q.from_numpy(ind_L)
             lambda_i=m_distances*exp_weight+1e-8*m_distances.ones_like()
             if lambda_i.isnan().any():
                 print(f"NaN values in lambda_i:")
@@ -242,18 +242,20 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
                     print(f"q_trial:{q_trial}")
                     print(f"q:{q}")
                 print(f"ind_L:{ind_L}")
-                        
-            sel_ind = np.where(np.random.multinomial(n=1,pvals=lambda_i,size = (N,)))[1]
+            norm_lambda=(lambda_i/lambda_i.sum()).numpy()
+            sel_ind =np.where(np.random.multinomial(n=1,pvals=norm_lambda,size = (N,)))[1]
+            
             delta_t = ep.clip(delta_t[sel_ind]+sig_dt*ep_normal_like(delta_t),min_=dt_min,max_=dt_max,)
+
             noise_L=np.random.rand(N)
             
-            ind_L= np.clip(ind_L[sel_ind]+((noise_L>=(2/3)).float()-(noise_L<=1/3).float())*ones_L,a_min=L_min,a_max=L+1e-3)
+            ind_L= np.clip(ind_L[sel_ind]+((noise_L>=(2/3)).astype(float)-(noise_L<=1/3).astype(float))*ones_L,a_min=L_min,a_max=L+1e-3)
             
         if skip_mh:
             q=q_trial
             nb_accept=N
         else:
-            alpha=np.random.rand(N)
+            alpha=delta_H.uniform(shape=(N,))
             accept=ep.exp(delta_H)>alpha
             nb_accept=accept.sum().item()
             acc+=nb_accept
@@ -290,12 +292,12 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     if FT:
         dict_out['dt']=delta_t
         dict_out['ind_L']=ind_L
-    v_q=V(q)
+    v_q=apply_native_to_ep(f =V,x =q)
     #no new potential computation 
     
     return q,v_q,nb_calls,dict_out
 
-def verleternel_ep(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaussian=True,kappa_opt=False,scale_M=None,GV=False):
+def verlet_kernel_ep(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaussian=True,kappa_opt=False,scale_M=None,GV=False):
     """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
 
     """
@@ -321,7 +323,6 @@ def verleternel_ep(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaus
         #I. Verlet scheme
         #computing half-point momentum
         #p_t = p_t-0.5*dt*gradV(X) / norms(gradV(X))
-        print(i_k)
         i_k_ep = (p_t.from_numpy(i_k)).reshape((-1,1))
         if not GV:
             #TODO /!\ find a way to compute gradient only for p_t[i_k] as in PyTorch implementation

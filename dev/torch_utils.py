@@ -249,7 +249,6 @@ def multi_unsqueeze(input_,k,dim=-1):
 def compute_V_grad_pyt2(model, input_, target_class):
     """ Returns potentials and associated gradients for given inputs, model and target classes """
     if input_.requires_grad!=True:
-        print("/!\\ input does not require gradient")
         input_.requires_grad=True
     #input_.retain_grad()
     
@@ -265,12 +264,13 @@ def compute_V_grad_pyt2(model, input_, target_class):
         v=torch.where(condition=mask, input=v_,other=torch.zeros_like(v_))
         mask=multi_unsqueeze(mask,k=a_priori_grad.ndim- mask.ndim)
         grad=torch.where(condition=mask, input=a_priori_grad,other=torch.zeros_like(a_priori_grad))
+
+    input_.requires_grad =False
     return v,grad
 
 def compute_V_grad_pyt(model, input_, target_class,L=0):
     """ Returns potentials and associated gradients for given inputs, model and target classes """
     if input_.requires_grad!=True:
-        print("/!\\ input does not require gradient")
         input_.requires_grad=True
     #input_.retain_grad()
     s=score_function(X=input_,y_0=target_class,model=model)
@@ -279,7 +279,7 @@ def compute_V_grad_pyt(model, input_, target_class,L=0):
     
 
     grad=torch.autograd.grad(outputs=v,inputs=input_,grad_outputs=torch.ones_like(v),retain_graph=False)[0]
-   
+    input_.requires_grad =False
     return v,grad
 
 
