@@ -17,7 +17,6 @@ from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intLis
 from stat_reliability_measure.home import ROOT_DIR
 method_name="smc_pyt_killing"
 
-#gaussian_linear
 class config:
     dataset='mnist'
     N=100
