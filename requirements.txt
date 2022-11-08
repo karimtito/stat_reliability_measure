@@ -3,6 +3,7 @@ pandas
 scipy 
 tqdm
 matplotlib
-
+tensorflow
+tensorflow_probability
 torch>=1.8
 eagerpy
