@@ -13,7 +13,6 @@ import math
 import numpy as np
 
 
-
 def TimeStepPyt(V,X,gradV,p=1,p_p=2):
     V_mean= V(X).mean()
     V_grad_norm_mean = ((torch.norm(gradV(X),dim = 1,p=p_p)**p).mean())**(1/p)
@@ -312,8 +311,8 @@ def compute_h_pyt(model, input_, target_class):
     return v 
 
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
-
-def V_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None):
+norm_dist_pyt = torch.distributions.Normal
+def V_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None, gaussian_prior=False):
     with torch.no_grad():
         if input_shape is None:
             input_shape=x_0.shape
@@ -325,7 +324,10 @@ def V_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,i
             u=torch.reshape(u,(u.shape[0],)+input_shape)
 
         
-        x_p = low+(high-low)*u
+        x_p = u if gaussian_prior else low+(high-low)*u 
+        if gaussian_prior:
+            x_p=torch.maximum(x_p,low.view(low.size()+(1,1)))
+            x_p=torch.minimum(x_p,high.view(high.size()+(1,1)))
     v = compute_V_pyt(model=model,input_=x_p,target_class=target_class)
     return v
 
@@ -342,8 +344,8 @@ def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=Tr
     
     x_p = u if gaussian_prior else low+(high-low)*u 
     if gaussian_prior:
-        x_p=torch.max(x_p,low.view(low.size()+(1,1)))
-        x_p=torch.min(x_p,high.view(high.size()+(1,1)))
+        x_p=torch.maximum(x_p,low.view(low.size()+(1,1)))
+        x_p=torch.minimum(x_p,high.view(high.size()+(1,1)))
     _,grad_x_p = compute_V_grad_pyt(model=model,input_=x_p,target_class=target_class)
     grad_u=torch.reshape(grad_x_p,x_.shape) if gaussian_prior else torch.reshape((high-low)*grad_x_p,x_.shape)
     if gaussian_latent and not gaussian_prior:
