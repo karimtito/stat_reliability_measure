@@ -1,6 +1,7 @@
 import eagerpy as ep
 import numpy as np
-
+from stat_reliability_measure.dev.tf_utils import compute_V_grad_tf, compute_V_tf, compute_h_tf, norm_dist_tf
+from stat_reliability_measure.dev.torch_utils import compute_V_pyt, compute_V_grad_pyt, compute_h_pyt, norm_dist_pyt
 
 
 def apply_native_to_ep(f,x: ep.Tensor)-> ep.Tensor:
@@ -29,8 +30,8 @@ def time_step_ep(V,X:ep.Tensor,gradV,p:int=1):
     Returns:
         ep.Tensor: _description_
     """
-    V_mean= ep.astensor(V(X.raw)).mean()
-    grads_ep = ep.astensor(gradV(X))
+    V_mean=V(X).mean()
+    grads_ep = gradV(X)
     V_grad_norm_mean = ((ep.norms.l2(grads_ep,axis=1)**p).mean())**(1/p)
     
     time_step=V_mean/V_grad_norm_mean
@@ -52,7 +53,7 @@ save_Ys=False,scale_M=1):
         kernel_pass+=nb
         l_kernel_pass+=nb
         # compute their scores
-        VZ= apply_native_to_ep(f=V,x=Z)
+        VZ= V(Z)
         nb_calls+=nb
         log_a_high=-beta*VZ
         log_a_low= -beta*VY
@@ -127,7 +128,7 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussia
         sqrt_M = ep.sqrt(scale_M)
         p=sqrt_M*ep_normal_like(q)
     (N,d)=q.shape
-    H_old = hamiltonian_nat_ep(X=q,p=p,beta=beta, gaussian=gaussian,V=V)
+    H_old = hamiltonian_ep(X=q,p=p,beta=beta, gaussian=gaussian,V=V)
     nb_calls=N
     if save_H:
         H_ = np.zeros(T+1)
@@ -139,7 +140,7 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussia
         q_trial,p_trial=verlet_kernel_ep(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=0,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M,ind_L=ind_L,GV=gaussian_verlet)
         nb_calls+=ind_L.sum().item()
-        H_trial= hamiltonian_nat_ep(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian)
+        H_trial= hamiltonian_ep(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian)
         nb_calls+=N
         
         alpha= q.uniform(size=(N,))
@@ -150,7 +151,7 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussia
         p = ep_normal_like(q)
         if scale_M is not None:
             p = sqrt_M*p
-        H_old= hamiltonian_nat_ep(X=q, p=p,V=V,beta=beta,gaussian=gaussian)
+        H_old= hamiltonian_ep(X=q, p=p,V=V,beta=beta,gaussian=gaussian)
         if save_H:
             H_[i+1] = H_old.mean()
         nb_calls+=N
@@ -207,7 +208,7 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     (N,d)=q.shape
     o_old=q+q**2
     mu_old,sig_old=(o_old).mean(0),ep_std(o_old)
-    H_old= hamiltonian_nat_ep(X=q, p=p,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
+    H_old= hamiltonian_ep(X=q, p=p,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
     nb_calls=0 #we can reuse the potential value v_q of previous iteration: no new potential computation
     if save_H:
         H_ = np.zeros(T+1)
@@ -223,7 +224,7 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
         scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
         
         nb_calls+=4*ind_L.sum()-N # for each particle each vertlet integration step requires two oracle calls (gradients)
-        H_trial= hamiltonian_nat_ep(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
+        H_trial= hamiltonian_ep(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
         nb_calls+=N # N new potentials are computed 
         delta_H= ep.clip(-(H_trial-H_old), min_=None,max_=0)
         if FT:
@@ -271,7 +272,7 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
         p = ep_normal_like(q)
         if scale_M is not None:
             p = sqrt_M*p
-        H_old= hamiltonian_nat_ep(X=q, p=p,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
+        H_old= hamiltonian_ep(X=q, p=p,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
         #no new potential is computed 
         if save_H:
             H_[i+1] = H_old.mean()
@@ -292,7 +293,7 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     if FT:
         dict_out['dt']=delta_t
         dict_out['ind_L']=ind_L
-    v_q=apply_native_to_ep(f =V,x =q)
+    v_q= V(q)
     #no new potential computation 
     
     return q,v_q,nb_calls,dict_out
@@ -344,3 +345,46 @@ def verlet_kernel_ep(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, ga
         k+=1
         i_k=ind_L>=k
     return q_t,p_t
+
+norm_dist_dic = {ep.TensorFlowTensor: norm_dist_tf,ep.PyTorchTensor: norm_dist_pyt}
+compute_grad_dic = {ep.TensorFlowTensor: compute_V_grad_tf, ep.PyTorchTensor: compute_V_grad_pyt }
+compute_V_dic = {ep.TensorFlowTensor: compute_V_tf, ep.PyTorchTensor: compute_V_pyt }
+compute_h_dic = {ep.TensorFlowTensor: compute_h_tf, ep.PyTorchTensor: compute_h_pyt }
+
+def gradV_ep(x_:ep.Tensor,model,target_class,input_shape,low:ep.Tensor,high:ep.Tensor
+,gaussian_latent=True,reshape=True,gaussian_prior=False) -> ep.Tensor:
+    if gaussian_latent and not gaussian_prior:
+        norm_dist=norm_dist_dic[type(x_)](loc=0.,scale=1.)
+        u=ep.astensor(norm_dist.cdf(x_.raw))
+    else:
+        u=x_
+    if reshape:
+        u=ep.reshape(u,(u.shape[0],)+input_shape)
+    
+    x_p = u if gaussian_prior else low+(high-low)*u 
+    if gaussian_prior:
+        x_p=ep.maximum(x_p,low.reshape(low.shape+(1,1)))
+        x_p=ep.minimum(x_p,high.reshape(high.shape+(1,1)))
+    _,grad_x_p = compute_grad_dic[type(x_)](model=model,input_=x_p.raw,target_class=target_class)
+    grad_x_p = ep.astensor(grad_x_p)
+    grad_u=ep.reshape(grad_x_p,x_.shape) if gaussian_prior else ep.reshape((high-low)*grad_x_p,x_.shape)
+    if gaussian_latent and not gaussian_prior:
+        grad_x=ep.exp(ep.astensor(norm_dist.log_prob(x_.raw)))*grad_u
+    else:
+        grad_x=grad_u
+    return grad_x
+
+def V_ep(x_,model,target_class,input_shape,low,high,gaussian_latent=True,reshape=True,gaussian_prior=False) -> ep.Tensor:
+    if gaussian_latent:
+        norm_dist=norm_dist_dic[type(x_)](loc=0.,scale=1.)
+        u=apply_native_to_ep(f=norm_dist.cdf, x=x_)
+    else:
+        u=x_
+    if reshape:
+        u=ep.reshape(u,(u.shape[0],)+input_shape)   
+    x_p = u if gaussian_prior else low+(high-low)*u 
+    if gaussian_prior:
+        x_p=ep.maximum(x_p,low.reshape(low.shape+(1,1)))
+        x_p=ep.minimum(x_p,high.reshape(high.shape+(1,1)))
+    v = ep.astensor(compute_V_dic[type(x_)](model=model,input_=x_p.raw,target_class=target_class))
+    return v
