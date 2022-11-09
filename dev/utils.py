@@ -1,6 +1,12 @@
 
 import argparse
 import numpy as np
+
+datasets_dims={'mnist':784,'cifar10':3*1024,'cifar100':3*1024,'imagenet':3*224**2}
+datasets_num_c={'mnist':10,'cifar10':10,'imagenet':1000}
+datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465),'cifar100':[125.3/255.0, 123.0/255.0, 113.9/255.0]}
+datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010),'cifar100':[63.0/255.0, 62.1/255.0, 66.7/255.0]}
+
 def dichotomic_search(f, a, b, thresh=0, n_max =50):
     """Implementation of dichotomic search of minimum solution for an increasing function
         Args:
