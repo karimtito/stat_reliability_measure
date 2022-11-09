@@ -5,6 +5,9 @@ def mult_expand_dims(x,k=2):
         x= tf.expand_dims(x,- 1)
     return x
 
+dic_in_shape_tf={'mnist':(28,28,1),'cifar10':(32,32,3),
+'cifar100':(32,32,3),'imagenet':(224,224,3)}
+
 def compute_V_grad_tf(model, input_, target_class):
     """ Returns potentials and potentials gradients for given input_, model and target classes """
     with tf.GradientTape() as tape:
