@@ -74,7 +74,7 @@ class config:
 
     log_dir=ROOT_DIR+"/logs/linear_gaussian_tests"
     batch_opt=True
-    allow_multi_gpu=False
+    allow_multi_gpu=True
     track_gpu=False
     track_cpu=False
     core_numbers=None
@@ -83,6 +83,7 @@ class config:
     cores_number=None
     correct_T=False
     last_particle=False
+    adapt_kernel = False
 
 parser=argparse.ArgumentParser()
 
@@ -127,6 +128,7 @@ parser.add_argument('--decay',type=float,default=config.decay)
 parser.add_argument('--gain_rate',type=float,default=config.gain_rate)
 parser.add_argument('--correct_T',type=str2bool,default=config.correct_T)
 parser.add_argument('--last_particle',type=str2bool,default=config.last_particle)
+parser.add_argument('--adapt_kernel',type=str2bool,default=config.adapt_kernel)
 args=parser.parse_args()
 for k,v in vars(args).items():
     setattr(config, k, v)
@@ -238,13 +240,15 @@ for p_t in config.p_range:
                     for i in tqdm(range(config.n_rep)):
                         t=time()
                         if config.batch_opt:
-                            amls_res=amls_pyt.ImportanceSplittingPytBatch(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
+                            batch_func = amls_pyt.ImportanceSplittingPytBatch if config.adapt_kernel else amls_pyt.ImportanceSplittingPytBatch2
+                            amls_res=batch_func(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
                         tau=1e-15 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                         s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                         device=config.device,track_accept=config.track_accept)
 
                         else:
-                            amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
+                            func = amls_pyt.ImportanceSplittingPyt if config.adapt_kernel else amls_pyt.ImportanceSplittingPyt2
+                            amls_res = func(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
                         tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                         s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                         device=config.device, )

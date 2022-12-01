@@ -70,7 +70,7 @@ class config:
 
     log_dir=ROOT_DIR+"/logs/anisotrop_tests"
     batch_opt=True
-    allow_multi_gpu=False
+    allow_multi_gpu=True
     track_gpu=False
     track_cpu=False
     core_numbers=None

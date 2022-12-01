@@ -59,7 +59,7 @@ class config:
     track_cpu=False
     device=None
     n_max=10000 
-    allow_multi_gpu=False
+    allow_multi_gpu=True
     tqdm_opt=True
     allow_zero_est=True
     track_accept=True
@@ -107,6 +107,7 @@ class config:
     sig_dt=0.02
     L_min=1
     skip_mh=False
+    adapt_kernel=True
     
     
 
@@ -179,6 +180,7 @@ parser.add_argument('--sig_dt', type=float,default=config.sig_dt)
 parser.add_argument('--L_min',type=int,default=config.L_min)
 parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
 parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
+parser.add_argument('--adapt_kernel',type=str2bool,default=config.adapt_kernel)
 
 args=parser.parse_args()
 

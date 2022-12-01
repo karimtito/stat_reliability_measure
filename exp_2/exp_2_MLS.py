@@ -77,7 +77,7 @@ class config:
     aggr_res_path=None
     gaussian_latent=True
     project_kernel=True
-    allow_multi_gpu=False
+    allow_multi_gpu=True
     input_start=0
     input_stop=None
     g_target=None
@@ -316,7 +316,7 @@ for l in range(len(inp_indices)):
     with torch.no_grad():
         x_0,y_0 = X_correct[l], label_correct[l]
     input_shape=x_0.shape
-    x_0.requires_grad=True
+    #x_0.requires_grad=True
     for idx in range(len(config.epsilons)):
         
         

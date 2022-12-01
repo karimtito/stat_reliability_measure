@@ -55,7 +55,7 @@ class config:
     aggr_res_path=None
     gaussian_latent=False
     project_kernel=True
-    allow_multi_gpu=False
+    allow_multi_gpu=True
     input_index=0
     g_target=None
     track_gpu=False

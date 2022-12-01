@@ -72,7 +72,7 @@ class config:
     track_cpu=False
     device=None
     n_max=10000 
-    allow_multi_gpu=False
+    allow_multi_gpu=True
     tqdm_opt=True
     allow_zero_est=True
     track_accept=True
