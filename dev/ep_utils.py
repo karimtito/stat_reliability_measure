@@ -1,6 +1,6 @@
 import eagerpy as ep
 import numpy as np
-from stat_reliability_measure.dev.tf_utils import compute_V_grad_tf, compute_V_tf, compute_h_tf, norm_dist_tf
+from stat_reliability_measure.dev.tf_utils import compute_V_grad_tf2, compute_V_tf2, compute_h_tf, norm_dist_tf
 from stat_reliability_measure.dev.torch_utils import compute_V_pyt, compute_V_grad_pyt, compute_h_pyt, norm_dist_pyt
 
 
@@ -219,18 +219,18 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     prod_correl = q.ones(shape=(d,))
     i=0
  
-    while (prod_correl>alpha_p).sum()>=prop_d*d and i<T_max:
+    while (prod_correl>alpha_p).sum().item()>=prop_d*d and i<T_max:
         q_trial,p_trial=verlet_kernel_ep(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
         
         nb_calls+=4*ind_L.sum()-N # for each particle each vertlet integration step requires two oracle calls (gradients)
         H_trial= hamiltonian_ep(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
         nb_calls+=N # N new potentials are computed 
-        delta_H= ep.clip(-(H_trial-H_old), min_=None,max_=0)
+        delta_H= ep.clip(-(H_trial-H_old), min_=-1e5,max_=0)
         if FT:
-            exp_weight = ep.exp(ep.clip(delta_H,min_=None,max_=0))
-            m_distances= maha_dist(x=q,y=q_trial)/q.from_numpy(ind_L)
-            lambda_i=m_distances*exp_weight+1e-8*m_distances.ones_like()
+            exp_weight = ep.exp(ep.clip(delta_H,min_=-1e5,max_=0))
+            m_distances= maha_dist(x=q,y=q_trial)/q.from_numpy(ind_L.astype(np.float32))
+            lambda_i=m_distances*exp_weight+1e-5*m_distances.ones_like()
             if lambda_i.isnan().any():
                 print(f"NaN values in lambda_i:")
                 print(lambda_i)
@@ -347,8 +347,8 @@ def verlet_kernel_ep(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, ga
     return q_t,p_t
 
 norm_dist_dic = {ep.TensorFlowTensor: norm_dist_tf,ep.PyTorchTensor: norm_dist_pyt}
-compute_grad_dic = {ep.TensorFlowTensor: compute_V_grad_tf, ep.PyTorchTensor: compute_V_grad_pyt }
-compute_V_dic = {ep.TensorFlowTensor: compute_V_tf, ep.PyTorchTensor: compute_V_pyt }
+compute_grad_dic = {ep.TensorFlowTensor: compute_V_grad_tf2, ep.PyTorchTensor: compute_V_grad_pyt }
+compute_V_dic = {ep.TensorFlowTensor: compute_V_tf2, ep.PyTorchTensor: compute_V_pyt }
 compute_h_dic = {ep.TensorFlowTensor: compute_h_tf, ep.PyTorchTensor: compute_h_pyt }
 
 def gradV_ep(x_:ep.Tensor,model,target_class,input_shape,low:ep.Tensor,high:ep.Tensor
