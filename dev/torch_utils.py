@@ -282,6 +282,7 @@ def compute_V_grad_pyt(model, input_, target_class,L=0):
     return v,grad
 
 
+
 def compute_V_pyt2(model, input_, target_class,L=0):
     """Return potentials for given inputs, model and target classes"""
     with torch.no_grad():
@@ -436,11 +437,7 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
         imagenet_dataset = datasets.ImageNet(data_dir, split="val", transform=data_transform)
 
         data_loader = DataLoader(imagenet_dataset, batch_size =batch_size, shuffle=False)
-
-
-
-    
-                    
+                         
     return data_loader
 
 
