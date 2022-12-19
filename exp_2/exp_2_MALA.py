@@ -167,7 +167,6 @@ parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_
 parser.add_argument('--torch_seed',type=int, default=config.torch_seed)
 parser.add_argument('--np_seed',type=int, default=config.np_seed)
 parser.add_argument('--sigma', type=float,default=config.sigma)
-
 parser.add_argument('--ess_alpha',type=float,default=config.ess_alpha)
 parser.add_argument('--e_range',type=str2floatList,default=config.e_range)
 parser.add_argument('--N_range',type=str2intList,default=config.N_range)
@@ -195,7 +194,6 @@ parser.add_argument('--adapt_dt_mcmc',type=str2bool,default=config.adapt_dt_mcmc
 parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
 parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
 parser.add_argument('--ess_opt',type=str2bool,default=config.ess_opt)
-
 parser.add_argument('--lambda_0',type=float,default=config.lambda_0)
 parser.add_argument('--test2',type=str2bool,default =config.test2)
 parser.add_argument('--print_config',type=str2bool,default=config.print_config)
@@ -206,14 +204,12 @@ parser.add_argument('--M_opt',type=str2bool,default=config.M_opt)
 parser.add_argument('--adapt_step',type=str2bool,default=config.adapt_step)
 parser.add_argument('--FT',type=str2bool,default=config.FT)
 parser.add_argument('--sig_dt', type=float,default=config.sig_dt)
-
 parser.add_argument('--load_batch_size',type=int,default=config.load_batch_size)
 parser.add_argument('--model_arch',type=str,default = config.model_arch)
 parser.add_argument('--robust_model',type=str2bool, default=config.robust_model)
 parser.add_argument('--nb_epochs',type=int,default=config.nb_epochs)
 parser.add_argument('--adversarial_every',type=int,default=config.adversarial_every)
 parser.add_argument('--gaussian_latent',type=str2bool,default=config.gaussian_latent)
-
 parser.add_argument('--eps_max',type=float,default=config.eps_max)
 parser.add_argument('--eps_min',type=float,default=config.eps_min)
 parser.add_argument('--eps_num',type=int,default=config.eps_num)
@@ -457,7 +453,7 @@ for l in inp_indices:
                             log_name=method_name+f'_N_{N}_T_{T}_L_{L}_a_{float_to_file_float(alpha)}_ess_{float_to_file_float(ess_t)}'+'_'+loc_time.split('_')[0]
                             log_path=os.path.join(exp_log_path,log_name)
                             if os.path.exists(log_path):
-                                log_path = log_path + '_'+str(np.random.randint(low=0,high =10))
+                                log_path = log_path + '_w'+str(np.random.randint(low=0,high =10))
                             
                             
                             os.mkdir(path=log_path)
