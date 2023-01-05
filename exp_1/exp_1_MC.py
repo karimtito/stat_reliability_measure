@@ -16,7 +16,7 @@ from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str
 import stat_reliability_measure.dev.mc.mc_pyt as mc_pyt
 
 
-method_name="MLS_SMC"
+method_name="MC_SMC"
 class config:
     
 
@@ -51,7 +51,7 @@ class config:
     tqdm_opt=True
     save_config = True
     print_config=True
-    update_agg_res=False
+    update_agg_res=True
     aggr_res_path = None
 
     track_advs=False
@@ -201,8 +201,7 @@ for p_t in config.p_range:
             
             
             print(f"Starting vanilla MC run {i_run}/{nb_runs}, with p_t= {p_t},N={N},batch size={bs}")
-            if config.verbose>3:
-                print(f"K/N:{K/N}")
+            
             times= []
             rel_error= []
             ests = [] 
