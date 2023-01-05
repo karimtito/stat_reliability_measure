@@ -12,6 +12,9 @@ import os
 import math
 import numpy as np
 
+def norm_batch_tensor(x,d):
+    y = x.reshape(x.shape[:1]+(d,))
+    return y.norm(dim=-1)
 
 def TimeStepPyt(V,X,gradV,p=1,p_p=2):
     V_mean= V(X).mean()
