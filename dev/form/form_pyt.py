@@ -3,10 +3,10 @@ from stat_reliability_measure.dev.torch_utils import norm_batch_tensor
 from math import sqrt
 
 def FORM_pyt(dp_search_method,X,y,score,d,max_dist=None,**kwargs):
-    """Computes 
+    """Computes the probability of failure using the First Order Method
 
     Args:
-        dp_search_method (_type_): _description_
+        dp_search_method (_type_): design point search method (eg. HLRF, iHLRF...)
         X (_type_): _description_
         y (_type_): _description_
         model (_type_): _description_
