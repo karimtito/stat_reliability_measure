@@ -133,230 +133,235 @@ args=parser.parse_args()
 for k,v in vars(args).items():
     setattr(config, k, v)
 
+def main():
+    #nb_runs=config.n_rep
+    nb_runs=1
+    if len(config.N_range)==0:
+        config.N_range=[config.N]
+    nb_runs*=len(config.N_range)
+    if len(config.T_range)==0:
+        config.T_range=[config.T]
+    nb_runs*=len(config.T_range)
+    if len(config.ratio_range)==0:
+        config.ratio_range=[config.ratio]
+    nb_runs*=len(config.ratio_range)
+    if len(config.s_range)==0:
+        config.s_range=[config.s]
+    nb_runs*=len(config.s_range)
+    if len(config.p_range)==0:
+        config.p_range=[config.p_t]
+    nb_runs*=len(config.p_range)
 
-#nb_runs=config.n_rep
-nb_runs=1
-if len(config.N_range)==0:
-    config.N_range=[config.N]
-nb_runs*=len(config.N_range)
-if len(config.T_range)==0:
-    config.T_range=[config.T]
-nb_runs*=len(config.T_range)
-if len(config.ratio_range)==0:
-    config.ratio_range=[config.ratio]
-nb_runs*=len(config.ratio_range)
-if len(config.s_range)==0:
-    config.s_range=[config.s]
-nb_runs*=len(config.s_range)
-if len(config.p_range)==0:
-    config.p_range=[config.p_t]
-nb_runs*=len(config.p_range)
-
-if config.device is None:
-    device= 'cuda:0' if torch.cuda.is_available() else 'cpu'
-
-
-if not config.allow_multi_gpu:
-    os.environ["CUDA_VISIBLE_DEVICES"]="0"
-
-if config.track_gpu:
-    import GPUtil
-    gpus=GPUtil.getGPUs()
-    if len(gpus)>1:
-        print("Multi gpus detected, only the first GPU will be tracked.")
-    config.gpu_name=gpus[0].name
-
-if config.track_cpu:
-    config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
-    config.cores_number=os.cpu_count()
+    if config.device is None:
+        device= 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
 
-epsilon=config.epsilon
-d=config.d
+    if not config.allow_multi_gpu:
+        os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
-if not os.path.exists(ROOT_DIR+'/logs'):
-    os.mkdir(ROOT_DIR+'/logs')
-    os.mkdir(config.log_dir)
-elif not os.path.exists(config.log_dir):
-    os.mkdir(config.log_dir)
-raw_logs=os.path.join(config.log_dir,'raw_logs/')
-if not os.path.exists(raw_logs):
-    os.mkdir(raw_logs)
-raw_logs_path=os.path.join(raw_logs,method_name)
-if not os.path.exists(raw_logs_path):
-    os.mkdir(raw_logs_path)
+    if config.track_gpu:
+        import GPUtil
+        gpus=GPUtil.getGPUs()
+        if len(gpus)>1:
+            print("Multi gpus detected, only the first GPU will be tracked.")
+        config.gpu_name=gpus[0].name
 
-loc_time= datetime.today().isoformat().split('.')[0]
+    if config.track_cpu:
+        config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
+        config.cores_number=os.cpu_count()
 
-exp_log_path=os.path.join(config.log_dir,method_name+'_t_'+loc_time.split('_')[0])
-os.mkdir(exp_log_path)
-exp_res = []
-config.json=vars(args)
-if config.print_config:
-    print(config.json)
-# if config.save_confi
-# if config.save_config:
-#     with open(file=os.path.join(),mode='w') as f:
-#         f.write(config.json)
 
-epsilon=config.epsilon
-e_1 = torch.Tensor([1]+[0]*(d-1),device=config.device)
-get_c_norm= lambda p:stat.norm.isf(p)
-i_run=0
-for p_t in config.p_range:
-    c=get_c_norm(p_t)
-    P_target=stat.norm.sf(c)
-    if config.verbose>=5:
-        print(f"P_target:{P_target}")
-    arbitrary_thresh=40 #pretty useless a priori but should not hurt results
-    def v_batch_pyt(X,c=c):
-        return torch.clamp(input=c-X[:,0],min=-arbitrary_thresh, max = None)
-    amls_gen = lambda N: torch.randn(size=(N,d),device=config.device)
-    batch_transform = lambda x: x
-    normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 
-    h_V_batch_pyt= lambda x: -v_batch_pyt(batch_transform(x)).reshape((x.shape[0],1))
+    epsilon=config.epsilon
+    d=config.d
 
-    for T in config.T_range:
-        for N in config.N_range: 
-            for s in config.s_range:
-                for ratio in config.ratio_range: 
-                    loc_time= datetime.today().isoformat().split('.')[0]
-                    log_name=method_name+f'_N_{N}_T_{T}_s_{float_to_file_float(s)}_r_{float_to_file_float(ratio)}_t_'+'_'+loc_time.split('_')[0]
-                    log_path=os.path.join(exp_log_path,log_name)
-                    os.mkdir(path=log_path)
-                    i_run+=1
-                    
-                    
-                    K=int(N*ratio) if not config.last_particle else N-1
-                    print(f"Starting run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},s={s}")
-                    if config.verbose>3:
-                        print(f"K/N:{K/N}")
-                    times= []
-                    rel_error= []
-                    ests = [] 
-                    calls=[]
-                    if config.track_finish:
-                        finish_flags=[]
-                    for i in tqdm(range(config.n_rep)):
-                        t=time()
-                        if config.batch_opt:
-                            batch_func = amls_pyt.ImportanceSplittingPytBatch if config.adapt_kernel else amls_pyt.ImportanceSplittingPytBatch2
-                            amls_res=batch_func(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
-                        tau=1e-15 , n_max=config.n_max,clip_s=config.clip_s , T=T,
-                        s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
-                        device=config.device,track_accept=config.track_accept)
+    if not os.path.exists(ROOT_DIR+'/logs'):
+        os.mkdir(ROOT_DIR+'/logs')
+        os.mkdir(config.log_dir)
+    elif not os.path.exists(config.log_dir):
+        os.mkdir(config.log_dir)
+    raw_logs=os.path.join(config.log_dir,'raw_logs/')
+    if not os.path.exists(raw_logs):
+        os.mkdir(raw_logs)
+    raw_logs_path=os.path.join(raw_logs,method_name)
+    if not os.path.exists(raw_logs_path):
+        os.mkdir(raw_logs_path)
 
-                        else:
-                            func = amls_pyt.ImportanceSplittingPyt if config.adapt_kernel else amls_pyt.ImportanceSplittingPyt2
-                            amls_res = func(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
-                        tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
-                        s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
-                        device=config.device, )
-                        t=time()-t
+    loc_time= datetime.today().isoformat().split('.')[0]
+
+    exp_log_path=os.path.join(config.log_dir,method_name+'_t_'+loc_time.split('_')[0])
+    os.mkdir(exp_log_path)
+    exp_res = []
+    config.json=vars(args)
+    if config.print_config:
+        print(config.json)
+    # if config.save_confi
+    # if config.save_config:
+    #     with open(file=os.path.join(),mode='w') as f:
+    #         f.write(config.json)
+
+    epsilon=config.epsilon
+    e_1 = torch.Tensor([1]+[0]*(d-1),device=config.device)
+    get_c_norm= lambda p:stat.norm.isf(p)
+    i_run=0
+
+
+    for p_t in config.p_range:
+        c=get_c_norm(p_t)
+        P_target=stat.norm.sf(c)
+        if config.verbose>=5:
+            print(f"P_target:{P_target}")
+        arbitrary_thresh=40 #pretty useless a priori but should not hurt results
+        def v_batch_pyt(X,c=c):
+            return torch.clamp(input=c-X[:,0],min=-arbitrary_thresh, max = None)
+        amls_gen = lambda N: torch.randn(size=(N,d),device=config.device)
+        batch_transform = lambda x: x
+        normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 
+        h_V_batch_pyt= lambda x: -v_batch_pyt(batch_transform(x)).reshape((x.shape[0],1))
+
+        for T in config.T_range:
+            for N in config.N_range: 
+                for s in config.s_range:
+                    for ratio in config.ratio_range: 
+                        loc_time= datetime.today().isoformat().split('.')[0]
+                        log_name=method_name+f'_N_{N}_T_{T}_s_{float_to_file_float(s)}_r_{float_to_file_float(ratio)}_t_'+'_'+loc_time.split('_')[0]
+                        log_path=os.path.join(exp_log_path,log_name)
+                        os.mkdir(path=log_path)
+                        i_run+=1
                         
-                        est=amls_res[0]
                         
-                        dict_out=amls_res[1]
-                        if config.track_accept:
-                            accept_logs=os.path.join(log_path,'accept_logs')
-                            if not os.path.exists(accept_logs):
-                                os.mkdir(path=accept_logs)
-                            accept_rates=dict_out['accept_rates']
-                            np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
-                            ,X=accept_rates)
-                            x_T=np.arange(len(accept_rates))
-                            plt.plot(x_T,accept_rates)
-                            plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
-                            plt.close()
-                            accept_rates_mcmc=dict_out['accept_rates_mcmc']
-                            x_T=np.arange(len(accept_rates_mcmc))
-                            plt.plot(x_T,accept_rates_mcmc)
-                            plt.savefig(os.path.join(accept_logs,f'accept_rates_mcmc_{i}.png'))
-                            plt.close()
-                            np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
-                            ,X=accept_rates_mcmc)
+                        K=int(N*ratio) if not config.last_particle else N-1
+                        print(f"Starting run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},s={s}")
+                        if config.verbose>3:
+                            print(f"K/N:{K/N}")
+                        times= []
+                        rel_error= []
+                        ests = [] 
+                        calls=[]
                         if config.track_finish:
-                            finish_flags.append(dict_out['finish_flag'])
-                        times.append(t)
-                        ests.append(est)
-                        calls.append(dict_out['Count_h'])
+                            finish_flags=[]
+                        for i in tqdm(range(config.n_rep)):
+                            t=time()
+                            if config.batch_opt:
+                                batch_func = amls_pyt.ImportanceSplittingPytBatch if config.adapt_kernel else amls_pyt.ImportanceSplittingPytBatch2
+                                amls_res=batch_func(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
+                            tau=1e-15 , n_max=config.n_max,clip_s=config.clip_s , T=T,
+                            s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
+                            device=config.device,track_accept=config.track_accept)
+
+                            else:
+                                func = amls_pyt.ImportanceSplittingPyt if config.adapt_kernel else amls_pyt.ImportanceSplittingPyt2
+                                amls_res = func(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
+                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
+                            s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
+                            device=config.device, )
+                            t=time()-t
+                            
+                            est=amls_res[0]
+                            
+                            dict_out=amls_res[1]
+                            if config.track_accept:
+                                accept_logs=os.path.join(log_path,'accept_logs')
+                                if not os.path.exists(accept_logs):
+                                    os.mkdir(path=accept_logs)
+                                accept_rates=dict_out['accept_rates']
+                                np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
+                                ,X=accept_rates)
+                                x_T=np.arange(len(accept_rates))
+                                plt.plot(x_T,accept_rates)
+                                plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
+                                plt.close()
+                                accept_rates_mcmc=dict_out['accept_rates_mcmc']
+                                x_T=np.arange(len(accept_rates_mcmc))
+                                plt.plot(x_T,accept_rates_mcmc)
+                                plt.savefig(os.path.join(accept_logs,f'accept_rates_mcmc_{i}.png'))
+                                plt.close()
+                                np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
+                                ,X=accept_rates_mcmc)
+                            if config.track_finish:
+                                finish_flags.append(dict_out['finish_flag'])
+                            times.append(t)
+                            ests.append(est)
+                            calls.append(dict_out['Count_h'])
 
 
-                    times=np.array(times)
-                    ests = np.array(ests)
-                    log_ests=np.log(np.clip(ests,a_min=1e-250,a_max=1))
-                    std_log_est=log_ests.std()
-                    mean_log_est=log_ests.mean()
-                    lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
-                    lg_est_path=os.path.join(log_path,'lg_ests.txt')
-                    np.savetxt(fname=lg_est_path,X=ests)
-                
-                    abs_errors=np.abs(ests-p_t)
-                    rel_errors=abs_errors/p_t
-                    bias=np.mean(ests)-p_t
-
-                    times=np.array(times)  
-                    ests=np.array(ests)
-                    calls=np.array(calls)
-                    errs=np.abs(ests-p_t)
-                    q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
-                    mean_calls=calls.mean()
-                    std_calls=calls.std()
-                    MSE=np.mean(abs_errors**2)
-                    MSE_adj=MSE*mean_calls
-                    MSE_rel=MSE/p_t**2
-                    MSE_rel_adj=MSE_rel*mean_calls
+                        times=np.array(times)
+                        ests = np.array(ests)
+                        log_ests=np.log(np.clip(ests,a_min=1e-250,a_max=1))
+                        std_log_est=log_ests.std()
+                        mean_log_est=log_ests.mean()
+                        lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                        lg_est_path=os.path.join(log_path,'lg_ests.txt')
+                        np.savetxt(fname=lg_est_path,X=ests)
                     
-                    print(f"mean est:{ests.mean()}, std est:{ests.std()}")
-                    print(f"mean rel error:{rel_errors.mean()}")
-                    print(f"MSE rel:{MSE/p_t**2}")
-                    print(f"MSE adj.:{MSE_adj}")
-                    print(f"MSE rel. adj.:{MSE_rel_adj}")
-                    print(f"mean calls:{calls.mean()}")
+                        abs_errors=np.abs(ests-p_t)
+                        rel_errors=abs_errors/p_t
+                        bias=np.mean(ests)-p_t
+
+                        times=np.array(times)  
+                        ests=np.array(ests)
+                        calls=np.array(calls)
+                        errs=np.abs(ests-p_t)
+                        q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                        mean_calls=calls.mean()
+                        std_calls=calls.std()
+                        MSE=np.mean(abs_errors**2)
+                        MSE_adj=MSE*mean_calls
+                        MSE_rel=MSE/p_t**2
+                        MSE_rel_adj=MSE_rel*mean_calls
+                        
+                        print(f"mean est:{ests.mean()}, std est:{ests.std()}")
+                        print(f"mean rel error:{rel_errors.mean()}")
+                        print(f"MSE rel:{MSE/p_t**2}")
+                        print(f"MSE adj.:{MSE_adj}")
+                        print(f"MSE rel. adj.:{MSE_rel_adj}")
+                        print(f"mean calls:{calls.mean()}")
 
 
-                    np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
-                    np.savetxt(fname=os.path.join(log_path,'ests.txt'),X=ests)
+                        np.savetxt(fname=os.path.join(log_path,'times.txt'),X=times)
+                        np.savetxt(fname=os.path.join(log_path,'ests.txt'),X=ests)
 
-                    plt.hist(times, bins=20)
-                    plt.savefig(os.path.join(log_path,'times_hist.png'))
-                    plt.close()
-                    plt.hist(rel_errors,bins=20)
-                    plt.savefig(os.path.join(log_path,'rel_errs_hist.png'))
-                    plt.close()
+                        plt.hist(times, bins=20)
+                        plt.savefig(os.path.join(log_path,'times_hist.png'))
+                        plt.close()
+                        plt.hist(rel_errors,bins=20)
+                        plt.savefig(os.path.join(log_path,'rel_errs_hist.png'))
+                        plt.close()
 
-                    #with open(os.path.join(log_path,'results.txt'),'w'):
-                    results={'p_t':p_t,'method':method_name,
-                    'N':N,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,'lg_est_path':lg_est_path
-                    ,'min_rate':config.min_rate,'mean_est':ests.mean(),'std_log_est':log_ests.std(),'mean_log_est':mean_log_est,
-                    'lg_q_1':lg_q_1,'lg_q_3':lg_q_3,"lg_med_est":lg_med_est
-                    ,'mean_time':times.mean()
-                    ,'std_time':times.std(),'MSE':MSE,'MSE_rel_adj':MSE_rel_adj,'MSE_rel':MSE_rel,
-                    'mean_calls':mean_calls,'last_particle':config.last_particle,
-                    'std_calls':std_calls
-                    ,'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
-                    'mean_rel_error':rel_errors.mean(),'std_est':ests.std(),'freq underest':(ests<p_t).mean()
-                    ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
-                    'batch_opt':config.batch_opt,"d":d, "correct_T":config.correct_T,
-                    "np_seed":config.np_seed,"torch_seed":config.torch_seed,
-                        'q_1':q_1,'q_3':q_3,'med_est':med_est}
-                    exp_res.append(results)
-                    results_df=pd.DataFrame([results])
-                    results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
-                    if config.aggr_res_path is None:
-                        aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
-                    else:
-                        aggr_res_path=config.aggr_res_path
-                    if config.update_agg_res:
-                        if not os.path.exists(aggr_res_path):
-                            cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est',
-                            'mean_calls','std_calls',
-                            'bias','mean abs error','mean_rel_error','std_est','freq underest','gpu_name','cpu_name']
-                            aggr_res_df= pd.DataFrame(columns=cols)
+                        #with open(os.path.join(log_path,'results.txt'),'w'):
+                        results={'p_t':p_t,'method':method_name,
+                        'N':N,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,'lg_est_path':lg_est_path
+                        ,'min_rate':config.min_rate,'mean_est':ests.mean(),'std_log_est':log_ests.std(),'mean_log_est':mean_log_est,
+                        'lg_q_1':lg_q_1,'lg_q_3':lg_q_3,"lg_med_est":lg_med_est
+                        ,'mean_time':times.mean()
+                        ,'std_time':times.std(),'MSE':MSE,'MSE_rel_adj':MSE_rel_adj,'MSE_rel':MSE_rel,
+                        'mean_calls':mean_calls,'last_particle':config.last_particle,
+                        'std_calls':std_calls
+                        ,'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
+                        'mean_rel_error':rel_errors.mean(),'std_est':ests.std(),'freq underest':(ests<p_t).mean()
+                        ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
+                        'batch_opt':config.batch_opt,"d":d, "correct_T":config.correct_T,
+                        "np_seed":config.np_seed,"torch_seed":config.torch_seed,
+                            'q_1':q_1,'q_3':q_3,'med_est':med_est}
+                        exp_res.append(results)
+                        results_df=pd.DataFrame([results])
+                        results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
+                        if config.aggr_res_path is None:
+                            aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                         else:
-                            aggr_res_df=pd.read_csv(aggr_res_path)
-                        aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
-                        aggr_res_df.to_csv(aggr_res_path,index=False)
+                            aggr_res_path=config.aggr_res_path
+                        if config.update_agg_res:
+                            if not os.path.exists(aggr_res_path):
+                                cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est',
+                                'mean_calls','std_calls',
+                                'bias','mean abs error','mean_rel_error','std_est','freq underest','gpu_name','cpu_name']
+                                aggr_res_df= pd.DataFrame(columns=cols)
+                            else:
+                                aggr_res_df=pd.read_csv(aggr_res_path)
+                            aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
+                            aggr_res_df.to_csv(aggr_res_path,index=False)
 
-exp_df=pd.DataFrame(exp_res)
-exp_df.to_csv(os.path.join(exp_log_path,'exp_results.csv'),index=False)
+    exp_df=pd.DataFrame(exp_res)
+    exp_df.to_csv(os.path.join(exp_log_path,'exp_results.csv'),index=False)
+
+if __name__ == "__main__":
+    main()
