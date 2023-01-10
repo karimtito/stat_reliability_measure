@@ -10,7 +10,17 @@ class config:
     methods_list=['MC','MLS','H_SMC','MALA_SMC','RW_SMC']
     params_dic={'MC': {'N_range':[int(1e5),int(1e6)],'batch_size':[128]},
 
-                'MLS': {'N_range':[int(1e2,1e3)]}
+                'MLS': {'N_range':[int(1e2,1e3)],'ratio_range':[0.2,0.5,0.8],
+                        'T_range':[1,10,100],},
+                'H_SMC':{'N_range':[int(1e2,1e3)],'ess_range':[0.2,0.5,0.8],
+                        'T_range':[1,10,100], 'L_range':[]},
+                'MALA_SMC':{'N_range':[int(1e2,1e3)],'ess_range':[0.2,0.5,0.8],
+                        'T_range':[1,10,100],},
+                'RW_SMC':{'N_range':[int(1e2,1e3)],'ess_range':[0.2,0.5,0.8],
+                        'T_range':[1,10,100],},
+
+                
+                
                 }
 
     log_dir=Path('./low_prob_logs/exp_1')
@@ -34,6 +44,17 @@ def main():
                 setattr(exp_1_MLS.config, key, value)
             exp_1_MLS.main()
             del exp_1_MLS
-
+        if method=='RW_SMC':
+            import exp_1.exp_1_RW as exp_1_RW
+            for key,value in config.params_dic['RW_SMC'].items:
+                setattr(exp_1_RW.config, key, value)
+            exp_1_RW.main()
+            del exp_1_RW
+        if method=='FORM':
+            import exp_1.exp_1_FORM as exp_1_FORM
+            for key,value in config.params_dic['FORM'].items:
+                setattr(exp_1_FORM.config, key, value)
+            exp_1_MC.main()
+            del exp_1_MC 
 if __name__ == '__main__':
     main()
