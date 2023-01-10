@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import torch
 import pandas as pd
 import argparse
-from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
+from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search,get_sel_df
 from scipy.special import betainc
 from stat_reliability_measure.home import ROOT_DIR
 
@@ -107,7 +107,7 @@ class config:
     sig_dt=0.02
     L_min=1
     skip_mh=False
-    
+    repeat_exp = True 
     
 
 
@@ -179,7 +179,7 @@ parser.add_argument('--sig_dt', type=float,default=config.sig_dt)
 parser.add_argument('--L_min',type=int,default=config.L_min)
 parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
 parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
-
+parser.add_argument('--repeat_exp',type=str2bool,default=config.repeat_exp)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -346,13 +346,24 @@ def main():
             for T in config.T_range:
                 for alpha in config.alpha_range:       
                     for N in config.N_range:
+                        if (not config.repeat_exp) and config.update_agg_res and os.path.exists(aggr_res_path):
+                            aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                            if os.path.exists(aggr_res_path):
+                                aggr_res_df = pd.read_csv(aggr_res_path)
+                                same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method','H_SMC','='),
+                                ('p_t',p_t,'='),('n_rep',config.n_rep,'='),
+                    ('N',N,'='),('T',T,'='),('L',L,'='),('alpha',alpha,'='),
+                    ('ess')] )  
+                                # if a similar experiment has been done in the current log directory we skip it
+                                if len(same_exp_df):
+                                    continue
                         loc_time= datetime.today().isoformat().split('.')[0]
                         log_name=method_name+f'_N_{N}_T_{T}_L_{L}_a_{float_to_file_float(alpha)}_ess_{float_to_file_float(ess_t)}'+'_'+loc_time.split('_')[0]
                         log_path=os.path.join(exp_log_path,log_name)
                         if os.path.exists(log_path):
                             log_path=log_path+'_'+str(np.random.randint(low=0,high=10))
                         
-                        
+
                         os.mkdir(path=log_path)
                         run_nb+=1
                         print(f'Run {run_nb}/{nb_runs}')
@@ -361,6 +372,7 @@ def main():
                         calls=[]
                         finished_flags=[]
                         iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
+                        
                         print(f"Starting simulations with p_t:{p_t},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
                         for i in iterator:
                             t=time()
