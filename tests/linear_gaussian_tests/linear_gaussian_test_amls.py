@@ -216,7 +216,7 @@ for p_t in config.p_range:
                     
                     
                     K=int(N*ratio) if not config.last_particle else N-1
-                    print(f"Starting run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},s={s}")
+                    print(f"Starting {method_name} run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},s={s}")
                     if config.verbose>3:
                         print(f"K/N:{K/N}")
                     times= []

@@ -226,7 +226,7 @@ for p_s in config.p_range:
                     
 
                     K=int(N*ratio)
-                    print(f"Starting run {i_run}/{nb_runs}, with p_t= {p_t},p_s={p_s},p_w={config.p_w},N={N},K={K},T={T},s={s}")
+                    print(f"Starting {method_name} run {i_run}/{nb_runs}, with p_t= {p_t},p_s={p_s},p_w={config.p_w},N={N},K={K},T={T},s={s}")
                     if config.verbose>3:
                         print(f"K/N:{K/N}")
                     

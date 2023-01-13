@@ -301,7 +301,7 @@ param_lens=np.array([len(l) for l in param_ranges])
 nb_runs= np.prod(param_lens)
 
 mh_str="adjusted" 
-method=method_name+'_'+mh_str
+method=method_name
 save_every = 1
 #adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBetaPyt
 
@@ -363,7 +363,7 @@ for p_s in config.p_range:
                         calls=[]
                         finished_flags=[]
                         iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
-                        print(f"Starting simulations with p_t:{p_t},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
+                        print(f"Starting {method} simulations with p_t:{p_t},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
                         for i in iterator:
                             t=time()
                             p_est,res_dict,=smc_pyt.SamplerSMC(gen=norm_gen,V= V,gradV=gradV,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,

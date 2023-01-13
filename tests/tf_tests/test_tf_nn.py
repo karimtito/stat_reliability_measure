@@ -286,7 +286,7 @@ param_lens=np.array([len(l) for l in param_ranges])
 nb_runs= np.prod(param_lens)
 
 mh_str="adjusted" 
-method=method_name+'_'+mh_str
+method=method_name
 save_every = 1
 x_min=0
 x_max=1
@@ -446,7 +446,7 @@ for ess_t in config.e_range:
                             calls=[]
                             finished_flags=[]
                             iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
-                            print(f"Starting simulations with model:{model_name} img_idx:{l},eps={epsilon},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
+                            print(f"Starting {method} simulations with model:{model_name} img_idx:{l},eps={epsilon},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
                             for i in iterator:
                                 t=time()
                                 p_est,res_dict,=smc_ep.SamplerSMC(gen=gen,V= V_ep,gradV=gradV_ep,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,
