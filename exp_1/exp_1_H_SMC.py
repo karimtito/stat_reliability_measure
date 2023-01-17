@@ -5,11 +5,13 @@ from tqdm import tqdm
 from time import time
 from datetime import datetime
 import os
+import json
 import matplotlib.pyplot as plt
 import torch
 import pandas as pd
 import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search,get_sel_df
+from stat_reliability_measure.dev.utils import print_config
 from scipy.special import betainc
 from stat_reliability_measure.home import ROOT_DIR
 
@@ -250,7 +252,7 @@ def main():
 
 
     if config.device is None:
-        config.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
+        config.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         if config.verbose>=5:
             print(config.device)
         device=config.device
@@ -294,16 +296,20 @@ def main():
 
     if config.dt_gain is None:
         config.dt_gain=1/config.dt_decay
-    config.json=vars(args)
-    if config.print_config:
-        print(config.json)
+    
+    config_dict=print_config(config)
+    path_config=os.path.join(exp_log_path,'config.json')
+    with open(path_config,'w') as f:
+        f.write(json.dumps(config_dict, indent = 4))
 
-    param_ranges = [config.N_range,config.T_range,config.alpha_range,config.p_range,config.L_range,config.e_range]
+    param_ranges = [config.N_range,config.T_range,config.alpha_range,config.p_range,config.e_range]
     param_lens=np.array([len(l) for l in param_ranges])
+    print(param_lens)
     nb_runs= np.prod(param_lens)
 
-    mh_str="adjusted" 
-    method=method_name+'_'+mh_str
+    #mh_str="adjusted" 
+    #method=method_name
+    method=method_name
     save_every = 1
     #adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBetaPyt
 
@@ -346,17 +352,18 @@ def main():
             for T in config.T_range:
                 for alpha in config.alpha_range:       
                     for N in config.N_range:
+                        run_nb+=1
+                        aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                         if (not config.repeat_exp) and config.update_agg_res and os.path.exists(aggr_res_path):
-                            aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
-                            if os.path.exists(aggr_res_path):
-                                aggr_res_df = pd.read_csv(aggr_res_path)
-                                same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method','H_SMC','='),
-                                ('p_t',p_t,'='),('n_rep',config.n_rep,'='),
-                    ('N',N,'='),('T',T,'='),('L',L,'='),('alpha',alpha,'='),
-                    ('ess')] )  
-                                # if a similar experiment has been done in the current log directory we skip it
-                                if len(same_exp_df):
-                                    continue
+                            aggr_res_df = pd.read_csv(aggr_res_path)
+                            same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method,'='),
+                            ('p_t',p_t,'='),('n_rep',config.n_rep,'='),
+                ('N',N,'='),('T',T,'='),('L',L,'='),('alpha',alpha,'='),
+                ('ess_alpha',ess_t,'=')] )  
+                            # if a similar experiment has been done in the current log directory we skip it
+                            if len(same_exp_df)>0:
+                                print(f"Skipping {method_name} run {run_nb}/{nb_runs}, with p_t:{p_t},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
+                                continue
                         loc_time= datetime.today().isoformat().split('.')[0]
                         log_name=method_name+f'_N_{N}_T_{T}_L_{L}_a_{float_to_file_float(alpha)}_ess_{float_to_file_float(ess_t)}'+'_'+loc_time.split('_')[0]
                         log_path=os.path.join(exp_log_path,log_name)
@@ -365,7 +372,7 @@ def main():
                         
 
                         os.mkdir(path=log_path)
-                        run_nb+=1
+                        
                         print(f'Run {run_nb}/{nb_runs}')
                         times=[]
                         ests = []
@@ -373,12 +380,12 @@ def main():
                         finished_flags=[]
                         iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
                         
-                        print(f"Starting simulations with p_t:{p_t},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
+                        print(f"Starting {method} simulations with p_t:{p_t},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
                         for i in iterator:
                             t=time()
                             sampler=smc_pyt.SamplerSMC 
-                            p_est,res_dict,=sampler(gen=norm_gen,V= V,gradV=gradV,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,
-                            alpha=alpha,n_max=10000,
+                            p_est,res_dict,=sampler(gen=norm_gen, V=V, gradV=gradV, adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,
+                            alpha=alpha, n_max=10000,
                             verbose=config.verbose, track_accept=config.track_accept,track_beta=config.track_beta,track_v_means=config.track_v_means,
                             track_ratios=config.track_ratios,track_ess=config.track_ess,kappa_opt=config.kappa_opt
                             ,gaussian =True,accept_spread=config.accept_spread, 
@@ -390,8 +397,8 @@ def main():
                             GV_opt=config.GV_opt
                             )
                             t1=time()-t
-
-                            print(p_est)
+                            if config.verbose>=2:
+                                print(p_est)
                             #finish_flag=res_dict['finished']
                             
                             if config.track_accept:
@@ -499,7 +506,7 @@ def main():
                         if config.update_agg_res:
                             if not os.path.exists(aggr_res_path):
                                 cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est',
-                                'bias','mean abs error','mean_rel_error','std_est','freq underest','gpu_name','cpu_name']
+                                'bias','mean abs error','mean_rel_error','std_est','freq underest','gpu_name','cpu_name','ratio']
                                 aggr_res_df= pd.DataFrame(columns=cols)
                             else:
                                 aggr_res_df=pd.read_csv(aggr_res_path)

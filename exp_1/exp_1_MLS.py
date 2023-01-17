@@ -11,8 +11,8 @@ from tqdm import tqdm
 import torch
 from stat_reliability_measure.home import ROOT_DIR
 from datetime import datetime
-
-from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList
+import json
+from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, get_sel_df, print_config
 import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
 
 
@@ -62,7 +62,7 @@ class config:
     tqdm_opt=True
     save_config = True
     print_config=True
-    update_agg_res=False
+    update_aggr_res=False
     aggr_res_path = None
 
     track_accept=False
@@ -84,6 +84,7 @@ class config:
     correct_T=False
     last_particle=False
     adapt_kernel = False
+    repeat_exp = True
 
 parser=argparse.ArgumentParser()
 
@@ -112,7 +113,7 @@ parser.add_argument('--epsilon',type=float, default=config.epsilon)
 parser.add_argument('--tqdm_opt',type=bool,default=config.tqdm_opt)
 parser.add_argument('--save_config', type=bool, default=config.save_config)
 parser.add_argument('--print_config',type=bool , default=config.print_config)
-parser.add_argument('--update_agg_res', type=bool,default=config.update_agg_res)
+parser.add_argument('--update_aggr_res', type=bool,default=config.update_aggr_res)
 
 parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
@@ -129,6 +130,7 @@ parser.add_argument('--gain_rate',type=float,default=config.gain_rate)
 parser.add_argument('--correct_T',type=str2bool,default=config.correct_T)
 parser.add_argument('--last_particle',type=str2bool,default=config.last_particle)
 parser.add_argument('--adapt_kernel',type=str2bool,default=config.adapt_kernel)
+parser.add_argument('--repeat_exp',type=str2bool,default=config.repeat_exp)
 args=parser.parse_args()
 for k,v in vars(args).items():
     setattr(config, k, v)
@@ -188,19 +190,23 @@ def main():
 
     loc_time= datetime.today().isoformat().split('.')[0]
 
-    exp_log_path=os.path.join(config.log_dir,method_name+'_t_'+loc_time.split('_')[0])
+    exp_log_path=os.path.join(raw_logs_path,method_name+'_t_'+loc_time.split('_')[0])
+
     os.mkdir(exp_log_path)
     exp_res = []
     config.json=vars(args)
-    if config.print_config:
-        print(config.json)
+    #if config.print_config:
+    config_dict=print_config(config)
+    path_config=os.path.join(exp_log_path,'config.json')
+    with open(path_config,'w') as f:
+        f.write(json.dumps(config_dict, indent = 4))
     # if config.save_confi
     # if config.save_config:
     #     with open(file=os.path.join(),mode='w') as f:
     #         f.write(config.json)
 
     epsilon=config.epsilon
-    e_1 = torch.Tensor([1]+[0]*(d-1),device=config.device)
+    
     get_c_norm= lambda p:stat.norm.isf(p)
     i_run=0
 
@@ -222,15 +228,28 @@ def main():
             for N in config.N_range: 
                 for s in config.s_range:
                     for ratio in config.ratio_range: 
+                        i_run+=1
+                        aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                        
+                        if (not config.repeat_exp) and config.update_aggr_res and os.path.exists(aggr_res_path):
+                            aggr_res_df = pd.read_csv(aggr_res_path)
+                            same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method_name,'='),
+                            ('p_t',p_t,'='),('n_rep',config.n_rep,'='),('s',s,'='),
+                ('N',N,'='),('T',T,'='),('ratio',ratio,'='),('last_particle',config.last_particle,'==')] )  
+                            # if a similar experiment has been done in the current log directory we skip it
+                            if len(same_exp_df)>0:
+                                K=int(N*ratio) if not config.last_particle else N-1
+                                print(f"Skipping MLS run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},s={s}")
+                                continue
                         loc_time= datetime.today().isoformat().split('.')[0]
                         log_name=method_name+f'_N_{N}_T_{T}_s_{float_to_file_float(s)}_r_{float_to_file_float(ratio)}_t_'+'_'+loc_time.split('_')[0]
                         log_path=os.path.join(exp_log_path,log_name)
                         os.mkdir(path=log_path)
-                        i_run+=1
+                        
                         
                         
                         K=int(N*ratio) if not config.last_particle else N-1
-                        print(f"Starting run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},s={s}")
+                        print(f"Starting {method_name} run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},s={s}")
                         if config.verbose>3:
                             print(f"K/N:{K/N}")
                         times= []
@@ -291,7 +310,7 @@ def main():
                         mean_log_est=log_ests.mean()
                         lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                         lg_est_path=os.path.join(log_path,'lg_ests.txt')
-                        np.savetxt(fname=lg_est_path,X=ests)
+                        np.savetxt(fname=lg_est_path,X=log_ests)
                     
                         abs_errors=np.abs(ests-p_t)
                         rel_errors=abs_errors/p_t
@@ -349,7 +368,7 @@ def main():
                             aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                         else:
                             aggr_res_path=config.aggr_res_path
-                        if config.update_agg_res:
+                        if config.update_aggr_res:
                             if not os.path.exists(aggr_res_path):
                                 cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est',
                                 'mean_calls','std_calls',
@@ -360,8 +379,8 @@ def main():
                             aggr_res_df = pd.concat([aggr_res_df,results_df],ignore_index=True)
                             aggr_res_df.to_csv(aggr_res_path,index=False)
 
-    exp_df=pd.DataFrame(exp_res)
-    exp_df.to_csv(os.path.join(exp_log_path,'exp_results.csv'),index=False)
+        exp_df=pd.DataFrame(exp_res)
+        exp_df.to_csv(os.path.join(exp_log_path,'exp_results.csv'),index=False)
 
 if __name__ == "__main__":
     main()
