@@ -82,12 +82,32 @@ def str2list(in_str,split_chr=',',type_out=None):
         l=[type_out(e) for e in l]
     return l
 
+
+def print_config(config):
+    """prints and returns ditcionnary of configuration attributes
+
+    Args:
+        config (_type_): _description_
+
+    Returns:
+        dict: dictionnary containing only useful attributes of config
+    """
+    config_dict=config.__dict__
+    clean_keys= [key for key in config_dict.keys() if '__' not in key and key!='json']+['__module__']
+    clean_dict = {key: config_dict[key] for key in clean_keys}
+    print(f"configuration:\n {clean_dict}")
+    return clean_dict
+
 def get_sel_df(df,cols=None,vals=None,conds=None,triplets=None):
-    cvc_flag=(cols is not None and vals is not None and conds is not None)
+    cvc_flag=(cols is not None and vals is not None and (len(cols)==len(vals)))
     triplet_flag=triplets is not None
     assert triplet_flag or cvc_flag,"triplets or (cols,vals,conds) should be not empty"
     mask=np.ones(len(df))
     if cvc_flag:
+        if conds is None:
+            # by defaults, the condition is equality
+            l = len(cols)
+            conds= ['==']*l
         iterator=zip(cols,vals,conds)
         if triplet_flag:
             iterator=list(iterator)
