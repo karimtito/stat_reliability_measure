@@ -5,7 +5,7 @@
 
 
 #project specific 
-logs
+logs*
 data
 models
 notebooks
