@@ -66,7 +66,7 @@ class config:
     verbose=0
     log_dir=None
     aggr_res_path = None
-    update_agg_res=True
+    update_aggr_res=True
     sigma=1
     v1_kernel=True
     torch_seed=None
@@ -163,7 +163,7 @@ parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
 
 parser.add_argument('--save_config',type=str2bool, default=config.save_config)
-#parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
+#parser.add_argument('--update_aggr_res',type=str2bool,default=config.update_aggr_res)
 #parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
 #parser.add_argument('--rho',type=float,default=config.rho)
 parser.add_argument('--allow_multi_gpu',type=str2bool)
@@ -199,7 +199,7 @@ parser.add_argument('--dt_gain',type=float,default=config.dt_gain)
 parser.add_argument('--dt_min',type=float,default=config.dt_min)
 parser.add_argument('--dt_max',type=float,default=config.dt_max)
 parser.add_argument('--adapt_dt_mcmc',type=str2bool,default=config.adapt_dt_mcmc)
-parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
+parser.add_argument('--update_aggr_res',type=str2bool,default=config.update_aggr_res)
 parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
 parser.add_argument('--ess_opt',type=str2bool,default=config.ess_opt)
 
@@ -577,7 +577,7 @@ for l in inp_indices:
                                 aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                             else:
                                 aggr_res_path=config.aggr_res_path
-                            if config.update_agg_res:
+                            if config.update_aggr_res:
                                 if not os.path.exists(aggr_res_path):
                                     cols=['method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est',
                                     'bias','mean abs error','mean_rel_error','std_est','freq underest','gpu_name','cpu_name']

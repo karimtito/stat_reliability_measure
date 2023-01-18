@@ -52,7 +52,7 @@ class config:
     tqdm_opt=True
     save_config = True
     print_config=True
-    update_agg_res=True
+    update_aggr_res=True
     aggr_res_path = None
 
     track_advs=False
@@ -98,7 +98,7 @@ parser.add_argument('--epsilon',type=float, default=config.epsilon)
 parser.add_argument('--tqdm_opt',type=bool,default=config.tqdm_opt)
 parser.add_argument('--save_config', type=bool, default=config.save_config)
 parser.add_argument('--print_config',type=bool , default=config.print_config)
-parser.add_argument('--update_agg_res', type=bool,default=config.update_agg_res)
+parser.add_argument('--update_aggr_res', type=bool,default=config.update_aggr_res)
 
 parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
@@ -199,7 +199,7 @@ def main():
             for bs in config.b_range:
                 i_run+=1
                 aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
-                if (not config.repeat_exp) and config.update_agg_res and os.path.exists(aggr_res_path):
+                if (not config.repeat_exp) and config.update_aggr_res and os.path.exists(aggr_res_path):
                     aggr_res_df = pd.read_csv(aggr_res_path)
                     same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method_name,'='),
                     ('p_t',p_t,'='),('n_rep',config.n_rep,'='),('N',N,'='),
@@ -301,7 +301,7 @@ def main():
                     aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                 else:
                     aggr_res_path=config.aggr_res_path
-                if config.update_agg_res:
+                if config.update_aggr_res:
                     if not os.path.exists(aggr_res_path):
                         cols=['p_t','method','N','rho','n_rep','alpha','min_rate','mean_time','std_time','mean_est',
                         'mean_calls','std_calls','ratio', 'T',                      

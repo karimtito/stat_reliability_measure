@@ -281,7 +281,7 @@ def compute_V_grad_pyt(model, input_, target_class,L=0):
     
 
     grad=torch.autograd.grad(outputs=v,inputs=input_,grad_outputs=torch.ones_like(v),retain_graph=False)[0]
-    input_.requires_grad =False
+
     return v,grad
 
 

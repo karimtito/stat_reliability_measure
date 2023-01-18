@@ -80,7 +80,7 @@ class config:
     allow_zero_est=True
     save_config=True
     print_config=True
-    update_agg_res=True
+    update_aggr_res=True
     aggr_res_path=None
     gaussian_latent=True
     project_kernel=True
@@ -136,7 +136,7 @@ parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
 parser.add_argument('--T',type=int,default=config.T)
 parser.add_argument('--save_config',type=str2bool, default=config.save_config)
-parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
+parser.add_argument('--update_aggr_res',type=str2bool,default=config.update_aggr_res)
 parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
 parser.add_argument('--gaussian_latent',type=str2bool, default=config.gaussian_latent)
 parser.add_argument('--allow_multi_gpu',type=str2bool)
@@ -316,7 +316,7 @@ param_ranges= [ inp_indices,config.T_range,config.N_range,config.s_range ,config
 lenghts=np.array([len(L) for L in param_ranges])
 nb_exps= np.prod(lenghts)
 
-for l in range(len(inp_indices)):
+for l in inp_indices:
     with torch.no_grad():
     
         x_0,y_0 = X_correct[l], label_correct[l]
@@ -488,7 +488,7 @@ for l in range(len(inp_indices)):
                         else: 
                             aggr_res_path=config.aggr_res_path
 
-                        if config.update_agg_res:
+                        if config.update_aggr_res:
                             if not os.path.exists(aggr_res_path):
                                 print(f'aggregate results csv file not found \n it will be build at {aggr_res_path}')
                                 cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',

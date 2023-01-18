@@ -11,6 +11,7 @@ import torch
 import pandas as pd
 import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
+from stat_reliability_measure.dev.utils import get_sel_df, print_config
 from stat_reliability_measure.home import ROOT_DIR
 
 
@@ -64,7 +65,7 @@ class config:
     verbose=0
     log_dir=None
     aggr_res_path = None
-    update_agg_res=False
+    update_aggr_res=False
     sigma=1
     v1_kernel=True
     torch_seed=None
@@ -145,7 +146,7 @@ class config:
     skip_mh=False
     force_train=False
     killing=True
-
+    repeat_exp=False
 parser=argparse.ArgumentParser()
 parser.add_argument('--log_dir',default=config.log_dir)
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
@@ -192,7 +193,7 @@ parser.add_argument('--dt_gain',type=float,default=config.dt_gain)
 parser.add_argument('--dt_min',type=float,default=config.dt_min)
 parser.add_argument('--dt_max',type=float,default=config.dt_max)
 parser.add_argument('--adapt_dt_mcmc',type=str2bool,default=config.adapt_dt_mcmc)
-parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
+parser.add_argument('--update_aggr_res',type=str2bool,default=config.update_aggr_res)
 parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
 parser.add_argument('--ess_opt',type=str2bool,default=config.ess_opt)
 
@@ -229,6 +230,7 @@ parser.add_argument('--force_train',type=str2bool,default=config.force_train)
 parser.add_argument('--dataset',type=str, default=config.dataset)
 parser.add_argument('--input_start',type=int, default=config.input_start)
 parser.add_argument('--input_stopt',type=int, default=config.input_stop)
+parser.add_argument('--repeat_exp',type=str2bool,default=config.repeat_exp)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
@@ -236,8 +238,9 @@ for k,v in vars(args).items():
 
 if config.model_dir is None:
     config.model_dir=os.path.join(ROOT_DIR+"/models/",config.dataset)
-    if not os.path.exists(config.model_dir):
-        os.mkdir(config.model_dir)
+
+if not os.path.exists(config.model_dir):
+    os.mkdir(config.model_dir)
 
 config.d = t_u.datasets_dims[config.dataset]
 color_dataset=config.dataset in ('cifar10','cifar100','imagenet') 
@@ -453,6 +456,18 @@ for l in inp_indices:
                 for L in config.L_range:
                     for alpha in config.alpha_range:       
                         for N in config.N_range:
+                            run_nb+=1
+                            aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                            if (not config.repeat_exp) and config.update_aggr_res and os.path.exists(aggr_res_path):
+                                aggr_res_df = pd.read_csv(aggr_res_path)
+                                same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method,'='),
+                                ('model_name',model_name,'='),('epsilon',epsilon,'='),('image_idx',l,'='),('n_rep',config.n_rep,'='),
+                    ('N',N,'='),('T',T,'='),('L',L,'='),('alpha',alpha,'='),
+                    ('ess_alpha',ess_t,'=')] )  
+                                # if a similar experiment has been done in the current log directory we skip it
+                                if len(same_exp_df)>0:
+                                    print(f"Skipping {method_name} run {run_nb}/{nb_runs}, with model: {model_name}, img_idx:{l},eps:{epsilon},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
+                                    continue
                             loc_time= datetime.today().isoformat().split('.')[0].replace(':','_')
                             log_name=method_name+f'_N_{N}_T_{T}_L_{L}_a_{float_to_file_float(alpha)}_ess_{float_to_file_float(ess_t)}'+'_'+loc_time.split('_')[0]
                             log_path=os.path.join(exp_log_path,log_name)
@@ -461,7 +476,7 @@ for l in inp_indices:
                             
                             
                             os.mkdir(path=log_path)
-                            run_nb+=1
+                            
                             print(f'Run {run_nb}/{nb_runs}')
                             times=[]
                             ests = []
@@ -577,10 +592,10 @@ for l in inp_indices:
                             results_df=pd.DataFrame([results])
                             results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
                             if config.aggr_res_path is None:
-                                aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
+                                aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                             else:
                                 aggr_res_path=config.aggr_res_path
-                            if config.update_agg_res:
+                            if config.update_aggr_res:
                                 if not os.path.exists(aggr_res_path):
                                     cols=['method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est',
                                     'bias','mean abs error','mean_rel_error','std_est','freq underest','gpu_name','cpu_name']

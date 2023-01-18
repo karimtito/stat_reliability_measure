@@ -164,6 +164,8 @@ if config.log_dir is None:
 if config.model_dir is None:
     config.model_dir=os.path.join(ROOT_DIR,f"models/{config.dataset}")
 
+if not os.path.exists(config.model_dir):
+    os.mkdir(config.model_dir)
 
 if len(config.epsilons)==0:
     log_eps=np.linspace(start=np.log(config.eps_min),stop=np.log(config.eps_max),num=config.eps_num)
@@ -472,7 +474,7 @@ for l in inp_indices:
                     if not os.path.exists(aggr_res_path):
                         print(f'aggregate results csv file not found \n it will be build at {aggr_res_path}')
                         cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
-                        'std_est','freq underest','g_target']
+                        'std_est','freq underest','g_target','L','ratio','ess_apha']
                         cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
                         cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist','datetime']
                         aggr_res_df= pd.DataFrame(columns=cols)

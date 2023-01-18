@@ -58,7 +58,7 @@ class config:
     tqdm_opt=True
     save_config = True
     print_config=True
-    update_agg_res=False
+    update_aggr_res=False
     aggr_res_path = None
 
     track_accept=False
@@ -108,7 +108,7 @@ parser.add_argument('--epsilon',type=float, default=config.epsilon)
 parser.add_argument('--tqdm_opt',type=bool,default=config.tqdm_opt)
 parser.add_argument('--save_config', type=bool, default=config.save_config)
 parser.add_argument('--print_config',type=bool , default=config.print_config)
-parser.add_argument('--update_agg_res', type=bool,default=config.update_agg_res)
+parser.add_argument('--update_aggr_res', type=bool,default=config.update_aggr_res)
 
 parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
@@ -327,7 +327,7 @@ for p_s in config.p_range:
                         aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                     else:
                         aggr_res_path=config.aggr_res_path
-                    if config.update_agg_res:
+                    if config.update_aggr_res:
                         if not os.path.exists(aggr_res_path):
                             cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est',
                             'mean_calls','std_calls',
