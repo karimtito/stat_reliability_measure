@@ -477,7 +477,7 @@ for l in range(len(inp_indices)):
 
                         if config.update_agg_res:
                             if not os.path.exists(aggr_res_path):
-                                print(f'aggregate results csv file not found /n it will be build at {aggr_res_path}')
+                                print(f'aggregate results csv file not found \n it will be build at {aggr_res_path}')
                                 cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
                                 'std_est','freq underest','g_target']
                                 cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
