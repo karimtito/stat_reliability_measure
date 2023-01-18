@@ -453,7 +453,7 @@ for l in inp_indices:
                 for L in config.L_range:
                     for alpha in config.alpha_range:       
                         for N in config.N_range:
-                            loc_time= datetime.today().isoformat().split('.')[0]
+                            loc_time= datetime.today().isoformat().split('.')[0].replace(':','_')
                             log_name=method_name+f'_N_{N}_T_{T}_L_{L}_a_{float_to_file_float(alpha)}_ess_{float_to_file_float(ess_t)}'+'_'+loc_time.split('_')[0]
                             log_path=os.path.join(exp_log_path,log_name)
                             if os.path.exists(log_path):
