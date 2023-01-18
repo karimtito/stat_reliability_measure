@@ -472,7 +472,7 @@ def get_model_imagenet(model_arch,model_dir):
     return model,mean,std
 
 def get_model(model_arch, robust_model, robust_eps,nb_epochs,model_dir,data_dir,test_loader, device ,
-download,force_train=False,dataset='mnist',batch_size=100):
+download,force_train=False,dataset='mnist',batch_size=100,lr=1E-1):
     
     input_shape=datasets_in_shape[dataset]
     print(f"input_shape:{input_shape}")
@@ -496,7 +496,7 @@ download,force_train=False,dataset='mnist',batch_size=100):
         else:
             print("Model not found: it will be trained from scratch.")
         train_loader=get_loader(train=True, data_dir=data_dir, download=download,dataset=dataset,batch_size=batch_size)
-        opt = optim.SGD(model.parameters(), lr=1e-1)
+        opt = optim.SGD(model.parameters(), lr=lr)
 
         print("Train Err", "Train Loss", "Test Err", "Test Loss", sep="\t")
         for _ in range(nb_epochs):
