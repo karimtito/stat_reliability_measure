@@ -183,7 +183,8 @@ raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
-loc_time= datetime.today().isoformat().split('.')[0]
+loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+    log_name=method_name+'_'+'_'+loc_time
 
 exp_log_path=os.path.join(raw_logs_path,method_name+'_t_'+loc_time.split('_')[0])
 os.mkdir(exp_log_path)
@@ -218,7 +219,8 @@ for p_s in config.p_range:
         for N in config.N_range: 
             for s in config.s_range:
                 for ratio in config.ratio_range: 
-                    loc_time= datetime.today().isoformat().split('.')[0]
+                    loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+                    log_name=method_name+'_'+'_'+loc_time
                     log_name=method_name+f'_N_{N}_T_{T}_s_{float_to_file_float(s)}_r_{float_to_file_float(ratio)}_t_'+'_'+loc_time.split('_')[0]
                     log_path=os.path.join(exp_log_path,log_name)
                     os.mkdir(path=log_path)

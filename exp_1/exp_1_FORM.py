@@ -18,44 +18,23 @@ import stat_reliability_measure.dev.form.form_pyt as form_pyt
 
 method_name="FORM"
 class config:
-    
-
     n_rep=200
-    
     p_t=1e-15
     p_range=[]
     optim_steps=10
     opt_steps_list = []
-    
-    
-    
-    
     verbose=0
-
-
     allow_zero_est=True
-    
-    
-    
-
-
-    
-
-    
     d = 1024
     epsilon = 1
-    
-    
     tqdm_opt=True
     save_config = True
     print_config=True
     update_aggr_res=True
     aggr_res_path = None
-
     track_advs=False
     track_finish=True
     device = None
-
     torch_seed=0
     np_seed=0
 
@@ -163,7 +142,8 @@ def main():
     if not os.path.exists(raw_logs_path):
         os.mkdir(raw_logs_path)
 
-    loc_time= datetime.today().isoformat().split('.')[0]
+    loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+    log_name=method_name+'_'+'_'+loc_time
 
     exp_log_path=os.path.join(config.log_dir,method_name+'_t_'+loc_time.split('_')[0])
     os.mkdir(exp_log_path)
@@ -197,7 +177,8 @@ def main():
         for N in config.N_range: 
             for bs in config.b_range:
             
-                loc_time= datetime.today().isoformat().split('.')[0]
+                loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+                log_name=method_name+'_'+'_'+loc_time
                 log_name=method_name+f'_N_{N}_bs_{bs}_t_'+'_'+loc_time.split('_')[0]
                 log_path=os.path.join(exp_log_path,log_name)
                 os.mkdir(path=log_path)
@@ -214,7 +195,7 @@ def main():
                     finish_flags=[]
                 for _ in tqdm(range(config.n_rep)):
                     t=time()
-                    est = 
+                    est = form_pyt.FORM_pyt()
                     t=time()-t
                     
                 

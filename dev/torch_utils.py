@@ -376,8 +376,9 @@ datasets_num_c={'mnist':10,'cifar10':10,'imagenet':1000}
 datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465),'cifar100':[125.3/255.0, 123.0/255.0, 113.9/255.0]}
 datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010),'cifar100':[63.0/255.0, 62.1/255.0, 66.7/255.0]}
 datasets_supp_archs={'mnist':{'dnn2':dnn2,'dnn4':dnn4,'cnn_custom':CNN_custom},
-                    'cifar10':{'lenet':LeNet,'convnet':ConvNet},
+                    'cifar10':{'lenet':LeNet,'convnet':ConvNet,'dnn2':dnn2},
                     'cifar100':{'densenet':DenseNet3}}
+datasets_default_arch={'mnist':'dnn2', 'cifar10':'convnet', 'cifar100':'densenet'}
 def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=None,x_std=None): 
     assert dataset in supported_datasets,f"support datasets are in {supported_datasets}"
     if dataset=='mnist':

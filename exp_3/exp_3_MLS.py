@@ -346,7 +346,8 @@ for l in inp_indices:
             for N in config.N_range: 
                 for s in config.s_range :
                     for ratio in config.ratio_range: 
-                        loc_time= datetime.today().isoformat().split('.')[0]
+                        loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+                        log_name=method_name+'_'+'_'+loc_time
                         log_name=method_name+'_e_'+float_to_file_float(config.epsilons[idx])+'_N_'+str(N)+'_T_'+str(T)+'_s_'+float_to_file_float(s)
                         log_name=log_name+'_r_'+float_to_file_float(ratio)+'_'+'_'+loc_time
                         log_path=os.path.join(raw_logs_path,log_name)

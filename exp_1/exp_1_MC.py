@@ -163,7 +163,8 @@ def main():
     if not os.path.exists(raw_logs_path):
         os.mkdir(raw_logs_path)
 
-    loc_time= datetime.today().isoformat().split('.')[0]
+    loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+    log_name=method_name+'_'+'_'+loc_time
 
     exp_log_path=os.path.join(raw_logs_path,method_name+'_t_'+loc_time.split('_')[0])
     os.mkdir(exp_log_path)
@@ -209,7 +210,8 @@ def main():
                         
                         print(f"Skipping {method_name} run {i_run}/{nb_runs}, with p_t= {p_t},N={N},batch size={bs}")
                         continue
-                loc_time= datetime.today().isoformat().split('.')[0]
+                loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+                log_name=method_name+'_'+'_'+loc_time
                 log_name=method_name+f'_N_{N}_bs_{bs}_t_'+'_'+loc_time.split('_')[0]
                 log_path=os.path.join(exp_log_path,log_name)
                 os.mkdir(path=log_path)
