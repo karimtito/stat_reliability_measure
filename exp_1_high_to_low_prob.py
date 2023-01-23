@@ -34,6 +34,8 @@ class config:
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
+parser.add_argument('--torch_seed',type=int,default=config.torch_seed)
+parser.add_argument('--np_seed',type=int,default=config.np_seed)
 parser.add_argument('--p_range',type=str2floatList,default=config.p_range)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--methods_list',type=str2list,default=config.methods_list)

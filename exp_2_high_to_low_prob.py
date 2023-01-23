@@ -20,7 +20,8 @@ class config:
     torch_seed=0
     robust_model=False
     robust_eps=0.1
-    methods_list=['MC','H_SMC','MALA_SMC','RW_SMC']
+    repeat_exp=True
+    methods_list=['MC','H_SMC','MLS_SMC','MALA_SMC','RW_SMC']
     params_dic={'MC': {'mnist':
                             {'N_range':[int(1e5),int(1e6)],'b_range':[int(1e5)]},
                        'cifar10': 
@@ -28,34 +29,34 @@ class config:
                             },
 
                 'MLS_SMC': {'mnist':
-                            {'N_range':[int(1e2),int(5e2)],'ratio_range':[0.1,0.5,0.9],
+                            {'N_range':[int(1e2),int(5e2)],'ratio_range':[0.2,0.5,0.8],
                         'T_range':[1,10,100]},
                        'cifar10': 
-                            {'N_range':[int(1e2),int(2e2)],'ratio_range':[0.1,0.5,0.9],
+                            {'N_range':[int(1e2),int(2e2)],'ratio_range':[0.2,0.5,0.8],
                         'T_range':[1,10]}
                             },
                 
                 
     
                 'H_SMC':{'mnist':
-                            {'N_range':[int(1e2),int(5e2)],'e_range':[0.1,0.5,0.9],
+                            {'N_range':[int(1e2),int(5e2)],'e_range':[0.2,0.5,0.8],
                         'T_range':[1,10,100],'L_range':[10]},
                        'cifar10': 
-                            {'N_range':[int(1e2),int(2e2)],'e_range':[0.1,0.5,0.9],
+                            {'N_range':[int(1e2),int(2e2)],'e_range':[0.2,0.5,0.8],
                         'T_range':[1,10],'L_range':[5]}
                             },
                 'MALA_SMC':{'mnist':
-                            {'N_range':[int(1e2),int(5e2)],'e_range':[0.1,0.5,0.9],
+                            {'N_range':[int(1e2),int(5e2)],'e_range':[0.2,0.5,0.8],
                         'T_range':[1,10,100]},
                        'cifar10': 
-                            {'N_range':[int(1e2),int(2e2)],'e_range':[0.1,0.5,0.9],
+                            {'N_range':[int(1e2),int(2e2)],'e_range':[0.2,0.5,0.8],
                         'T_range':[1,10]}
                             },
                 'RW_SMC':{'mnist':
-                            {'N_range':[int(1e2),int(5e2)],'e_range':[0.1,0.5,0.9],
+                            {'N_range':[int(1e2),int(5e2)],'e_range':[0.2,0.5,0.8],
                         'T_range':[1,10,100]},
                        'cifar10': 
-                            {'N_range':[int(1e2),int(2e2)],'e_range':[0.1,0.5,0.9],
+                            {'N_range':[int(1e2),int(2e2)],'e_range':[0.2,0.5,0.8],
                         'T_range':[1,10]}
                             },
                 }
@@ -138,7 +139,7 @@ def main():
         print(f"Completion rate: 0%")
         cols=['epsilon','method','dataset','N','model_name','image_idx','rho','ratio','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est','s',
             'bias','mean abs error','batch_size','mean_rel_error','std_est','freq underest','gpu_name','cpu_name','ratio',
-            'ess_alpha','L']
+            'ess_alpha','L','last_particle']
         aggr_res_df= pd.DataFrame(columns=cols)
         aggr_res_df.to_csv(aggr_res_path,index=False)
     else:
