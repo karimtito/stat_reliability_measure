@@ -164,9 +164,9 @@ def main():
         os.mkdir(raw_logs_path)
 
     loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
-    log_name=method_name+'_'+'_'+loc_time
-
-    exp_log_path=os.path.join(raw_logs_path,method_name+'_t_'+loc_time.split('_')[0])
+    log_name=method_name+'_'+'_'+loc_time+'_'+str(np.random.randint(0,10000))
+    np.random.seed(config.np_seed)
+    exp_log_path=os.path.join(raw_logs_path,log_name)
     os.mkdir(exp_log_path)
     exp_res = []
     config.json=vars(args)
