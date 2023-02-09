@@ -13,21 +13,31 @@ from stat_reliability_measure.home import ROOT_DIR
 from datetime import datetime
 import json
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, get_sel_df, print_config
-import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
+import stat_reliability_measure.dev.hybrid_mls.hybrid_mls_pyt as hmls_pyt
 
 
-method_name="MLS_SMC"
+method_name="HMLS"
 class config:
     
-
+    alpha=0.2
+    alpha_range=[]
     n_rep=200
     T_range=[10,20,50]
     N_range=[32,64,128,256,512,1024]
     ratio_range=[0.1]
     p_range=[1e-6,1e-12]
-    
-    
-    
+    adapt_dt=False
+    adapt_dt_mcmc=False
+    target_accept=0.574
+    accept_spread=0.1
+    dt_decay=0.999
+    dt_gain=None
+    dt_min=1e-3
+    dt_max=0.5
+    v_min_opt=True
+    ess_opt=False
+    only_duplicated=True
+    GV_opt=True
     
     
     
@@ -45,7 +55,7 @@ class config:
     
 
     T=1
-    
+    L=1
 
     ratio=0.6
 
@@ -54,7 +64,7 @@ class config:
 
     p_t=1e-15
 
-    
+    sig_dt=0.01
     d = 1024
     epsilon = 1
     
@@ -85,6 +95,8 @@ class config:
     last_particle=False
     adapt_kernel = False
     repeat_exp = True
+    adapt_dt=False
+    FT=True
 
 parser=argparse.ArgumentParser()
 
@@ -100,6 +112,7 @@ parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_
 parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--N_range',type=str2intList,default=config.N_range)
 parser.add_argument('--T',type=int,default=config.T)
+parser.add_argument('--L',type=int,default=config.L)
 parser.add_argument('--T_range',type=str2intList,default=config.T_range)
 parser.add_argument('--ratio',type=float,default=config.ratio)
 parser.add_argument('--ratio_range',type=str2floatList,default=config.ratio_range)
@@ -114,7 +127,15 @@ parser.add_argument('--tqdm_opt',type=bool,default=config.tqdm_opt)
 parser.add_argument('--save_config', type=bool, default=config.save_config)
 parser.add_argument('--print_config',type=bool , default=config.print_config)
 parser.add_argument('--update_aggr_res', type=bool,default=config.update_aggr_res)
-
+parser.add_argument('--adapt_dt',type=str2bool,default=config.adapt_dt)
+parser.add_argument('--target_accept',type=float,default=config.target_accept)
+parser.add_argument('--accept_spread',type=float,default=config.accept_spread)
+parser.add_argument('--dt_decay',type=float,default=config.dt_decay)
+parser.add_argument('--dt_gain',type=float,default=config.dt_gain)
+parser.add_argument('--dt_min',type=float,default=config.dt_min)
+parser.add_argument('--dt_max',type=float,default=config.dt_max)
+parser.add_argument('--alpha',type=float,default=config.alpha)
+parser.add_argument('--adapt_dt_mcmc',type=str2bool,default=config.adapt_dt_mcmc)
 parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
 parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
@@ -127,10 +148,13 @@ parser.add_argument('--np_seed',type=int,default=config.np_seed)
 parser.add_argument('--torch_seed',type=int,default=config.torch_seed)
 parser.add_argument('--decay',type=float,default=config.decay)
 parser.add_argument('--gain_rate',type=float,default=config.gain_rate)
+parser.add_argument('--sig_dt',type=float,default=config.sig_dt)
 parser.add_argument('--correct_T',type=str2bool,default=config.correct_T)
 parser.add_argument('--last_particle',type=str2bool,default=config.last_particle)
 parser.add_argument('--adapt_kernel',type=str2bool,default=config.adapt_kernel)
 parser.add_argument('--repeat_exp',type=str2bool,default=config.repeat_exp)
+parser.add_argument('--FT',type=str2bool,default=config.FT)
+parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
 args=parser.parse_args()
 for k,v in vars(args).items():
     setattr(config, k, v)
@@ -189,7 +213,7 @@ def main():
         os.mkdir(raw_logs_path)
 
     loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
-    log_name=method_name+'_t'+'_'+loc_time+f'_{np.random.randint(low=1,high=100)}'
+    log_name=method_name+'_'+'_'+loc_time
 
     exp_log_path=os.path.join(raw_logs_path,log_name)
 
@@ -213,18 +237,16 @@ def main():
 
 
     for p_t in config.p_range:
+        get_c_norm= lambda p:stat.norm.isf(p)
         c=get_c_norm(p_t)
-        P_target=stat.norm.sf(c)
-        if config.verbose>=5:
-            print(f"P_target:{P_target}")
-        arbitrary_thresh=40 #pretty useless a priori but should not hurt results
-        def v_batch_pyt(X,c=c):
-            return torch.clamp(input=c-X[:,0],min=-arbitrary_thresh, max = None)
-        amls_gen = lambda N: torch.randn(size=(N,d),device=config.device)
-        batch_transform = lambda x: x
-        normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 
-        h_V_batch_pyt= lambda x: -v_batch_pyt(batch_transform(x)).reshape((x.shape[0],1))
-
+        if config.verbose>=1.:
+            print(f'c:{c}')
+        e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
+        V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=None)
+        
+        gradV= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
+        
+        norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
         for T in config.T_range:
             for N in config.N_range: 
                 for s in config.s_range:
@@ -236,11 +258,12 @@ def main():
                             aggr_res_df = pd.read_csv(aggr_res_path)
                             same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method_name,'='),
                             ('p_t',p_t,'='),('n_rep',config.n_rep,'='),('s',s,'='),
-                ('N',N,'='),('T',T,'='),('ratio',ratio,'='),('last_particle',config.last_particle,'==')] )  
+                            ('N',N,'='),
+                            ('T',T,'='),('ratio',ratio,'='),('last_particle',config.last_particle,'==')] )  
                             # if a similar experiment has been done in the current log directory we skip it
                             if len(same_exp_df)>0:
                                 K=int(N*ratio) if not config.last_particle else N-1
-                                print(f"Skipping MLS run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},s={s}")
+                                print(f"Skipping HMLS run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T}")
                                 continue
                         loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
                         log_name=method_name+'_'+'_'+loc_time
@@ -250,10 +273,8 @@ def main():
                         
                         
                         
-                        K=int(N*ratio) if not config.last_particle else N-1
-                        print(f"Starting {method_name} run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},s={s},ratio={ratio}")
-                        if config.verbose>3:
-                            print(f"K/N:{K/N}")
+                        K = int(N*(ratio)) #if not config.last_particle else int(N-1)
+                        print(f"Starting Hybrid-MLS run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},L={config.L},ratio={ratio}")
                         times= []
                         rel_error= []
                         ests = [] 
@@ -262,19 +283,21 @@ def main():
                             finish_flags=[]
                         for i in tqdm(range(config.n_rep)):
                             t=time()
-                            if config.batch_opt:
-                                batch_func = amls_pyt.ImportanceSplittingPytBatch if config.adapt_kernel else amls_pyt.ImportanceSplittingPytBatch2
-                                amls_res=batch_func(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
-                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
-                            s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
-                            device=config.device,track_accept=config.track_accept)
+                            amls_res=hmls_pyt.HybridMLS(norm_gen, V=V,gradV=gradV
+                             ,K=K, N=N, L=config.L,
+                            tau=0 , n_max=config.n_max, T=T
+                            ,verbose= config.verbose,
+                            device=config.device,track_accept=config.track_accept,
+                            accept_spread=config.accept_spread, 
+                            adapt_dt=config.adapt_dt, dt_decay=config.dt_decay,
+                            only_duplicated=config.only_duplicated,
+                            dt_gain=config.dt_gain,dt_min=config.dt_min,dt_max=config.dt_max,
+                            GV_opt=config.GV_opt,sig_dt=config.sig_dt,
+                            alpha=config.alpha
+                            )
 
-                            else:
-                                func = amls_pyt.ImportanceSplittingPyt if config.adapt_kernel else amls_pyt.ImportanceSplittingPyt2
-                                amls_res = func(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
-                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
-                            s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
-                            device=config.device, )
+                      
+                                
                             t=time()-t
                             
                             est=amls_res[0]
@@ -284,13 +307,13 @@ def main():
                                 accept_logs=os.path.join(log_path,'accept_logs')
                                 if not os.path.exists(accept_logs):
                                     os.mkdir(path=accept_logs)
-                                accept_rates=dict_out['accept_rates']
-                                np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
-                                ,X=accept_rates)
-                                x_T=np.arange(len(accept_rates))
-                                plt.plot(x_T,accept_rates)
-                                plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
-                                plt.close()
+                                # accept_rates=dict_out['accept_rates']
+                                # np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
+                                # ,X=accept_rates)
+                                # x_T=np.arange(len(accept_rates))
+                                # plt.plot(x_T,accept_rates)
+                                # plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
+                                # plt.close()
                                 accept_rates_mcmc=dict_out['accept_rates_mcmc']
                                 x_T=np.arange(len(accept_rates_mcmc))
                                 plt.plot(x_T,accept_rates_mcmc)
@@ -302,7 +325,7 @@ def main():
                                 finish_flags.append(dict_out['finish_flag'])
                             times.append(t)
                             ests.append(est)
-                            calls.append(dict_out['Count_h'])
+                        calls.append(dict_out['Count_V'])
 
 
                         times=np.array(times)
@@ -350,7 +373,7 @@ def main():
 
                         #with open(os.path.join(log_path,'results.txt'),'w'):
                         results={'p_t':p_t,'method':method_name,
-                        'N':N,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,'lg_est_path':lg_est_path
+                        'N':N,'L':config.L,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,'lg_est_path':lg_est_path
                         ,'min_rate':config.min_rate,'mean_est':ests.mean(),'std_log_est':log_ests.std(),'mean_log_est':mean_log_est,
                         'lg_q_1':lg_q_1,'lg_q_3':lg_q_3,"lg_med_est":lg_med_est
                         ,'mean_time':times.mean()
@@ -362,7 +385,9 @@ def main():
                         ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
                         'batch_opt':config.batch_opt,"d":d, "correct_T":config.correct_T,
                         "np_seed":config.np_seed,"torch_seed":config.torch_seed,
-                            'q_1':q_1,'q_3':q_3,'med_est':med_est}
+                            'q_1':q_1,'q_3':q_3,'med_est':med_est,
+                            "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,'sig_dt':config.sig_dt
+                            }
                         exp_res.append(results)
                         results_df=pd.DataFrame([results])
                         results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)

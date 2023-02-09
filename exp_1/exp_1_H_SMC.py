@@ -30,7 +30,7 @@ class config:
     only_duplicated=True
     v_min_opt=True
     
-    
+    lambda_0 = 0.5
     
     
     L_range=[]
@@ -79,7 +79,6 @@ class config:
     ess_opt=False
     only_duplicated=True
     np_seed=None
-    lambda_0=0.5
     test2=False
 
     s_opt=False
@@ -106,7 +105,7 @@ class config:
     M_opt = False
     adapt_step=True
     FT=True
-    sig_dt=0.02
+    sig_dt=0.01
     L_min=1
     skip_mh=False
     repeat_exp = True 
