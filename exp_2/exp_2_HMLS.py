@@ -26,7 +26,7 @@ class config:
     T_range=[1,5,10,20,50]
     ratio_range=[0.85]
     n_rep=100
-    L=5
+    L=1
     GV_opt=False
     
     min_rate=0.15
@@ -112,7 +112,7 @@ class config:
 
     track_ess=True
     track_beta=True
-    track_dt=True
+    
     track_v_means=True
     track_ratios=False
 
@@ -171,7 +171,7 @@ parser.add_argument('--np_seed',type=int, default=config.np_seed)
 parser.add_argument('--sigma', type=float,default=config.sigma)
 
 parser.add_argument('--ess_alpha',type=float,default=config.ess_alpha)
-parser.add_argument('--e_range',type=str2floatList,default=config.e_range)
+
 parser.add_argument('--N_range',type=str2intList,default=config.N_range)
 parser.add_argument('--T',type=int,default=config.T)
 parser.add_argument('--T_range',type=str2intList,default=config.T_range)
@@ -266,8 +266,7 @@ def main():
     else:
         method_name="H_SMC"
 
-    if len(config.e_range)==0:
-        config.e_range= [config.ess_alpha]
+   
 
     if config.input_stop is None:
         config.input_stop=config.input_start+1
@@ -372,7 +371,7 @@ def main():
         log_line=np.linspace(start=log_min,stop=log_max,num=config.eps_num)
         config.epsilons=np.exp(log_line)
 
-    param_ranges = [config.N_range,config.T_range,config.L_range,config.e_range,config.alpha_range]
+    param_ranges = [config.N_range,config.T_range,config.L_range,config.ratio_range,config.alpha_range]
     param_lens=np.array([len(l) for l in param_ranges])
     nb_runs= np.prod(param_lens)
 
@@ -454,9 +453,7 @@ def main():
             V_ = lambda X: t_u.V_pyt(X,x_0=x_0,model=model,low=low,high=high,target_class=y_0,gaussian_latent=config.gaussian_latent)
             gradV_ = lambda X: t_u.gradV_pyt(X,x_0=x_0,model=model,low=low,high=high, target_class=y_0,gaussian_latent=config.gaussian_latent)
             
-            for ess_t in config.e_range:
-                if config.adapt_func.lower()=='ess':
-                    adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=ess_t,max_beta=1e6)
+            for ratio in config.ratio_range:
                 for T in config.T_range:
                     for L in config.L_range:
                         for alpha in config.alpha_range:       
@@ -468,14 +465,14 @@ def main():
                                     same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method,'='),
                                     ('model_name',model_name,'='),('epsilon',epsilon,'='),('image_idx',l,'='),('n_rep',config.n_rep,'='),
                         ('N',N,'='),('T',T,'='),('L',L,'='),('alpha',alpha,'='),
-                        ('ess_alpha',ess_t,'=')] )  
+                        ('ratio',ratio,'=')] )  
                                     # if a similar experiment has been done in the current log directory we skip it
                                     if len(same_exp_df)>0:
-                                        print(f"Skipping {method_name} run {run_nb}/{nb_runs}, with model: {model_name}, img_idx:{l},eps:{epsilon},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
+                                        print(f"Skipping {method_name} run {run_nb}/{nb_runs}, with model: {model_name}, img_idx:{l},eps:{epsilon},ratio:{ratio},T:{T},alpha:{alpha},N:{N},L:{L}")
                                         continue
                                 loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
                                 log_name=method_name+'_'+'_'+loc_time.replace(':','_')
-                                log_name=method_name+f'_N_{N}_T_{T}_L_{L}_a_{float_to_file_float(alpha)}_ess_{float_to_file_float(ess_t)}'+'_'+loc_time.split('_')[0]
+                                log_name=method_name+f'_N_{N}_T_{T}_L_{L}_a_{float_to_file_float(alpha)}_ratio_{float_to_file_float(ratio)}'+'_'+loc_time.split('_')[0]
                                 log_path=os.path.join(exp_log_path,log_name)
                                 if os.path.exists(log_path):
                                     log_path = log_path + '_'+str(np.random.randint(low=0,high =10))
@@ -489,19 +486,21 @@ def main():
                                 calls=[]
                                 finished_flags=[]
                                 iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
-                                print(f"Starting {method} run {run_nb}/{nb_runs} with model:{model_name} img_idx:{l},eps={epsilon},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
+                                print(f"Starting {method} run {run_nb}/{nb_runs} with model:{model_name} img_idx:{l},eps={epsilon},ratio:{ratio},T:{T},alpha:{alpha},N:{N},L:{L}")
                                 for i in iterator:
                                     t=time()
-                                    p_est,res_dict,=smc_pyt.SamplerSMC(gen=gen,V= V_,gradV=gradV_,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,
-                                    alpha=alpha,n_max=config.n_max,L_min=config.L_min,
-                                    verbose=config.verbose, track_accept=config.track_accept,track_beta=config.track_beta,track_v_means=config.track_v_means,
-                                    track_ratios=config.track_ratios,track_ess=config.track_ess,kappa_opt=config.kappa_opt
-                                    ,gaussian =True,accept_spread=config.accept_spread, 
+                                    p_est,res_dict,=hmls_pyt.HybridMLS(norm_gen, V=V,gradV=gradV
+                                    ,K=K, N=N, L=config.L,
+                                    tau=0 , n_max=config.n_max, T=T
+                                    ,verbose= config.verbose,
+                                    device=config.device,track_accept=config.track_accept,
+                                    track_dt=config.track_dt,
+                                    accept_spread=config.accept_spread, 
                                     adapt_dt=config.adapt_dt, dt_decay=config.dt_decay,
+                                    only_duplicated=config.only_duplicated,
                                     dt_gain=config.dt_gain,dt_min=config.dt_min,dt_max=config.dt_max,
-                                    v_min_opt=config.v_min_opt,
-                                    track_dt=config.track_dt,M_opt=config.M_opt,adapt_step=config.adapt_step,FT=config.FT,
-                                    sig_dt=config.sig_dt, skip_mh=config.skip_mh,GV_opt=config.GV_opt
+                                    GV_opt=config.GV_opt,sig_dt=config.sig_dt,
+                                    alpha=config.alpha
                                     )
                                     t1=time()-t
                                     if config.verbose>2:
@@ -572,7 +571,7 @@ def main():
                             
                                 #with open(os.path.join(log_path,'results.txt'),'w'):
                                 results={"method":method_name,'T':T,'N':N,'L':L,
-                                "ess_alpha":ess_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
+                                "ratio":ratio,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
                                 "method":method,'adapt_dt':config.adapt_dt,"epsilon":epsilon,
                                 "model_name":model_name,"dataset":config.dataset
                                 ,"image_idx":l, 
