@@ -187,7 +187,9 @@ debug=False,kappa_opt=False,
     if track_ess:
         ess_=[]
     if track_dt:
-        dt_s=[]
+        dt_means=[]
+        dt_stds=[]
+
     if track_H:
         H_s=[]
     if track_beta:
@@ -285,7 +287,8 @@ debug=False,kappa_opt=False,
                 if verbose>=2.5:
                     print(f"New mean dt:{dt.mean().item()}")
             if track_dt:
-                dt_s.append(dt.mean().item())
+                dt_means.append(dt.mean().item())
+                dt_stds.append(dt.std().item())
             if only_duplicated and nb_to_renew>0:
                 X[to_renew]=Y
                 v[to_renew]=v_y
@@ -377,7 +380,8 @@ debug=False,kappa_opt=False,
     if track_v_means: 
         dic_out['v_means']=np.array(v_means)
     if track_dt:
-        dic_out['dts']=dt_s
+        dic_out['dt_means']=dt_means
+        dic_out['dt_stds']=dt_stds
     return P_est,dic_out
 
 def SamplerSMC2(gen,  V, gradV,adapt_func,min_rate=0.8,alpha =0.1,N=300,T = 1,L=1,n_max=5000, 
@@ -436,7 +440,7 @@ debug=False,kappa_opt=False,
     if track_ess:
         ess_=[]
     if track_dt:
-        dt_s=[]
+        dt_means=[]
     if track_H:
         H_s=[]
     if track_beta:
@@ -527,7 +531,7 @@ debug=False,kappa_opt=False,
                 if verbose>=2.5:
                     print(f"New mean dt:{dt.mean().item()}")
             if track_dt:
-                dt_s.append(dt.mean().item())
+                dt_means.append(dt.mean().item())
     
             X=Y
             v=v_y
@@ -607,7 +611,7 @@ debug=False,kappa_opt=False,
     if track_v_means: 
         dic_out['v_means']=np.array(v_means)
     if track_dt:
-        dic_out['dts']=dt_s
+        dic_out['dts']=dt_means
     return P_est,dic_out
 
 
@@ -670,7 +674,7 @@ debug=False,kappa_opt=False,
     if track_ess:
         ess_=[]
     if track_dt:
-        dt_s=[]
+        dt_means=[]
     if track_H:
         H_s=[]
     if track_beta:
@@ -768,7 +772,7 @@ debug=False,kappa_opt=False,
                 if verbose>=2.5:
                     print(f"New mean dt:{dt.mean().item()}")
             if track_dt:
-                dt_s.append(dt.mean().item())
+                dt_means.append(dt.mean().item())
             if only_duplicated and nb_to_renew>0:
                 X[to_renew]=Y
                 v[to_renew]=v_y
@@ -856,5 +860,5 @@ debug=False,kappa_opt=False,
     if track_v_means: 
         dic_out['v_means']=np.array(v_means)
     if track_dt:
-        dic_out['dts']=dt_s
+        dic_out['dts']=dt_means
     return P_est,dic_out
