@@ -58,7 +58,7 @@ class config:
     tqdm_opt=True
     save_config = True
     print_config=True
-    update_agg_res=False
+    update_aggr_res=False
     aggr_res_path = None
 
     track_accept=False
@@ -108,7 +108,7 @@ parser.add_argument('--epsilon',type=float, default=config.epsilon)
 parser.add_argument('--tqdm_opt',type=bool,default=config.tqdm_opt)
 parser.add_argument('--save_config', type=bool, default=config.save_config)
 parser.add_argument('--print_config',type=bool , default=config.print_config)
-parser.add_argument('--update_agg_res', type=bool,default=config.update_agg_res)
+parser.add_argument('--update_aggr_res', type=bool,default=config.update_aggr_res)
 
 parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
@@ -183,7 +183,8 @@ raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
-loc_time= datetime.today().isoformat().split('.')[0]
+loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+    log_name=method_name+'_'+'_'+loc_time
 
 exp_log_path=os.path.join(raw_logs_path,method_name+'_t_'+loc_time.split('_')[0])
 os.mkdir(exp_log_path)
@@ -218,7 +219,8 @@ for p_s in config.p_range:
         for N in config.N_range: 
             for s in config.s_range:
                 for ratio in config.ratio_range: 
-                    loc_time= datetime.today().isoformat().split('.')[0]
+                    loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+                    log_name=method_name+'_'+'_'+loc_time
                     log_name=method_name+f'_N_{N}_T_{T}_s_{float_to_file_float(s)}_r_{float_to_file_float(ratio)}_t_'+'_'+loc_time.split('_')[0]
                     log_path=os.path.join(exp_log_path,log_name)
                     os.mkdir(path=log_path)
@@ -226,7 +228,7 @@ for p_s in config.p_range:
                     
 
                     K=int(N*ratio)
-                    print(f"Starting run {i_run}/{nb_runs}, with p_t= {p_t},p_s={p_s},p_w={config.p_w},N={N},K={K},T={T},s={s}")
+                    print(f"Starting {method_name} run {i_run}/{nb_runs}, with p_t= {p_t},p_s={p_s},p_w={config.p_w},N={N},K={K},T={T},s={s}")
                     if config.verbose>3:
                         print(f"K/N:{K/N}")
                     
@@ -327,7 +329,7 @@ for p_s in config.p_range:
                         aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                     else:
                         aggr_res_path=config.aggr_res_path
-                    if config.update_agg_res:
+                    if config.update_aggr_res:
                         if not os.path.exists(aggr_res_path):
                             cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est',
                             'mean_calls','std_calls',

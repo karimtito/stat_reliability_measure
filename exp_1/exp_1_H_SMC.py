@@ -1,4 +1,3 @@
-import stat_reliability_measure.dev.torch_utils as t_u
 import stat_reliability_measure.dev.smc.smc_pyt as smc_pyt
 import scipy.stats as stat
 import numpy as np
@@ -6,35 +5,45 @@ from tqdm import tqdm
 from time import time
 from datetime import datetime
 import os
+import json
 import matplotlib.pyplot as plt
 import torch
-import GPUtil
-import cpuinfo
 import pandas as pd
 import argparse
-from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search
+from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search,get_sel_df
+from stat_reliability_measure.dev.utils import print_config
 from scipy.special import betainc
 from stat_reliability_measure.home import ROOT_DIR
-method_name="smc_pyt_killing"
 
-#gaussian_linear
+
+
+method_name="H_SMC"
 class config:
-    N=100
-    N_range=[]
-    T=1
-    T_range=[]
-    L=1
+    
+    n_rep=200
+    GV_opt=False
+    L=10
+    e_range=[0.75,0.85,0.95]
+    p_range=[1e-6,1e-12]
+    N_range=[32,64,128,256,512,1024]
+    T_range=[10,20,50]
+    only_duplicated=True
+    v_min_opt=True
+    
+    lambda_0 = 0.5
+    
+    
     L_range=[]
-    min_rate=0.2
+    min_rate=0.15
     
     alpha=0.2
     alpha_range=[]
     ess_alpha=0.8
-    e_range=[]
-    p_range=[]
-    p_t=1e-6
-    n_rep=10
     
+    p_t=1e-6
+    
+    N=100
+    T=1
     save_config=False 
     print_config=True
     d=1024
@@ -66,11 +75,10 @@ class config:
     dt_gain=None
     dt_min=1e-3
     dt_max=0.5
-    v_min_opt=False
+    v_min_opt=True
     ess_opt=False
-    only_duplicated=False
+    only_duplicated=True
     np_seed=None
-    lambda_0=0.5
     test2=False
 
     s_opt=False
@@ -81,7 +89,7 @@ class config:
     s_decay=0.95
     s_gain=1.0001
 
-    track_dt=False
+    
     mult_last=True
     linear=True
 
@@ -97,11 +105,10 @@ class config:
     M_opt = False
     adapt_step=True
     FT=True
-    sig_dt=0.02
+    sig_dt=0.01
     L_min=1
     skip_mh=False
-    GV_opt=False
-    killing=True
+    repeat_exp = True 
     
 
 
@@ -111,10 +118,12 @@ parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--d',type=int,default=config.d)
+
 parser.add_argument('--min_rate',type=float,default=config.min_rate)
 parser.add_argument('--alpha',type=float,default=config.alpha)
 parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
+
 parser.add_argument('--save_config',type=str2bool, default=config.save_config)
 #parser.add_argument('--update_aggr_res',type=str2bool,default=config.update_aggr_res)
 #parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
@@ -171,188 +180,213 @@ parser.add_argument('--sig_dt', type=float,default=config.sig_dt)
 parser.add_argument('--L_min',type=int,default=config.L_min)
 parser.add_argument('--skip_mh',type=str2bool,default=config.skip_mh)
 parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
-parser.add_argument('--killing',type=str2bool,default=config.killing)
+parser.add_argument('--repeat_exp',type=str2bool,default=config.repeat_exp)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
     setattr(config, k, v)
 
+def main():
 
-assert config.adapt_func.lower() in smc_pyt.supported_beta_adapt.keys(),f"select adaptive function in {smc_pyt.supported_beta_adapt.keys}"
-adapt_func=smc_pyt.supported_beta_adapt[config.adapt_func.lower()]
+    assert config.adapt_func.lower() in smc_pyt.supported_beta_adapt.keys(),f"select adaptive function in {smc_pyt.supported_beta_adapt.keys}"
+    adapt_func=smc_pyt.supported_beta_adapt[config.adapt_func.lower()]
 
-if config.adapt_func.lower()=='simp_ess':
-    adapt_func = lambda beta,v : smc_pyt.nextBetaSimpESS(beta_old=beta,v=v,lambda_0=config.lambda_0,max_beta=1e6)
-prblm_str='linear_gaussian' if config.linear else 'gaussian'
-if not config.linear:
-    config.log_dir=config.log_dir.replace('linear_gaussian','gaussian')
-if len(config.p_range)==0:
-    config.p_range= [config.p_t]
+    if config.adapt_func.lower()=='simp_ess':
+        adapt_func = lambda beta,v : smc_pyt.nextBetaSimpESS(beta_old=beta,v=v,lambda_0=config.lambda_0,max_beta=1e6)
+    prblm_str='linear_gaussian' if config.linear else 'gaussian'
 
-if len(config.e_range)==0:
-    config.e_range= [config.ess_alpha]
-
-
-if len(config.N_range)==0:
-    config.N_range= [config.N]
-
-
-if len(config.T_range)==0:
-    config.T_range= [config.T]
-
-if len(config.L_range)==0:
-    config.L_range= [config.L]
-if len(config.alpha_range)==0:
-    config.alpha_range= [config.alpha]
-
-
-if not config.allow_multi_gpu:
-    os.environ["CUDA_VISIBLE_DEVICES"]="0"
-
-
-
-if config.torch_seed is None:
-    config.torch_seed=int(time())
-torch.manual_seed(seed=config.torch_seed)
-
-if config.np_seed is None:
-    config.np_seed=int(time())
-torch.manual_seed(seed=config.np_seed)
-
-
-
-if config.track_gpu:
-    gpus=GPUtil.getGPUs()
-    if len(gpus)>1:
-        print("Multi gpus detected, only the first GPU will be tracked.")
-    config.gpu_name=gpus[0].name
-
-if config.track_cpu:
-    config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
-    config.cores_number=os.cpu_count()
-
-
-if config.device is None:
-    config.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
-    if config.verbose>=5:
-        print(config.device)
-    device=config.device
-else:
-    device=config.device
-
-d=config.d
-#epsilon=config.epsilon
-
-
-if not os.path.exists(ROOT_DIR+'/logs'):
-    os.mkdir(ROOT_DIR+'/logs')
-if not os.path.exists(config.log_dir):
-    os.mkdir(config.log_dir)
-
-results_path=ROOT_DIR+'/logs/'+ prblm_str+'_tests/results.csv' 
-if os.path.exists(results_path):
-    results_g=pd.read_csv(results_path)
-else:
-    results_g=pd.DataFrame(columns=['p_t','mean_est','mean_time','mean_err','stdtime','std_est','T','N','rho','alpha','n_rep','min_rate','method'])
-    results_g.to_csv(results_path,index=False)
-raw_logs = os.path.join(config.log_dir,'raw_logs/')
-if not os.path.exists(raw_logs):
-    os.mkdir(raw_logs)
-raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
-if not os.path.exists(raw_logs_path):
-    os.mkdir(raw_logs_path)
-
-loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
-    log_name=method_name+'_'+'_'+loc_time
-log_name=method_name+'_'+'_'+loc_time
-exp_log_path=os.path.join(raw_logs_path,log_name)
-if os.path.exists(exp_log_path):
-    exp_log_path = exp_log_path +'_'+ str(np.random.randint(low=0,high=9))
-os.mkdir(path=exp_log_path)
-config.json=vars(args)
-
-# if config.aggr_res_path is None:
-#     aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
-# else:
-#     aggr_res_path=config.aggr_res_path
-
-if config.dt_gain is None:
-    config.dt_gain=1/config.dt_decay
-config.json=vars(args)
-if config.print_config:
-    print(config.json)
-
-param_ranges = [config.N_range,config.T_range,config.alpha_range,config.p_range,config.L_range,config.e_range]
-param_lens=np.array([len(l) for l in param_ranges])
-nb_runs= np.prod(param_lens)
-
-mh_str="adjusted" 
-method=method_name
-save_every = 1
-#adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBetaPyt
-
-kernel_str='v1_kernel' if config.v1_kernel else 'v2_kernel'
-
-
-run_nb=0
-iterator= tqdm(range(config.n_rep))
-exp_res=[]
-
-for p_t in config.p_range:
-    if config.linear:
-        
-        get_c_norm= lambda p:stat.norm.isf(p)
-        c=get_c_norm(p_t)
-        if config.verbose>=1.:
-            print(f'c:{c}')
-        e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
-        V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=None)
-        
-        gradV= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
-        
-        norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
+    if config.GV_opt:
+        method_name="RW_SMC"
+    elif config.L>1:
+        method_name="H_SMC"
     else:
-        epsilon=1
-        p_target_f=lambda h: 0.5*betainc(0.5*(d-1),0.5,(2*epsilon*h-h**2)/(epsilon**2))
-        h,P_target = dichotomic_search(f=p_target_f,a=0,b=epsilon,thresh=p_t,n_max=100)
-        c=epsilon-h
-        print(f'c:{c}',f'P_target:{P_target}')
-        e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
-        V = lambda X: torch.clamp(input=torch.norm(X,p=2,dim=-1)*c-X[:,0], min=0, max=None)
-        
-        gradV= lambda X: (c*X/torch.norm(X,p=2,dim=-1)[:,None] -e_1[None,:])*(X[:,0]<c*torch.norm(X,p=2,dim=1))[:,None]
-        
-        norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
+        method_name="MALA_SMC"
+    if not config.linear:
+        config.log_dir=config.log_dir.replace('linear_gaussian','gaussian')
+    if len(config.p_range)==0:
+        config.p_range= [config.p_t]
 
-    for ess_t in config.e_range:
-        if config.adapt_func.lower()=='ess':
-            adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=ess_t,max_beta=1e6)
-        for T in config.T_range:
-            for L in config.L_range:
+    if len(config.e_range)==0:
+        config.e_range= [config.ess_alpha]
+
+
+    if len(config.N_range)==0:
+        config.N_range= [config.N]
+
+
+    if len(config.T_range)==0:
+        config.T_range= [config.T]
+
+
+    if len(config.alpha_range)==0:
+        config.alpha_range= [config.alpha]
+
+
+    if not config.allow_multi_gpu:
+        os.environ["CUDA_VISIBLE_DEVICES"]="0"
+
+
+
+    if config.torch_seed is None:
+        config.torch_seed=int(time())
+    torch.manual_seed(seed=config.torch_seed)
+
+    if config.np_seed is None:
+        config.np_seed=int(time())
+    torch.manual_seed(seed=config.np_seed)
+
+
+
+    if config.track_gpu:
+        import GPUtil
+        gpus=GPUtil.getGPUs()
+        if len(gpus)>1:
+            print("Multi gpus detected, only the first GPU will be tracked.")
+        config.gpu_name=gpus[0].name
+
+    if config.track_cpu:
+        import cpuinfo
+        config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
+        config.cores_number=os.cpu_count()
+
+
+    if config.device is None:
+        config.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        if config.verbose>=5:
+            print(config.device)
+        device=config.device
+    else:
+        device=config.device
+
+    d=config.d
+    #epsilon=config.epsilon
+
+
+    if not os.path.exists(ROOT_DIR+'/logs'):
+        os.mkdir(ROOT_DIR+'/logs')
+    if not os.path.exists(config.log_dir):
+        os.mkdir(config.log_dir)
+
+    results_path=ROOT_DIR+'/logs/'+ prblm_str+'_tests/results.csv' 
+    if os.path.exists(results_path):
+        results_g=pd.read_csv(results_path)
+    else:
+        results_g=pd.DataFrame(columns=['p_t','mean_est','mean_time','mean_err','stdtime','std_est','T','N','rho','alpha','n_rep','min_rate','method'])
+        results_g.to_csv(results_path,index=False)
+    raw_logs = os.path.join(config.log_dir,'raw_logs/')
+    if not os.path.exists(raw_logs):
+        os.mkdir(raw_logs)
+    raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
+    if not os.path.exists(raw_logs_path):
+        os.mkdir(raw_logs_path)
+
+    loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+    log_name=method_name+'_'+'_'+loc_time
+    
+    exp_log_path=os.path.join(raw_logs_path,log_name)
+    if os.path.exists(exp_log_path):
+        exp_log_path = exp_log_path +'_'+ str(np.random.randint(low=0,high=9))
+    os.mkdir(path=exp_log_path)
+    config.json=vars(args)
+
+    # if config.aggr_res_path is None:
+    #     aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+    # else:
+    #     aggr_res_path=config.aggr_res_path
+
+    if config.dt_gain is None:
+        config.dt_gain=1/config.dt_decay
+    
+    config_dict=print_config(config)
+    path_config=os.path.join(exp_log_path,'config.json')
+    with open(path_config,'w') as f:
+        f.write(json.dumps(config_dict, indent = 4))
+
+    param_ranges = [config.N_range,config.T_range,config.alpha_range,config.p_range,config.e_range]
+    param_lens=np.array([len(l) for l in param_ranges])
+    print(param_lens)
+    nb_runs= np.prod(param_lens)
+
+    #mh_str="adjusted" 
+    #method=method_name
+    method=method_name
+    save_every = 1
+    #adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBetaPyt
+
+    kernel_str='v1_kernel' if config.v1_kernel else 'v2_kernel'
+
+
+    run_nb=0
+    iterator= tqdm(range(config.n_rep))
+    exp_res=[]
+    L=config.L
+    for p_t in config.p_range:
+        if config.linear:
+            
+            get_c_norm= lambda p:stat.norm.isf(p)
+            c=get_c_norm(p_t)
+            if config.verbose>=1.:
+                print(f'c:{c}')
+            e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
+            V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=None)
+            
+            gradV= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
+            
+            norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
+        else:
+            epsilon=1
+            p_target_f=lambda h: 0.5*betainc(0.5*(d-1),0.5,(2*epsilon*h-h**2)/(epsilon**2))
+            h,P_target = dichotomic_search(f=p_target_f,a=0,b=epsilon,thresh=p_t,n_max=100)
+            c=epsilon-h
+            print(f'c:{c}',f'P_target:{P_target}')
+            e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
+            V = lambda X: torch.clamp(input=torch.norm(X,p=2,dim=-1)*c-X[:,0], min=0, max=None)
+            
+            gradV= lambda X: (c*X/torch.norm(X,p=2,dim=-1)[:,None] -e_1[None,:])*(X[:,0]<c*torch.norm(X,p=2,dim=1))[:,None]
+            
+            norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
+
+        for ess_t in config.e_range:
+            if config.adapt_func.lower()=='ess':
+                adapt_func = lambda beta,v : smc_pyt.nextBetaESS(beta_old=beta,v=v,ess_alpha=ess_t,max_beta=1e6)
+            for T in config.T_range:
                 for alpha in config.alpha_range:       
                     for N in config.N_range:
+                        run_nb+=1
+                        aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                        if (not config.repeat_exp) and config.update_aggr_res and os.path.exists(aggr_res_path):
+                            aggr_res_df = pd.read_csv(aggr_res_path)
+                            same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method,'='),
+                            ('p_t',p_t,'='),('n_rep',config.n_rep,'='),
+                ('N',N,'='),('T',T,'='),('L',L,'='),('alpha',alpha,'='),
+                ('ess_alpha',ess_t,'=')] )  
+                            # if a similar experiment has been done in the current log directory we skip it
+                            if len(same_exp_df)>0:
+                                print(f"Skipping {method_name} run {run_nb}/{nb_runs}, with p_t:{p_t},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
+                                continue
                         loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
-                        log_name=method_name+'_'+'_'+loc_time
+                        log_name=method_name+'_'+'_'+loc_time.replace(':','_')
                         log_name=method_name+f'_N_{N}_T_{T}_L_{L}_a_{float_to_file_float(alpha)}_ess_{float_to_file_float(ess_t)}'+'_'+loc_time.split('_')[0]
                         log_path=os.path.join(exp_log_path,log_name)
                         if os.path.exists(log_path):
                             log_path=log_path+'_'+str(np.random.randint(low=0,high=10))
                         
-                        
+
                         os.mkdir(path=log_path)
-                        run_nb+=1
+                        
                         print(f'Run {run_nb}/{nb_runs}')
                         times=[]
                         ests = []
                         calls=[]
                         finished_flags=[]
                         iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
+                        
                         print(f"Starting {method} simulations with p_t:{p_t},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
                         for i in iterator:
                             t=time()
-                            sampler=smc_pyt.SamplerSMC if config.killing else smc_pyt.SamplerSMC2
-                            p_est,res_dict,=sampler(gen=norm_gen,V= V,gradV=gradV,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,
-                            alpha=alpha,n_max=10000,
+                            sampler=smc_pyt.SamplerSMC 
+                            p_est,res_dict,=sampler(gen=norm_gen, V=V, gradV=gradV, adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,
+                            alpha=alpha, n_max=10000,
                             verbose=config.verbose, track_accept=config.track_accept,track_beta=config.track_beta,track_v_means=config.track_v_means,
                             track_ratios=config.track_ratios,track_ess=config.track_ess,kappa_opt=config.kappa_opt
                             ,gaussian =True,accept_spread=config.accept_spread, 
@@ -364,8 +398,8 @@ for p_t in config.p_range:
                             GV_opt=config.GV_opt
                             )
                             t1=time()-t
-
-                            print(p_est)
+                            if config.verbose>=2:
+                                print(p_est)
                             #finish_flag=res_dict['finished']
                             
                             if config.track_accept:
@@ -378,15 +412,18 @@ for p_t in config.p_range:
                                 plt.close()
                                 
 
-                            if config.adapt_dt and config.track_dt:
-                                dts=res_dict['dts']
-                                np.savetxt(fname=os.path.join(log_path,f'dts_{i}.txt')
-                                ,X=dts)
-                                x_T=np.arange(len(dts))
-                                plt.plot(x_T,dts)
-                                plt.savefig(os.path.join(log_path,f'dts_{i}.png'))
+                            if (config.adapt_dt or config.adapt_step) and config.track_dt:
+                                dt_means=res_dict['dt_means']
+                                dt_stds=res_dict['dt_stds']
+                                dts_path=os.path.join(log_path,'dts')
+                                if not os.path.exists(dts_path):
+                                    os.mkdir(path=dts_path)
+                                np.savetxt(fname=os.path.join(dts_path,f'dt_means_{i}.txt'),X=dt_means)
+                                np.savetxt(fname=os.path.join(dts_path,f'dt_stds_{i}.txt'),X=dt_stds)
+                                x_T=np.arange(len(dt_means))
+                                plt.errorbar(x_T,dt_means,yerr=dt_stds,label='dt')
+                                plt.savefig(os.path.join(dts_path,f'dt_{i}.png'))
                                 plt.close()
-                            
                             
                             times.append(t1)
                             ests.append(p_est)
@@ -443,7 +480,7 @@ for p_t in config.p_range:
                         results={"p_t":p_t,"method":method_name,'T':T,'N':N,'L':L,
                         "ess_alpha":ess_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
                         "method":method,"kernel":kernel_str,'adapt_dt':config.adapt_dt,
-                        'mean_calls':calls.mean(),'std_calls':calls.std(),"killing":config.killing
+                        'mean_calls':calls.mean(),'std_calls':calls.std()
                         ,'mean_time':times.mean(),'std_time':times.std()
                         ,'mean_est':ests.mean(),'bias':ests.mean()-p_t,'mean abs error':abs_errors.mean(),
                         'mean_rel_error':rel_errors.mean(),'std_est':ests.std(),'freq underest':(ests<p_t).mean(), 
@@ -473,7 +510,7 @@ for p_t in config.p_range:
                         if config.update_aggr_res:
                             if not os.path.exists(aggr_res_path):
                                 cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est',
-                                'bias','mean abs error','mean_rel_error','std_est','freq underest','gpu_name','cpu_name']
+                                'bias','mean abs error','mean_rel_error','std_est','freq underest','gpu_name','cpu_name','ratio']
                                 aggr_res_df= pd.DataFrame(columns=cols)
                             else:
                                 aggr_res_df=pd.read_csv(aggr_res_path)
@@ -481,5 +518,8 @@ for p_t in config.p_range:
                             aggr_res_df.to_csv(aggr_res_path,index=False)
 
 
-exp_df=pd.DataFrame(exp_res)
-exp_df.to_csv(os.path.join(exp_log_path,'exp_results.csv'),index=False)                    
+    exp_df=pd.DataFrame(exp_res)
+    exp_df.to_csv(os.path.join(exp_log_path,'exp_results.csv'),index=False)                    
+
+if __name__ == "__main__":
+    main()

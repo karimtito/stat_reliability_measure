@@ -3,7 +3,6 @@ from time import time
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
-import json
 import GPUtil
 import cpuinfo
 import scipy.stats as stat
@@ -13,52 +12,29 @@ import torch
 from stat_reliability_measure.home import ROOT_DIR
 from datetime import datetime
 from pathlib import Path
-from stat_reliability_measure.dev.utils import  float_to_file_float, str2bool, str2intList, str2floatList, get_sel_df, print_config
-import stat_reliability_measure.dev.mc.mc_pyt as mc_pyt
+from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList
+import stat_reliability_measure.dev.form.form_pyt as form_pyt
 
 
-method_name="MC"
+method_name="FORM"
 class config:
-    
-
     n_rep=200
-    N=int(1e5)
-    N_range=[]
-    batch_size=int(1e4)
-    b_range=[]
     p_t=1e-15
     p_range=[]
-    
-    
-    
-    
-    
+    optim_steps=10
+    opt_steps_list = []
     verbose=0
-
-
     allow_zero_est=True
-    
-    
-    
-
-
-    
-
-    
     d = 1024
     epsilon = 1
-    
-    
     tqdm_opt=True
     save_config = True
     print_config=True
     update_aggr_res=True
     aggr_res_path = None
-
     track_advs=False
     track_finish=True
     device = None
-
     torch_seed=0
     np_seed=0
 
@@ -74,8 +50,6 @@ class config:
     correct_T=False
     last_particle=False
     adapt_kernel = False
-    repeat_exp=True
-
 
 parser=argparse.ArgumentParser()
 
@@ -95,6 +69,8 @@ parser.add_argument('--b_range',type=str2intList,default=config.b_range)
 
 parser.add_argument('--d',type=int,default=config.d)
 parser.add_argument('--epsilon',type=float, default=config.epsilon)
+parser.add_argument('--optim_steps',type=float, default=config.optim_steps)
+parser.add_argument('--opt_steps_list',type=str2floatList,default=config.opt_steps_list)
 parser.add_argument('--tqdm_opt',type=bool,default=config.tqdm_opt)
 parser.add_argument('--save_config', type=bool, default=config.save_config)
 parser.add_argument('--print_config',type=bool , default=config.print_config)
@@ -110,7 +86,7 @@ parser.add_argument('--track_advs',type=str2bool,default= config.track_advs)
 parser.add_argument('--track_finish',type=str2bool,default=config.track_finish)
 parser.add_argument('--np_seed',type=int,default=config.np_seed)
 parser.add_argument('--torch_seed',type=int,default=config.torch_seed)
-parser.add_argument('--repeat_exp',type=str2bool,default= config.repeat_exp)
+
 
 args=parser.parse_args()
 for k,v in vars(args).items():
@@ -135,6 +111,9 @@ def main():
 
     if not config.allow_multi_gpu:
         os.environ["CUDA_VISIBLE_DEVICES"]="0"
+
+    if len(config.opt_steps_list)==0:
+        config.opt_steps_list = [config.optim_steps]
 
     if config.track_gpu:
         import GPUtil
@@ -164,22 +143,21 @@ def main():
         os.mkdir(raw_logs_path)
 
     loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
-    log_name=method_name+'_'+'_'+loc_time+'_'+str(np.random.randint(0,10000))
-    np.random.seed(config.np_seed)
-    exp_log_path=os.path.join(raw_logs_path,log_name)
+    log_name=method_name+'_'+'_'+loc_time
+
+    exp_log_path=os.path.join(config.log_dir,method_name+'_t_'+loc_time.split('_')[0])
     os.mkdir(exp_log_path)
     exp_res = []
     config.json=vars(args)
-
-    config_dict=print_config(config)
-    path_config=os.path.join(exp_log_path,'config.json')
-    with open(path_config,'w') as f:
-        f.write(json.dumps(config_dict, indent = 4))
+    if config.print_config:
+        print(config.json)
     # if config.save_confi
     # if config.save_config:
     #     with open(file=os.path.join(),mode='w') as f:
     #         f.write(config.json)
 
+    epsilon=config.epsilon
+    e_1 = torch.Tensor([1]+[0]*(d-1),device=config.device)
     get_c_norm= lambda p:stat.norm.isf(p)
     i_run=0
 
@@ -198,27 +176,16 @@ def main():
 
         for N in config.N_range: 
             for bs in config.b_range:
-                i_run+=1
-                aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
-                if (not config.repeat_exp) and config.update_aggr_res and os.path.exists(aggr_res_path):
-                    aggr_res_df = pd.read_csv(aggr_res_path)
-                    same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method_name,'='),
-                    ('p_t',p_t,'='),('n_rep',config.n_rep,'='),('N',N,'='),
-                    ('batch_size',bs,'=')] )  
-                    # if a similar experiment has been done in the current log directory we skip it
-                    if len(same_exp_df)>0:
-                        
-                        print(f"Skipping {method_name} run {i_run}/{nb_runs}, with p_t= {p_t},N={N},batch size={bs}")
-                        continue
+            
                 loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
                 log_name=method_name+'_'+'_'+loc_time
                 log_name=method_name+f'_N_{N}_bs_{bs}_t_'+'_'+loc_time.split('_')[0]
                 log_path=os.path.join(exp_log_path,log_name)
                 os.mkdir(path=log_path)
+                i_run+=1
                 
                 
-                
-                print(f"Starting Crude MC run {i_run}/{nb_runs}, with p_t= {p_t},N={N},batch size={bs}")
+                print(f"Starting FORM run {i_run}/{nb_runs}, with p_t= {p_t},N={N},batch size={bs}")
                 
                 times= []
                 rel_error= []
@@ -226,9 +193,9 @@ def main():
                 calls=[]
                 if config.track_finish:
                     finish_flags=[]
-                for i in tqdm(range(config.n_rep)):
+                for _ in tqdm(range(config.n_rep)):
                     t=time()
-                    est = mc_pyt.MC_pf(gen=amls_gen, score=h_V_batch_pyt, N_mc=N,batch_size=bs,track_advs=config.track_advs)
+                    est = form_pyt.FORM_pyt()
                     t=time()-t
                     
                 
@@ -245,7 +212,7 @@ def main():
                 mean_log_est=log_ests.mean()
                 lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                 lg_est_path=os.path.join(log_path,'lg_ests.txt')
-                np.savetxt(fname=lg_est_path,X=log_ests)
+                np.savetxt(fname=lg_est_path,X=ests)
             
                 abs_errors=np.abs(ests-p_t)
                 rel_errors=abs_errors/p_t
@@ -306,7 +273,7 @@ def main():
                 if config.update_aggr_res:
                     if not os.path.exists(aggr_res_path):
                         cols=['p_t','method','N','rho','n_rep','alpha','min_rate','mean_time','std_time','mean_est',
-                        'mean_calls','std_calls','ratio', 'T',                      
+                        'mean_calls','std_calls',
                         'bias','mean abs error','mean_rel_error','std_est','freq underest','gpu_name','cpu_name']
                         aggr_res_df= pd.DataFrame(columns=cols)
                     else:

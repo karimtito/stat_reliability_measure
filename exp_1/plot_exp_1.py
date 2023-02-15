@@ -5,14 +5,14 @@ import os
 from stat_reliability_measure.dev.utils import get_sel_df
 from stat_reliability_measure.home import ROOT_DIR
 HOME_DIR=ROOT_DIR
-csv_path=os.path.join(HOME_DIR,'logs/linear_gaussian_tests/aggr_res.csv')
+csv_path=os.path.join(HOME_DIR,'/home/karim-tito/stat_reliability_measure/logs3/aggr_results/linear_gaussian/aggr_res.csv')
 csv_res=pd.read_csv(csv_path)
 csv_res=csv_res[csv_res['n_rep']==200]
 min_rate_smc=0.2
 min_rate_ams=0.3
-amls_filtr=(csv_res['min_rate']==min_rate_ams) & (csv_res['method']=='MLS_SMC')  & (csv_res['last_particle']==False)
-smc_filtr=(csv_res['min_rate']==min_rate_smc) & ((csv_res['method']=='H_SMC') | 
-                                                csv_res['method']=='MALA_SMC' | csv_res['method']=='RW_SMC')
+amls_filtr=(csv_res['min_rate']==min_rate_ams) & ((csv_res['method']=='MLS_SMC') | (csv_res['method']=='amls_pyt'))  & (csv_res['last_particle']==False)
+smc_filtr=(csv_res['min_rate']==min_rate_smc) & ((csv_res['method']=='H_SMC') |  (csv_res['method']=='smc_pyt_killing_adjusted') |
+                                                (csv_res['method']=='MALA_SMC') | (csv_res['method']=='RW_SMC'))
 csv_res_amls=csv_res[amls_filtr]
 csv_res_smc=csv_res[smc_filtr]
 plt.figure(figsize=(18,10))

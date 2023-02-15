@@ -86,7 +86,7 @@ class config:
     verbose=0
     log_dir=None
     aggr_res_path = None
-    update_agg_res=False
+    update_aggr_res=False
     sigma=1
     v1_kernel=True
     torch_seed=None
@@ -259,7 +259,8 @@ raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
 if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
-loc_time= datetime.today().isoformat().split('.')[0]
+loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+log_name=method_name+'_'+'_'+loc_time
 log_name=method_name+'_'+'_'+loc_time
 exp_log_path=os.path.join(raw_logs_path,log_name)
 if os.path.exists(path=exp_log_path):
@@ -286,7 +287,7 @@ param_lens=np.array([len(l) for l in param_ranges])
 nb_runs= np.prod(param_lens)
 
 mh_str="adjusted" 
-method=method_name+'_'+mh_str
+method=method_name
 save_every = 1
 x_min=0
 x_max=1
@@ -431,7 +432,8 @@ for ess_t in config.e_range:
                 for L in config.L_range:
                     for alpha in config.alpha_range:       
                         for N in config.N_range:
-                            loc_time= datetime.today().isoformat().split('.')[0]
+                            loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+                            log_name=method_name+'_'+'_'+loc_time
                             log_name=method_name+f'_N_{N}_T_{T}_L_{L}_a_{float_to_file_float(alpha)}_ess_{float_to_file_float(ess_t)}'+'_'+loc_time.split('_')[0]
                             log_path=os.path.join(exp_log_path,log_name)
                             if os.path.exists(log_path):
@@ -446,7 +448,7 @@ for ess_t in config.e_range:
                             calls=[]
                             finished_flags=[]
                             iterator= tqdm(range(config.n_rep)) if config.tqdm_opt else range(config.n_rep)
-                            print(f"Starting simulations with model:{model_name} img_idx:{l},eps={epsilon},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
+                            print(f"Starting {method} simulations with model:{model_name} img_idx:{l},eps={epsilon},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
                             for i in iterator:
                                 t=time()
                                 p_est,res_dict,=smc_ep.SamplerSMC(gen=gen,V= V_ep,gradV=gradV_ep,adapt_func=adapt_func,min_rate=config.min_rate,N=N,T=T,L=L,

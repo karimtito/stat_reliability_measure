@@ -5,13 +5,15 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import argparse
 import os
+import json
 from stat_reliability_measure.home import ROOT_DIR
 from time import time
 from datetime import datetime
 import stat_reliability_measure.dev.torch_utils as t_u
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
 #setting PRNG seeds for reproducibility
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, str2list
+from stat_reliability_measure.dev.utils import get_sel_df, print_config
 import stat_reliability_measure.dev.mls.amls_uniform as amls_mls
 
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
@@ -23,20 +25,17 @@ class config:
     dataset="mnist"
     log_dir=ROOT_DIR+"/logs/mnist_tests"
     model_dir=ROOT_DIR+"/models/mnist"
-    model_arch="dnn2"  
+    model_arch=None
     epsilons = [0.15]
     N_range=[32,64,128,256,512,1024]
-    N_range_alt=[10,16,32,64,128,256]
+    N_range_alt=[] 
     T_range=[1,10,20,50,100,200,500,1000]
     ratio_range=[0.1]
     n_rep=100
-      
     a=0
     verbose=0
     min_rate=0.51
-    
     clip_s=True
-   
     s_min=8e-3
     s_max=3
     n_max=2000
@@ -45,35 +44,23 @@ class config:
     x_mean=0
     x_std=1
     allow_zero_est=True
-    
     N=40
-    
-
     T=1
-    
-
     ratio=0.6
-    
-
     s=1
     s_range = []
-
     track_accept=False
-    
     d = 784
     epsilon = 0.1
-    
     n_max=2000
     tqdm_opt=True
-    
-    
     eps_max=0.3
     eps_min=0.1 
     eps_num=5
     allow_zero_est=True
     save_config=True
     print_config=True
-    update_agg_res=True
+    update_aggr_res=True
     aggr_res_path=None
     gaussian_latent=True
     project_kernel=True
@@ -90,7 +77,6 @@ class config:
     torch_seed=0
     np_seed=0
     tf_seed=None
-
     model_path=None
     export_to_onnx=False
     use_attack=False
@@ -98,9 +84,7 @@ class config:
     lirpa_bounds=False
     download=True
     train_model=False
-    
     noise_dist='uniform'
-   
     batch_opt=True
     track_finish=False
     lirpa_cert=False
@@ -112,6 +96,8 @@ class config:
     data_dir=ROOT_DIR+"/data"
     p_ref_compute=False
     force_train=False
+    last_particle=False
+    repeat_exp=True
 
 
 parser=argparse.ArgumentParser()
@@ -128,7 +114,7 @@ parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
 parser.add_argument('--T',type=int,default=config.T)
 parser.add_argument('--save_config',type=str2bool, default=config.save_config)
-parser.add_argument('--update_agg_res',type=str2bool,default=config.update_agg_res)
+parser.add_argument('--update_aggr_res',type=str2bool,default=config.update_aggr_res)
 parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
 parser.add_argument('--gaussian_latent',type=str2bool, default=config.gaussian_latent)
 parser.add_argument('--allow_multi_gpu',type=str2bool)
@@ -170,321 +156,351 @@ parser.add_argument('--robust_model',type=str2bool, default=config.robust_model)
 parser.add_argument('--nb_epochs',type=int,default=config.nb_epochs)
 parser.add_argument('--adversarial_every',type=int,default=config.adversarial_every)
 parser.add_argument('--force_train',type=str2bool,default=config.force_train)
+parser.add_argument('--repeat_exp',type=str2bool,default=config.repeat_exp)
 args=parser.parse_args()
 
 for k,v in vars(args).items():
     setattr(config, k, v)
 
-if config.dataset!='mnist':
-    config.log_dir=config.log_dir.replace('mnist',config.dataset)
-    config.model_dir=config.model_dir.replace('mnist',config.dataset)
+def main():
 
-if len(config.epsilons)==0:
-    log_eps=np.linspace(start=np.log(config.eps_min),stop=np.log(config.eps_max),num=config.eps_num)
-    config.epsilons=np.exp(log_eps)
+    if config.dataset!='mnist':
+        config.log_dir=config.log_dir.replace('mnist',config.dataset)
+        config.model_dir=config.model_dir.replace('mnist',config.dataset)
 
-if config.input_stop is None:
-    config.input_stop=config.input_start+1
+    if config.model_arch is None:
+        config.model_arch = t_u.datasets_default_arch[config.dataset]
 
-if config.noise_dist is not None:
-    config.noise_dist=config.noise_dist.lower()
+    if len(config.epsilons)==0:
+        log_eps=np.linspace(start=np.log(config.eps_min),stop=np.log(config.eps_max),num=config.eps_num)
+        config.epsilons=np.exp(log_eps)
 
-if config.noise_dist not in ['uniform','gaussian']:
-    raise NotImplementedError("Only uniform and Gaussian distributions are implemented.")
+    if config.input_stop is None:
+        config.input_stop=config.input_start+1
 
-if not config.allow_multi_gpu:
-    os.environ["CUDA_VISIBLE_DEVICES"]="0"
+    if config.noise_dist is not None:
+        config.noise_dist=config.noise_dist.lower()
 
-if config.np_seed is None:
-    config.np_seed=int(time.time())
-np.random.seed(seed=config.np_seed)
+    if config.noise_dist not in ['uniform','gaussian']:
+        raise NotImplementedError("Only uniform and Gaussian distributions are implemented.")
 
-if config.torch_seed is None:
-    config.torch_seed=int(time.time())
-torch.manual_seed(seed=config.torch_seed)
+    if not config.allow_multi_gpu:
+        os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
-if len(config.T_range)<1:
-    config.T_range=[config.T]
-if len(config.N_range)<1:
-    config.N_range=[config.N]
-if len(config.s_range)<1:
-    config.s_range=[config.s]
-if len(config.ratio_range)<1:
-    config.ratio_range=[config.ratio]
+    if config.np_seed is None:
+        config.np_seed=int(time.time())
+    np.random.seed(seed=config.np_seed)
 
+    if config.torch_seed is None:
+        config.torch_seed=int(time.time())
+    torch.manual_seed(seed=config.torch_seed)
 
-if config.track_gpu:
-    import GPUtil
-    gpus=GPUtil.getGPUs()
-    if len(gpus)>1:
-        print("Multi gpus detected, only the first GPU will be tracked.")
-    config.gpu_name=gpus[0].name
+    if len(config.T_range)<1:
+        config.T_range=[config.T]
+    if len(config.N_range)<1:
+        config.N_range=[config.N]
 
-if config.track_cpu:
-    import cpuinfo
-    config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
-    config.cores_number=os.cpu_count()
+    if len(config.N_range_alt)<1:
+        config.N_range_alt=config.N_range
+    if len(config.s_range)<1:
+        config.s_range=[config.s]
+    if len(config.ratio_range)<1:
+        config.ratio_range=[config.ratio]
 
 
-if config.device is None:
-    config.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
-    if config.verbose>=5:
-        print(config.device)
-    device=config.device
-else:
-    device=config.device
+    if config.track_gpu:
+        import GPUtil
+        gpus=GPUtil.getGPUs()
+        if len(gpus)>1:
+            print("Multi gpus detected, only the first GPU will be tracked.")
+        config.gpu_name=gpus[0].name
 
-d=config.d
-#epsilon=config.epsilon
-
-
-if not os.path.exists(ROOT_DIR+'/logs'):
-    print('logs not found')
-    os.mkdir(ROOT_DIR+'/logs')
-if not os.path.exists(config.log_dir):
-    os.mkdir(config.log_dir)
-
-raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
-if not os.path.exists(raw_logs_path):
-    os.mkdir(raw_logs_path)
+    if config.track_cpu:
+        import cpuinfo
+        config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
+        config.cores_number=os.cpu_count()
 
 
-if config.epsilons is None:
-    log_min,log_max=np.log(config.eps_min),np.log(config.eps_max)
-    log_line=np.linspace(start=log_min,stop=log_max,num=config.eps_num)
-    config.epsilons=np.exp(log_line)
+    if config.device is None:
+        config.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        if config.verbose>=5:
+            print(config.device)
+        device=config.device
+    else:
+        device=config.device
 
-if config.aggr_res_path is None:
-    aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
-else:
-    aggr_res_path=config.aggr_res_path
-
-
-
-config.json=vars(config)
-if config.print_config:
-    print(', '.join("%s: %s" % item for item in config.json.items()))
-
-#loading data
+    d=config.d
+    #epsilon=config.epsilon
 
 
-num_classes=10
-test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
-                ,dataset=config.dataset,batch_size=config.load_batch_size,
-            x_mean=None,x_std=None)
+    if not os.path.exists(ROOT_DIR+'/logs'):
+        print('logs not found')
+        os.mkdir(ROOT_DIR+'/logs')
+    if not os.path.exists(config.log_dir):
+        os.mkdir(config.log_dir)
 
-model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
-    nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
-    download=config.download,dataset=config.dataset,force_train=config.force_train)
-X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
-if config.verbose>=2:
-    print(f"model accuracy on test batch:{accuracy}")
+    raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
+    if not os.path.exists(raw_logs_path):
+        os.mkdir(raw_logs_path)
+    loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+    log_name=method_name+'_'+'_'+loc_time
+    exp_log_path=os.path.join(raw_logs_path,log_name)
+    if os.path.exists(path=exp_log_path):
+        exp_log_path = exp_log_path+'_'+str(np.random.randint(low=0,high=9))
+    os.mkdir(path=exp_log_path)
 
-config.x_mean=t_u.datasets_means[config.dataset]
-config.x_std=t_u.datasets_stds[config.dataset]
+    if config.epsilons is None:
+        log_min,log_max=np.log(config.eps_min),np.log(config.eps_max)
+        log_line=np.linspace(start=log_min,stop=log_max,num=config.eps_num)
+        config.epsilons=np.exp(log_line)
+
+    if config.aggr_res_path is None:
+        aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
+    else:
+        aggr_res_path=config.aggr_res_path
 
 
 
-
-
-#X.requires_grad=True
-normal_dist=torch.distributions.Normal(loc=0, scale=1.)
-
-
-#inf=float('inf')
-
-x_min=0
-x_max=1
-if config.use_attack:
-
-    import foolbox as fb
-    fmodel = fb.PyTorchModel(model, bounds=(x_min,x_max))
-    attack=fb.attacks.LinfPGD()
     
-   
-    _, advs, success = attack(fmodel, X_correct[config.input_start:config.input_stop], 
-    label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
+
+    #loading data
 
 
-inp_indices=np.arange(start=config.input_start,stop=config.input_stop)
-i_exp=0
-param_ranges= [ inp_indices,config.T_range,config.N_range,config.s_range ,config.ratio_range,config.epsilons]
-lenghts=np.array([len(L) for L in param_ranges])
-nb_exps= np.prod(lenghts)
+    num_classes=10
+    test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
+                    ,dataset=config.dataset,batch_size=config.load_batch_size,
+                x_mean=None,x_std=None)
 
-for l in range(len(inp_indices)):
-    with torch.no_grad():
-        x_0,y_0 = X_correct[l], label_correct[l]
-    input_shape=x_0.shape
-    #x_0.requires_grad=True
-    for idx in range(len(config.epsilons)):
+    model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
+        nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
+        download=config.download,dataset=config.dataset,force_train=config.force_train)
+    X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
+    if config.verbose>=2:
+        print(f"model accuracy on test batch:{accuracy}")
+
+    config.x_mean=t_u.datasets_means[config.dataset]
+    config.x_std=t_u.datasets_stds[config.dataset]
+    config_dict=print_config(config)
+    path_config=os.path.join(exp_log_path,'config.json')
+    with open(path_config,'w') as f:
+        f.write(json.dumps(config_dict, indent = 4))
+
+
+
+
+
+
+
+    #inf=float('inf')
+
+    x_min=0
+    x_max=1
+    if config.use_attack:
+
+        import foolbox as fb
+        fmodel = fb.PyTorchModel(model, bounds=(x_min,x_max))
+        attack=fb.attacks.LinfPGD()
         
-        
-        epsilon = config.epsilons[idx]
-        pgd_success= (success[idx][l]).item() if config.use_attack else None 
-        p_l,p_u=None,None
-        if config.lirpa_bounds:
-            from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
-            # Step 2: define perturbation. Here we use a Linf perturbation on input image.
-            p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
-            num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)
-            p_l,p_u=p_l.item(),p_u.item()
-        def prop(x):
-            y = model(x)
-            y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)
-            y_diff, _ = y_diff.max(dim=1)
-            return y_diff #.max(dim=1)
+    
+        _, advs, success = attack(fmodel, X_correct[config.input_start:config.input_stop], 
+        label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
+
+
+    inp_indices=np.arange(start=config.input_start,stop=config.input_stop)
+    i_exp=0
+    param_ranges= [ inp_indices,config.T_range,config.N_range,config.s_range ,config.ratio_range,config.epsilons]
+    lenghts=np.array([len(L) for L in param_ranges])
+    nb_exps= np.prod(lenghts)
+
+    for l in inp_indices:
+        with torch.no_grad():
+            x_0,y_0 = X_correct[l], label_correct[l]
+        input_shape=x_0.shape
+        #x_0.requires_grad=True
+        for idx in range(len(config.epsilons)):
             
-        for T in config.T_range:
-            if T>=200:
-                    N_range=config.N_range_alt
-            else:
-                N_range=config.N_range
-            for N in N_range: 
-                for s in config.s_range :
-                    for ratio in config.ratio_range: 
-                        loc_time= datetime.today().isoformat().split('.')[0]
-                        log_name=method_name+'_e_'+float_to_file_float(config.epsilons[idx])+'_N_'+str(N)+'_T_'+str(T)+'_s_'+float_to_file_float(s)
-                        log_name=log_name+'_r_'+float_to_file_float(ratio)+'_'+'_'+loc_time
-                        log_path=os.path.join(raw_logs_path,log_name)
-                        i_exp+=1
-                        print(f"Starting experiment {i_exp}/{nb_exps}")
-                                          
-
-                        K=int(N*ratio)
-                        if config.verbose>=0:
-                            print(f"with model: {model_name}, img_idx:{l},eps:{epsilon},T:{T},N:{N},s:{s},K:{K}")
-                        if config.verbose>3:
-                            print(f"K/N:{K/N}")
-                        times= []
-                        rel_error= []
-                        ests = [] 
-                        log_ests=[]
-                        calls=[]
-                        if config.track_finish:
-                            finish_flags=[]
-                        for i in tqdm(range(config.n_rep)):
-                            t=time()
-                            lg_p,nb_calls,max_val,x,levels=amls_mls.multilevel_uniform(prop=prop,
-                            count_particles=N,count_mh_steps=T,x_min=x_min,x_max=x_max,
-                            x_sample=x_0,sigma=epsilon,rho=ratio,CUDA=True,debug=(config.verbose>=1))
-                            t=time()-t
-                            # we don't need adversarial examples and highest score
-                            del x
-                            del max_val
-                            log_ests.append(lg_p)
-                            est=np.exp(lg_p)
-                            if config.verbose:
-                                print(f"Est:{est}")
-                            # dict_out=amls_res[1]
-                            # if config.track_accept:
-                            #     accept_logs=os.path.join(log_path,'accept_logs')
-                            #     if not os.path.exists(accept_logs):
-                            #         os.mkdir(path=accept_logs)
-                            #     accept_rates=dict_out['accept_rates']
-                            #     np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
-                            #     ,X=accept_rates)
-                            #     x_T=np.arange(len(accept_rates))
-                            #     plt.plot(x_T,accept_rates)
-                            #     plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
-                            #     plt.close()
-                            #     accept_rates_mcmc=dict_out['accept_rates_mcmc']
-                            #     x_T=np.arange(len(accept_rates_mcmc))
-                            #     plt.plot(x_T,accept_rates_mcmc)
-                            #     plt.savefig(os.path.join(accept_logs,f'accept_rates_mcmc_{i}.png'))
-                            #     plt.close()
-                            #     np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
-                            #     ,X=accept_rates_mcmc)
+            
+            epsilon = config.epsilons[idx]
+            pgd_success= (success[idx][l]).item() if config.use_attack else None 
+            p_l,p_u=None,None
+            if config.lirpa_bounds:
+                from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
+                # Step 2: define perturbation. Here we use a Linf perturbation on input image.
+                p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
+                num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)
+                p_l,p_u=p_l.item(),p_u.item()
+            def prop(x):
+                y = model(x)
+                y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)
+                y_diff, _ = y_diff.max(dim=1)
+                return y_diff #.max(dim=1)
+                
+            for T in config.T_range:
+                if T>=200:
+                        N_range=config.N_range_alt
+                else:
+                    N_range=config.N_range
+                for N in N_range: 
+                    for s in config.s_range :
+                        for ratio in config.ratio_range: 
+                            i_exp+=1
+                            aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
+                            if (not config.repeat_exp) and config.update_aggr_res and os.path.exists(aggr_res_path):
+                                aggr_res_df = pd.read_csv(aggr_res_path)
+                                same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method_name,'='),
+                                ('model_name',model_name,'='),('epsilon',epsilon,'='),('image_idx',l,'='),('n_rep',config.n_rep,'='),
+                    ('N',N,'='),('T',T,'='),('s',s,'='),('last_particle',config.last_particle,'=='),
+                    ('ratio',ratio,'=')] )  
+                                # if a similar experiment has been done in the current log directory we skip it
+                                if len(same_exp_df)>0:
+                                    print(f"Skipping {method_name} run {run_nb}/{nb_runs}, with model: {model_name}, img_idx:{l},eps:{epsilon},ess_t:{ess_t},T:{T},alpha:{alpha},N:{N},L:{L}")
+                                    continue
+                            loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+                            log_name=method_name+'_e_'+float_to_file_float(config.epsilons[idx])+'_N_'+str(N)+'_T_'+str(T)+'_s_'+float_to_file_float(s)
+                            log_name=log_name+'_r_'+float_to_file_float(ratio)+'_'+'_'+loc_time
+                            log_path=os.path.join(exp_log_path,log_name)
+                            
+                            print(f"Starting {method_name} run {i_exp}/{nb_exps}")
+                                            
+                            
+                            K=int(N*ratio) if not config.last_particle else N-1
+                            if config.verbose>=0:
+                                print(f"with model: {model_name}, img_idx:{l},eps:{epsilon},T:{T},N:{N},s:{s},K:{K}")
+                            if config.verbose>3:
+                                print(f"K/N:{K/N}")
+                            times= []
+                            rel_error= []
+                            ests = [] 
+                            log_ests=[]
+                            calls=[]
                             if config.track_finish:
-                                finish_flags.append(levels[-1]>=0)
-                            times.append(t)
-                            ests.append(est)
-                            calls.append(nb_calls)
-            
-                        times=np.array(times)
-                        ests = np.array(ests)
-                        log_ests=np.array(log_ests)
-                        mean_est=ests.mean()
-                        calls=np.array(calls)
-                        mean_calls=calls.mean()
-                        std_est=ests.std()
-                        
-                        q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
-                        std_rel=std_est/mean_est**2 if mean_est >0 else 0
-                        std_rel_adj=std_rel*mean_calls
-                        print(f"mean est:{ests.mean()}, std est:{ests.std()}")
-                        print(f"mean calls:{calls.mean()}")
-                        print(f"std. re.:{std_rel}")
-                        print(f"std. rel. adj.:{std_rel_adj}")
-                        
-                        if config.track_finish:
-                            finish_flags=np.array(finish_flags)
-                            freq_finished=finish_flags.mean()
-                            freq_zero_est=(ests==0).mean()
-                        else:
-                            freq_zero_est,freq_finished=None,None
-                        #finished=np.array(finish_flag)
-                        if config.track_finish and freq_finished<1:
-                            unfinish_est=ests[~finish_flags]
-                            unfinish_times=times[~finish_flags]
-                            unfinished_mean_est=unfinish_est.mean()
-                            unfinished_mean_time=unfinish_times.mean()
-                        else:
-                            unfinished_mean_est,unfinished_mean_time=None,None
-                        if os.path.exists(log_path):
-                            log_path=log_path+'_rand_'+str(np.random.randint(low=0,high=9))
-                        os.mkdir(log_path)
-                        times_path=os.path.join(log_path,'times.txt')
-                        np.savetxt(fname=times_path,X=times)
-                        est_path=os.path.join(log_path,'ests.txt')
-                        np.savetxt(fname=est_path,X=ests)
-
-                        std_log_est=log_ests.std()
-                        mean_log_est=log_ests.mean()
-                        lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
-                        lg_est_path=os.path.join(log_path,'lg_ests.txt')
-                        np.savetxt(fname=lg_est_path,X=ests)
-
-                        
-
-                        plt.hist(times, bins=10)
-                        plt.savefig(os.path.join(log_path,'times_hist.png'))
-                        plt.hist(ests,bins=10)
-                        plt.savefig(os.path.join(log_path,'ests_hist.png'))
-                    
-                        
-
-                        #with open(os.path.join(log_path,'results.txt'),'w'):
-                        results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),'image_idx':l,
-                            'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
-                        'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std_adj":ests.std()*mean_calls,
-                        'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),'est_path':est_path,'times_path':times_path,
-                        'std_est':ests.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
-                        'cores_number':config.cores_number,'g_target':config.g_target,"std_rel":std_rel, "std_rel_adj":std_rel_adj,
-                        'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
-                        'unfinished_mean_est':unfinished_mean_est,"lg_est_path":lg_est_path,
-                            "mean_log_est":mean_log_est,"std_log_est":std_log_est,
-                            "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
-                        'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
-                        'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time,
-                        'q_1':q_1,'q_3':q_3,'med_est':med_est}
-                        results_df=pd.DataFrame([results])
-                        results_df.to_csv(os.path.join(log_path,'results.csv'),)
-                        if config.aggr_res_path is None:
-                            aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
-                        else: 
-                            aggr_res_path=config.aggr_res_path
-
-                        if config.update_agg_res:
-                            if not os.path.exists(aggr_res_path):
-                                print(f'aggregate results csv file not found /n it will be build at {aggr_res_path}')
-                                cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
-                                'std_est','freq underest','g_target']
-                                cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
-                                cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist','datetime']
-                                agg_res_df= pd.DataFrame(columns=cols)
-
+                                finish_flags=[]
+                            for i in tqdm(range(config.n_rep)):
+                                t=time()
+                                lg_p,nb_calls,max_val,x,levels=amls_mls.multilevel_uniform(prop=prop,
+                                count_particles=N,count_mh_steps=T,x_min=x_min,x_max=x_max,
+                                x_sample=x_0,sigma=epsilon,rho=ratio,CUDA=True,debug=(config.verbose>=1))
+                                t=time()-t
+                                # we don't need adversarial examples and highest score
+                                del x
+                                del max_val
+                                log_ests.append(lg_p)
+                                est=np.exp(lg_p)
+                                if config.verbose:
+                                    print(f"Est:{est}")
+                                # dict_out=amls_res[1]
+                                # if config.track_accept:
+                                #     accept_logs=os.path.join(log_path,'accept_logs')
+                                #     if not os.path.exists(accept_logs):
+                                #         os.mkdir(path=accept_logs)
+                                #     accept_rates=dict_out['accept_rates']
+                                #     np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
+                                #     ,X=accept_rates)
+                                #     x_T=np.arange(len(accept_rates))
+                                #     plt.plot(x_T,accept_rates)
+                                #     plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
+                                #     plt.close()
+                                #     accept_rates_mcmc=dict_out['accept_rates_mcmc']
+                                #     x_T=np.arange(len(accept_rates_mcmc))
+                                #     plt.plot(x_T,accept_rates_mcmc)
+                                #     plt.savefig(os.path.join(accept_logs,f'accept_rates_mcmc_{i}.png'))
+                                #     plt.close()
+                                #     np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
+                                #     ,X=accept_rates_mcmc)
+                                if config.track_finish:
+                                    finish_flags.append(levels[-1]>=0)
+                                times.append(t)
+                                ests.append(est)
+                                calls.append(nb_calls)
+                
+                            times=np.array(times)
+                            ests = np.array(ests)
+                            log_ests=np.array(log_ests)
+                            mean_est=ests.mean()
+                            calls=np.array(calls)
+                            mean_calls=calls.mean()
+                            std_est=ests.std()
+                            
+                            q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                            std_rel=std_est/mean_est**2 if mean_est >0 else 0
+                            std_rel_adj=std_rel*mean_calls
+                            print(f"mean est:{ests.mean()}, std est:{ests.std()}")
+                            print(f"mean calls:{calls.mean()}")
+                            print(f"std. re.:{std_rel}")
+                            print(f"std. rel. adj.:{std_rel_adj}")
+                            
+                            if config.track_finish:
+                                finish_flags=np.array(finish_flags)
+                                freq_finished=finish_flags.mean()
+                                freq_zero_est=(ests==0).mean()
                             else:
-                                agg_res_df=pd.read_csv(aggr_res_path)
-                            agg_res_df = pd.concat([agg_res_df,results_df],ignore_index=True)
-                            agg_res_df.to_csv(aggr_res_path,index=False)
+                                freq_zero_est,freq_finished=None,None
+                            #finished=np.array(finish_flag)
+                            if config.track_finish and freq_finished<1:
+                                unfinish_est=ests[~finish_flags]
+                                unfinish_times=times[~finish_flags]
+                                unfinished_mean_est=unfinish_est.mean()
+                                unfinished_mean_time=unfinish_times.mean()
+                            else:
+                                unfinished_mean_est,unfinished_mean_time=None,None
+                            if os.path.exists(log_path):
+                                log_path=log_path+'_rand_'+str(np.random.randint(low=0,high=9))
+                            os.mkdir(log_path)
+                            times_path=os.path.join(log_path,'times.txt')
+                            np.savetxt(fname=times_path,X=times)
+                            est_path=os.path.join(log_path,'ests.txt')
+                            np.savetxt(fname=est_path,X=ests)
+
+                            std_log_est=log_ests.std()
+                            mean_log_est=log_ests.mean()
+                            lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
+                            lg_est_path=os.path.join(log_path,'lg_ests.txt')
+                            np.savetxt(fname=lg_est_path,X=ests)
+
+                            
+
+                            plt.hist(times, bins=10)
+                            plt.savefig(os.path.join(log_path,'times_hist.png'))
+                            plt.hist(ests,bins=10)
+                            plt.savefig(os.path.join(log_path,'ests_hist.png'))
+                        
+                            
+
+                            #with open(os.path.join(log_path,'results.txt'),'w'):
+                            results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),
+                            'image_idx':l,'dataset':config.dataset,
+                                'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
+                            'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std_adj":ests.std()*mean_calls,
+                            'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),'est_path':est_path,'times_path':times_path,
+                            'std_est':ests.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
+                            'cores_number':config.cores_number,'g_target':config.g_target,"std_rel":std_rel, "std_rel_adj":std_rel_adj,
+                            'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
+                            'unfinished_mean_est':unfinished_mean_est,"lg_est_path":lg_est_path,
+                                "mean_log_est":mean_log_est,"std_log_est":std_log_est,
+                                "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
+                            'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
+                            'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time,
+                            'q_1':q_1,'q_3':q_3,'med_est':med_est}
+                            results_df=pd.DataFrame([results])
+                            results_df.to_csv(os.path.join(log_path,'results.csv'),)
+                            if config.aggr_res_path is None:
+                                aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
+                            else: 
+                                aggr_res_path=config.aggr_res_path
+
+                            if config.update_aggr_res:
+                                if not os.path.exists(aggr_res_path):
+                                    print(f'aggregate results csv file not found \n it will be build at {aggr_res_path}')
+                                    cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
+                                    'std_est','freq underest','g_target']
+                                    cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
+                                    cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist','datetime']
+                                    agg_res_df= pd.DataFrame(columns=cols)
+
+                                else:
+                                    agg_res_df=pd.read_csv(aggr_res_path)
+                                agg_res_df = pd.concat([agg_res_df,results_df],ignore_index=True)
+                                agg_res_df.to_csv(aggr_res_path,index=False)
+
+if __name__=='__main__':
+    main()

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import os
 from stat_reliability_measure.dev.utils import float_to_file_float,get_sel_df
 from stat_reliability_measure.home import ROOT_DIR
-csv_path=os.path.join(ROOT_DIR,'logs/mnist_tests/agg_res.csv')
+csv_path=os.path.join(ROOT_DIR,'/home/karim-tito/stat_reliability_measure/logs3/aggr_results/mnist/agg_res.csv')
 csv_res=pd.read_csv(csv_path)
 csv_res['mean_log10_est']=csv_res['mean_log_est']/np.log(10)
 csv_res['std_log10_est']=csv_res['std_log_est']/np.log(10)
@@ -18,10 +18,11 @@ ratio_range=[0.1,0.6]
 min_rate_smc=0.2
 min_rate_ams=0.51
 v_min_opt=True
-amls_filtr= (csv_res['method']=='MLS_SMC')  
+amls_filtr= (csv_res['method']=='MLS_SMC') |  (csv_res['method']=='webb_ams') | (csv_res['method']=='amls_pyt')
 smc_filtr= ((csv_res['method']=='H_SMC') | 
-            csv_res['method']=='MALA_SMC' | 
-            csv_res['method']=='RW_SMC')
+            (csv_res['method']=='smc_pyt_killing_adjusted') |
+            (csv_res['method']=='MALA_SMC') | 
+            (csv_res['method']=='RW_SMC'))
 csv_res_webb=csv_res[amls_filtr]
 
 csv_res_smc=csv_res[smc_filtr]

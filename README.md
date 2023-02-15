@@ -1,6 +1,7 @@
 # stat_reliability_measure
 
 This repository contains implementations of Sequential Monte Carlo methods to estimate the probability of failure of neural networks under noisy inputs.
+More information can be found in the [Experimental Design](experimental_design.md).
 
 ## Requirements
 The code was tested on python3.8+.

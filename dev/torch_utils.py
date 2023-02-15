@@ -148,7 +148,9 @@ def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_si
     return X_new
 
 
-def verlet_kernel1(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaussian=True,kappa_opt=False,scale_M=None,GV=False):
+def verlet_kernel1(X, gradV, delta_t, beta,L,
+ind_L=None,p_0=None,lambda_=0, 
+gaussian=True,kappa_opt=False,scale_M=None,GV=False):
     """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
 
     """
@@ -196,7 +198,9 @@ def verlet_kernel1(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaus
         i_k=ind_L>=k
     return q_t.detach(),p_t
 
-def verlet_kernel2(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaussian=True,kappa_opt=False,scale_M=None,GV=False):
+def verlet_kernel2(X, gradV, delta_t, beta,L,
+    ind_L=None,p_0=None,lambda_=0, gaussian=True,
+    kappa_opt=False,scale_M=None,GV=False):
     """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
 
     """
@@ -281,7 +285,7 @@ def compute_V_grad_pyt(model, input_, target_class,L=0):
     
 
     grad=torch.autograd.grad(outputs=v,inputs=input_,grad_outputs=torch.ones_like(v),retain_graph=False)[0]
-    input_.requires_grad =False
+
     return v,grad
 
 
@@ -376,8 +380,9 @@ datasets_num_c={'mnist':10,'cifar10':10,'imagenet':1000}
 datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465),'cifar100':[125.3/255.0, 123.0/255.0, 113.9/255.0]}
 datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010),'cifar100':[63.0/255.0, 62.1/255.0, 66.7/255.0]}
 datasets_supp_archs={'mnist':{'dnn2':dnn2,'dnn4':dnn4,'cnn_custom':CNN_custom},
-                    'cifar10':{'lenet':LeNet,'convnet':ConvNet},
+                    'cifar10':{'lenet':LeNet,'convnet':ConvNet,'dnn2':dnn2},
                     'cifar100':{'densenet':DenseNet3}}
+datasets_default_arch={'mnist':'dnn2', 'cifar10':'convnet', 'cifar100':'densenet'}
 def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=None,x_std=None): 
     assert dataset in supported_datasets,f"support datasets are in {supported_datasets}"
     if dataset=='mnist':
@@ -472,7 +477,7 @@ def get_model_imagenet(model_arch,model_dir):
     return model,mean,std
 
 def get_model(model_arch, robust_model, robust_eps,nb_epochs,model_dir,data_dir,test_loader, device ,
-download,force_train=False,dataset='mnist',batch_size=100):
+download,force_train=False,dataset='mnist',batch_size=100,lr=1E-1):
     
     input_shape=datasets_in_shape[dataset]
     print(f"input_shape:{input_shape}")
@@ -496,7 +501,7 @@ download,force_train=False,dataset='mnist',batch_size=100):
         else:
             print("Model not found: it will be trained from scratch.")
         train_loader=get_loader(train=True, data_dir=data_dir, download=download,dataset=dataset,batch_size=batch_size)
-        opt = optim.SGD(model.parameters(), lr=1e-1)
+        opt = optim.SGD(model.parameters(), lr=lr)
 
         print("Train Err", "Train Loss", "Test Err", "Test Loss", sep="\t")
         for _ in range(nb_epochs):
@@ -1019,7 +1024,7 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussia
 
 def adapt_verlet_mcmc(q,v_q,ind_L,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
 kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,alpha_p:float=0.1,prop_d=0.1,FT=False,dt_max=None,dt_min=None,sig_dt=0.015,
-verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
+verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False,correct_kernel=False):
     """ Simple implementation of Hamiltonian dynanimcs MCMC 
 
     Args:
@@ -1040,6 +1045,7 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     Returns:
         _type_: _description_
     """
+    verlet_mixer=verlet_kernel2 if correct_kernel else verlet_kernel1
     acc  = 0
     T_max=T
     if scale_M is None:
@@ -1067,7 +1073,7 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     i=0
     #torch.multinomial(input=)
     while (prod_correl>alpha_p).sum()>=prop_d*d and i<T_max:
-        q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
+        q_trial,p_trial=verlet_mixer(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
         
         nb_calls+=4*ind_L.sum().item()-N # for each particle each vertlet integration step requires two oracle calls (gradients)
