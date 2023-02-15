@@ -1,5 +1,5 @@
 import stat_reliability_measure.dev.torch_utils as t_u
-import stat_reliability_measure.dev.smc.smc_pyt as smc_pyt
+import stat_reliability_measure.dev.hybrid_mls.hybrid_mls_pyt as hmls
 import numpy as np
 from tqdm import tqdm
 from time import time
@@ -118,7 +118,7 @@ class config:
 
     kappa_opt=True
 
-    adapt_func='ESS'
+  
     M_opt = False
     adapt_step=True
     FT=True
@@ -197,25 +197,21 @@ parser.add_argument('--adapt_dt_mcmc',type=str2bool,default=config.adapt_dt_mcmc
 parser.add_argument('--update_aggr_res',type=str2bool,default=config.update_aggr_res)
 parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
 parser.add_argument('--ess_opt',type=str2bool,default=config.ess_opt)
-
 parser.add_argument('--lambda_0',type=float,default=config.lambda_0)
 parser.add_argument('--test2',type=str2bool,default =config.test2)
 parser.add_argument('--print_config',type=str2bool,default=config.print_config)
 parser.add_argument('--track_dt',type=str2bool,default=config.track_dt)
 parser.add_argument('--linear',type=str2bool,default=config.linear)
-parser.add_argument('--adapt_func',type=str,default=config.adapt_func)
 parser.add_argument('--M_opt',type=str2bool,default=config.M_opt)
 parser.add_argument('--adapt_step',type=str2bool,default=config.adapt_step)
 parser.add_argument('--FT',type=str2bool,default=config.FT)
 parser.add_argument('--sig_dt', type=float,default=config.sig_dt)
-
 parser.add_argument('--load_batch_size',type=int,default=config.load_batch_size)
 parser.add_argument('--model_arch',type=str,default = config.model_arch)
 parser.add_argument('--robust_model',type=str2bool, default=config.robust_model)
 parser.add_argument('--nb_epochs',type=int,default=config.nb_epochs)
 parser.add_argument('--adversarial_every',type=int,default=config.adversarial_every)
 parser.add_argument('--gaussian_latent',type=str2bool,default=config.gaussian_latent)
-
 parser.add_argument('--eps_max',type=float,default=config.eps_max)
 parser.add_argument('--eps_min',type=float,default=config.eps_min)
 parser.add_argument('--eps_num',type=int,default=config.eps_num)
@@ -249,13 +245,9 @@ def main():
 
     config.d = t_u.datasets_dims[config.dataset]
     color_dataset=config.dataset in ('cifar10','cifar100','imagenet') 
-    #assert config.adapt_func.lower() in smc_pyt.supported_beta_adapt.keys(),f"select adaptive function in {smc_pyt.supported_beta_adapt.keys}"
-    #adapt_func=smc_pyt.supported_beta_adapt[config.adapt_func.lower()]
+   
 
-    if config.adapt_func.lower()=='simp_ess':
-        adapt_func = lambda beta,v : smc_pyt.nextBetaSimpESS(beta_old=beta,v=v,lambda_0=config.lambda_0,max_beta=1e6)
-    elif config.adapt_func.lower()=='simp':
-        adapt_func = lambda beta,v: smc_pyt.SimpAdaptBetaPyt(beta,v,config.g_target,v_min_opt=config.v_min_opt)
+  
     prblm_str=config.dataset
 
 
@@ -378,7 +370,6 @@ def main():
     mh_str="adjusted" 
     method=method_name
     save_every = 1
-    #adapt_func= smc_pyt.ESSAdaptBetaPyt if config.ess_opt else smc_pyt.SimpAdaptBetaPyt
     num_classes=t_u.datasets_num_c[config.dataset.lower()]
     print(f"Running reliability experiments on architecture {config.model_arch} trained on {config.dataset}.")
     print(f"Testing uniform noise pertubatin with epsilon in {config.epsilons}")
@@ -470,12 +461,13 @@ def main():
                                     if len(same_exp_df)>0:
                                         print(f"Skipping {method_name} run {run_nb}/{nb_runs}, with model: {model_name}, img_idx:{l},eps:{epsilon},ratio:{ratio},T:{T},alpha:{alpha},N:{N},L:{L}")
                                         continue
+                                K=int(N*ratio)
                                 loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
                                 log_name=method_name+'_'+'_'+loc_time.replace(':','_')
-                                log_name=method_name+f'_N_{N}_T_{T}_L_{L}_a_{float_to_file_float(alpha)}_ratio_{float_to_file_float(ratio)}'+'_'+loc_time.split('_')[0]
+                                log_name=method_name+f'_N_{N}_T_{T}_K_{K}_a_{float_to_file_float(alpha)}_ratio_{float_to_file_float(ratio)}'+'_'+loc_time.split('_')[0]
                                 log_path=os.path.join(exp_log_path,log_name)
                                 if os.path.exists(log_path):
-                                    log_path = log_path + '_'+str(np.random.randint(low=0,high =10))
+                                    log_path = log_path + '_'+str(np.random.randint(low=0,high =40))
                                 
                                 
                                 os.mkdir(path=log_path)
@@ -489,7 +481,7 @@ def main():
                                 print(f"Starting {method} run {run_nb}/{nb_runs} with model:{model_name} img_idx:{l},eps={epsilon},ratio:{ratio},T:{T},alpha:{alpha},N:{N},L:{L}")
                                 for i in iterator:
                                     t=time()
-                                    p_est,res_dict,=hmls_pyt.HybridMLS(norm_gen, V=V,gradV=gradV
+                                    p_est,res_dict,=hmls.HybridMLS(gen, V=V_,gradV=gradV_
                                     ,K=K, N=N, L=config.L,
                                     tau=0 , n_max=config.n_max, T=T
                                     ,verbose= config.verbose,
@@ -518,13 +510,19 @@ def main():
                                         
 
                                     if config.track_dt:
-                                        dts=res_dict['dts']
-                                        np.savetxt(fname=os.path.join(log_path,f'dts_{i}.txt')
-                                        ,X=dts)
-                                        x_T=np.arange(len(dts))
-                                        plt.plot(x_T,dts)
-                                        plt.savefig(os.path.join(log_path,f'dts_{i}.png'))
+                                        dt_logs=os.path.join(log_path,'dt_logs')
+                                        if not os.path.exists(dt_logs):
+                                            os.mkdir(path=dt_logs)
+
+                                        dt_means = dict_out['dt_means']
+                                        dt_stds = dict_out['dt_stds']
+                                        np.savetxt(fname=os.path.join(dt_logs,f'dt_means_{i}.txt'),X=dt_means)
+                                        np.savetxt(fname=os.path.join(dt_logs,f'dt_stds_{i}.txt'),X=dt_stds)
+                                        x_T=np.arange(len(dt_means))
+                                        plt.errorbar(x_T,dt_means,yerr=dt_stds,label='dt')
+                                        plt.savefig(os.path.join(dt_logs,f'dt_{i}.png'))
                                         plt.close()
+                                        
                                     
                                     
                                     times.append(t1)
@@ -585,7 +583,7 @@ def main():
                                 "mh_opt":config.mh_opt,'only_duplicated':config.only_duplicated,
                                 "np_seed":config.np_seed,"torch_seed":config.torch_seed
                                 ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
-                                "d":config.d,"adapt_func":config.adapt_func,
+                                "d":config.d,
                                 "ess_opt":config.ess_opt, "linear":config.linear,
                                 "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
                                 "M_opt":config.M_opt,"adapt_step":config.adapt_step,

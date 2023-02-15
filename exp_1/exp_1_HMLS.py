@@ -68,7 +68,7 @@ class config:
     d = 1024
     epsilon = 1
     
-    
+    track_dt=True
     tqdm_opt=True
     save_config = True
     print_config=True
@@ -155,6 +155,7 @@ parser.add_argument('--adapt_kernel',type=str2bool,default=config.adapt_kernel)
 parser.add_argument('--repeat_exp',type=str2bool,default=config.repeat_exp)
 parser.add_argument('--FT',type=str2bool,default=config.FT)
 parser.add_argument('--GV_opt',type=str2bool,default=config.GV_opt)
+parser.add_argument('--track_dt',type=str2bool,default=config.track_dt)
 args=parser.parse_args()
 for k,v in vars(args).items():
     setattr(config, k, v)
@@ -294,7 +295,7 @@ def main():
                             only_duplicated=config.only_duplicated,
                             dt_gain=config.dt_gain,dt_min=config.dt_min,dt_max=config.dt_max,
                             GV_opt=config.GV_opt,sig_dt=config.sig_dt,
-                            alpha=config.alpha
+                            alpha=config.alpha,track_dt=config.track_dt,
                             )
 
                       
@@ -324,6 +325,20 @@ def main():
                                 ,X=accept_rates_mcmc)
                             if config.track_finish:
                                 finish_flags.append(dict_out['finish_flag'])
+                            if config.track_dt:
+                                dt_logs=os.path.join(log_path,'dt_logs')
+                                if not os.path.exists(dt_logs):
+                                    os.mkdir(path=dt_logs)
+
+                                dt_means = dict_out['dt_means']
+                                dt_stds = dict_out['dt_stds']
+                                np.savetxt(fname=os.path.join(dt_logs,f'dt_means_{i}.txt'),X=dt_means)
+                                np.savetxt(fname=os.path.join(dt_logs,f'dt_stds_{i}.txt'),X=dt_stds)
+                                x_T=np.arange(len(dt_means))
+                                plt.errorbar(x_T,dt_means,yerr=dt_stds,label='dt')
+                                plt.savefig(os.path.join(dt_logs,f'dt_{i}.png'))
+                                plt.close()
+                                
                             times.append(t)
                             ests.append(est)
                         calls.append(dict_out['Count_V'])
@@ -345,6 +360,9 @@ def main():
                         times=np.array(times)  
                         ests=np.array(ests)
                         calls=np.array(calls)
+
+
+
                         errs=np.abs(ests-p_t)
                         q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                         mean_calls=calls.mean()

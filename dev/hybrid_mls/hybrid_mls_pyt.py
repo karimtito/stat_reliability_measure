@@ -56,14 +56,13 @@ exp_rate=1.
         accept_rate =[]
         accept_rates_mcmc=[]
     if track_dt:
-        dt_s=[]
+        dt_means=[]
+        dt_stds = []
     if track_H:
         H_s=[]
-    if track_beta:
-        betas=[]
-    if track_v_means: 
+    if track_v: 
         v_means=[]
-    
+        v_stds=[]
     
     exp_dist = torch.distributions.Exponential(rate=torch.tensor([exp_rate]))
     gibbs_kernel = verlet_mcmc if not adapt_step else adapt_verlet_mcmc
@@ -163,7 +162,8 @@ exp_rate=1.
             if verbose>=2.5:
                 print(f"New mean dt:{dt.mean().item()}")
         if track_dt:
-            dt_s.append(dt.mean().item())
+            dt_means.append(dt.mean().item())
+            dt_stds.append(dt.std().item())
         
         Count_V+=nb_calls
             
@@ -226,7 +226,8 @@ exp_rate=1.
         # dic_out['accept_rates']=np.array(accept_rate)
         dic_out['accept_rates_mcmc']=np.array(accept_rates_mcmc)
     if track_dt:
-        dic_out['dts'] =dt_s
+        dic_out['dt_means']=dt_means
+        dic_out['dt_stds']=dt_stds
     dic_out['finish_flag']=finish_flag
 
 
