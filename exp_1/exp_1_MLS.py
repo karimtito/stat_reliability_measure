@@ -40,7 +40,7 @@ class config:
     decay=0.95
     gain_rate=1.0001
     allow_zero_est=True
-    
+    track_s=True
     N=40
     
 
@@ -300,6 +300,17 @@ def main():
                                 ,X=accept_rates_mcmc)
                             if config.track_finish:
                                 finish_flags.append(dict_out['finish_flag'])
+                            if config.track_dts:
+                                dts=dict_out['dts']
+                                dts_path=os.path.join(log_path,'dts')
+                                if not os.path.exists(dts_path):
+                                    os.mkdir(path=dts_path)
+                                np.savetxt(fname=os.path.join(dts_path,f'dts_{i}.txt'),X=dts)
+                                x_T=np.arange(len(dts))
+                                plt.plot(x_T,dts)
+                                plt.savefig(os.path.join(dts_path,f'dts_{i}.png'))
+                                plt.close()
+                                
                             times.append(t)
                             ests.append(est)
                             calls.append(dict_out['Count_h'])

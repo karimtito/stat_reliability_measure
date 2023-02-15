@@ -10,7 +10,7 @@ def score(v,Lambda):
     return s
     
 def HybridMLS(gen,V,gradV,tau,score=score,
-N=2000,K=1000,s=1,decay=0.95,T = 30,L=1,n_max = 300, alpha = 0.2,
+N=2000,K=1000,s=1,decay=0.95,T = 30,L=1,n_max = 300, alpha = 0.2,alpha_q=0.95,
 verbose=1,device=None,track_accept=False,
 adapt_step=True,kappa_opt=False, alpha_p:float=0.1,FT:bool=True,
 only_duplicated:bool=True,adapt_dt=False,
@@ -68,7 +68,7 @@ exp_rate=1.
     exp_dist = torch.distributions.Exponential(rate=torch.tensor([exp_rate]))
     gibbs_kernel = verlet_mcmc if not adapt_step else adapt_verlet_mcmc
     # Internals 
-    q = -stat.norm.ppf((1-alpha)/2) # gaussian quantile
+    q = -stat.norm.ppf((1-alpha_q)/2) # gaussian quantile
     d =gen(1).shape[-1] # dimension of the random vectors
     n = 1 # Number of iterations
     finish_flag=False
@@ -225,6 +225,8 @@ exp_rate=1.
     if track_accept:
         # dic_out['accept_rates']=np.array(accept_rate)
         dic_out['accept_rates_mcmc']=np.array(accept_rates_mcmc)
+    if track_dt:
+        dic_out['dts'] =dt_s
     dic_out['finish_flag']=finish_flag
 
 

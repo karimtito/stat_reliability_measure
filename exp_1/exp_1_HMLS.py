@@ -197,7 +197,6 @@ def main():
         config.cores_number=os.cpu_count()
 
 
-    epsilon=config.epsilon
     d=config.d
 
     if not os.path.exists(ROOT_DIR+'/logs'):
@@ -230,7 +229,7 @@ def main():
     #     with open(file=os.path.join(),mode='w') as f:
     #         f.write(config.json)
 
-    epsilon=config.epsilon
+    
     
     get_c_norm= lambda p:stat.norm.isf(p)
     i_run=0

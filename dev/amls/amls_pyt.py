@@ -1,6 +1,7 @@
 import scipy.stats as stat 
 import numpy as np 
 import torch
+import math
 
 
 def ImportanceSplittingPyt(gen,kernel,h,tau,N=2000,K=1000,s=1,decay=0.95,T = 30,n_max = 5000, alpha = 0.95,
@@ -165,10 +166,13 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False)
     return P_est,dic_out
 
 
+def s_to_dt(s):
+    return s/math.sqrt(1+s**2)
 
 def ImportanceSplittingPytBatch(gen,kernel,h,tau,N=2000,K=1000,s=1,decay=0.95,T = 30,n_max = 300, alpha = 0.95,
 verbose=1, track_rejection=False, rejection_ctrl = False, reject_thresh=0.9, gain_rate = 1.0001, 
-prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,allow_unfinished=False):
+prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,allow_unfinished=False,
+track_s=False):
     """
       Importance splitting estimator
       Args:
@@ -222,6 +226,9 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
     if track_accept:
         accept_rates=[]
         accept_rates_mcmc=[]
+    if track_s:
+        dt_s=[1.]
+    
     ## While
     
     while (tau_j<=tau).item():              #loose equality
@@ -261,12 +268,12 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
                 accept_rates.append(accept_flag.float().mean())
 
 
-            if rejection_ctrl and rejection_rate>=reject_thresh:
-                
-                s = s*decay if not clip_s else np.clip(s*decay,a_min=s_min,a_max=s_max)
-                if verbose>1:
-                    print('Strength of kernel diminished!')
-                    print(f's={s}')
+        if rejection_ctrl and rejection_rate>=reject_thresh:
+            
+            s = s*decay if not clip_s else np.clip(s*decay,a_min=s_min,a_max=s_max)
+            if verbose>1:
+                print('Strength of kernel diminished!')
+                print(f's={s}')
         
         if track_accept:
             accept_rate_mcmc=np.array(l_accept_rates).mean()
@@ -301,7 +308,8 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
             if verbose>1:
                 print(f'Rejection rate: {rejection_rate}')
             rejection_rates+=[rejection_rate]
-
+        if track_s:
+            dt_s.append(s_to_dt(s))
     # step E: Last round
     if (tau_j>=tau).item():
         finish_flag=True
@@ -325,6 +333,8 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
     if track_accept:
         dic_out['accept_rates']=np.array(accept_rates)
         dic_out['accept_rates_mcmc']=np.array(accept_rates_mcmc)
+    if track_s:
+        dic_out['dts']=np.array(dt_s)
     dic_out['finish_flag']=finish_flag
 
 

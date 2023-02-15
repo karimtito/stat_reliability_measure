@@ -148,7 +148,9 @@ def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_si
     return X_new
 
 
-def verlet_kernel1(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaussian=True,kappa_opt=False,scale_M=None,GV=False):
+def verlet_kernel1(X, gradV, delta_t, beta,L,
+ind_L=None,p_0=None,lambda_=0, 
+gaussian=True,kappa_opt=False,scale_M=None,GV=False):
     """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
 
     """
@@ -196,7 +198,9 @@ def verlet_kernel1(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaus
         i_k=ind_L>=k
     return q_t.detach(),p_t
 
-def verlet_kernel2(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaussian=True,kappa_opt=False,scale_M=None,GV=False):
+def verlet_kernel2(X, gradV, delta_t, beta,L,
+    ind_L=None,p_0=None,lambda_=0, gaussian=True,
+    kappa_opt=False,scale_M=None,GV=False):
     """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
 
     """
@@ -1020,7 +1024,7 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussia
 
 def adapt_verlet_mcmc(q,v_q,ind_L,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
 kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,alpha_p:float=0.1,prop_d=0.1,FT=False,dt_max=None,dt_min=None,sig_dt=0.015,
-verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
+verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False,correct_kernel=False):
     """ Simple implementation of Hamiltonian dynanimcs MCMC 
 
     Args:
@@ -1041,6 +1045,7 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     Returns:
         _type_: _description_
     """
+    verlet_mixer=verlet_kernel2 if correct_kernel else verlet_kernel1
     acc  = 0
     T_max=T
     if scale_M is None:
@@ -1068,7 +1073,7 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     i=0
     #torch.multinomial(input=)
     while (prod_correl>alpha_p).sum()>=prop_d*d and i<T_max:
-        q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
+        q_trial,p_trial=verlet_mixer(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
         
         nb_calls+=4*ind_L.sum().item()-N # for each particle each vertlet integration step requires two oracle calls (gradients)
