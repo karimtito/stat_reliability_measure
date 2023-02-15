@@ -251,12 +251,7 @@ def main():
     prblm_str=config.dataset
 
 
-    if config.GV_opt:
-        method_name="RW_SMC"
-    elif config.L==1:
-        method_name="MALA_SMC"
-    else:
-        method_name="H_SMC"
+    method_name="HLMS"
 
    
 

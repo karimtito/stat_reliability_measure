@@ -16,7 +16,7 @@ adapt_step=True,kappa_opt=False, alpha_p:float=0.1,FT:bool=True,
 only_duplicated:bool=True,adapt_dt=False,
 target_accept=0.574,accept_spread=0.1,dt_decay=0.999,dt_gain=None,
 dt_min=1e-5,dt_max=1e-2,L_min=1,
-track_v_means=False,track_dt=False,track_H=False,track_beta=True
+track_v=False,track_dt=False,track_H=False
 , GV_opt=False,dt_d=1,skip_mh=False,scale_M=torch.tensor([1.]),gaussian=True, sig_dt=0.015,
 exp_rate=1.
 ):
@@ -144,7 +144,7 @@ exp_rate=1.
         else:
             Z,VZ,nb_calls,dict_out=gibbs_kernel(q=Z,beta=beta_j,gaussian=gaussian,
                                 V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
-                                scale_M=scale_M)
+                                scale_M=scale_M,GV_opt=GV_opt,verbose=verbose)
             if track_H:
                 H_s.extend(list(dic_out['H']))
         if track_accept:

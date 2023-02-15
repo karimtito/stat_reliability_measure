@@ -37,7 +37,7 @@ class config:
     v_min_opt=True
     ess_opt=False
     only_duplicated=True
-    GV_opt=True
+    GV_opt=False
     
     
     
