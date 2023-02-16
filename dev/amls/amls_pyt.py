@@ -344,7 +344,8 @@ track_s=False):
 
 def ImportanceSplittingPytBatch2(gen,kernel,h,tau,N=2000,K=1000,s=1,decay=0.95,T = 30,n_max = 300, alpha = 0.95,
 verbose=1, track_rejection=False, rejection_ctrl = False, reject_thresh=0.9, gain_rate = 1.0001, 
-prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,allow_unfinished=False):
+prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,allow_unfinished=False
+,track_s=False,track_finish=False):
     """
       Importance splitting estimator
       Args:
@@ -398,6 +399,8 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
     if track_accept:
         accept_rates=[]
         accept_rates_mcmc=[]
+    if track_s:
+        dt_s=[]
     ## While
     
     while (tau_j<=tau).item():              #loose equality
@@ -464,7 +467,8 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
             if verbose>1:
                 print('Strength of kernel increased!')
                 print(f's={s}')
-
+        if track_s:
+            dt_s.append(s_to_dt(s))
         tau_j = S_sort[K] # set the threshold to (K+1)-th
 
         
@@ -501,8 +505,12 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
     if track_accept:
         dic_out['accept_rates']=np.array(accept_rates)
         dic_out['accept_rates_mcmc']=np.array(accept_rates_mcmc)
-    dic_out['finish_flag']=finish_flag
-
+    if track_s:
+        dic_out['dts']=np.array(dt_s)
+    if track_finish:   
+        dic_out['finish_flag']=finish_flag
+    else:
+        dic_out['finish_flag']=None
 
        
     return P_est,dic_out
