@@ -66,7 +66,7 @@ class config:
     aggr_res_path = None
 
     track_accept=False
-    track_finish=True
+    track_finish=False
     device = None
 
     torch_seed=0
@@ -267,14 +267,14 @@ def main():
                                 amls_res=batch_func(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
                             tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                             s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
-                            device=config.device,track_accept=config.track_accept)
+                            device=config.device,track_accept=config.track_accept,track_s=config.track_s,track_finish=config.track_finish)
 
                             else:
                                 func = amls_pyt.ImportanceSplittingPyt if config.adapt_kernel else amls_pyt.ImportanceSplittingPyt2
                                 amls_res = func(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
                             tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                             s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
-                            device=config.device, )
+                            device=config.device, track_s=config.track_s,track_accept=config.track_accept)
                             t=time()-t
                             
                             est=amls_res[0]
@@ -300,7 +300,7 @@ def main():
                                 ,X=accept_rates_mcmc)
                             if config.track_finish:
                                 finish_flags.append(dict_out['finish_flag'])
-                            if config.track_dts:
+                            if config.track_s:
                                 dts=dict_out['dts']
                                 dts_path=os.path.join(log_path,'dts')
                                 if not os.path.exists(dts_path):

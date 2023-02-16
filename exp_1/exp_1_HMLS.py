@@ -64,7 +64,7 @@ class config:
 
     p_t=1e-15
 
-    sig_dt=0.01
+    sig_dt=0.02
     d = 1024
     epsilon = 1
     

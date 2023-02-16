@@ -105,7 +105,7 @@ class config:
     M_opt = False
     adapt_step=True
     FT=True
-    sig_dt=0.01
+    sig_dt=0.02
     L_min=1
     skip_mh=False
     repeat_exp = True 
@@ -304,7 +304,6 @@ def main():
 
     param_ranges = [config.N_range,config.T_range,config.alpha_range,config.p_range,config.e_range]
     param_lens=np.array([len(l) for l in param_ranges])
-    print(param_lens)
     nb_runs= np.prod(param_lens)
 
     #mh_str="adjusted" 
