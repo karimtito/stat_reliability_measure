@@ -26,4 +26,4 @@ We evaluate each estimation method on 3 test cases:
 ## 3. Rare Event Threshold
 
 We study Rare Events in the case of Neural Networks misclassifications. However 'Rare' is an ambiguous term. Therefore on the toy model and and the MNIST models we study the probability level threshold such that a Crude Monte Carlo simulation become less efficient than Rare Event Simulation algorithms.
-This corresponds to the experiments scripts [`exp_1_high_low_prob.py`](./exp_1_high_to_low_prob.py) and .
+This corresponds to the experiments scripts [`exp_1_high_low_prob.py`](./exp_1_high_to_low_prob.py).
