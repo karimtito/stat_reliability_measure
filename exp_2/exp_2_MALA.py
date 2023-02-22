@@ -518,13 +518,17 @@ def main():
                                         plt.close()
                                         
 
-                                    if config.track_dt:
-                                        dts=res_dict['dts']
-                                        np.savetxt(fname=os.path.join(log_path,f'dts_{i}.txt')
-                                        ,X=dts)
-                                        x_T=np.arange(len(dts))
-                                        plt.plot(x_T,dts)
-                                        plt.savefig(os.path.join(log_path,f'dts_{i}.png'))
+                                    if (config.adapt_dt or config.adapt_step) and config.track_dt:
+                                        dt_means=res_dict['dt_means']
+                                        dt_stds=res_dict['dt_stds']
+                                        dts_path=os.path.join(log_path,'dts')
+                                        if not os.path.exists(dts_path):
+                                            os.mkdir(path=dts_path)
+                                        np.savetxt(fname=os.path.join(dts_path,f'dt_means_{i}.txt'),X=dt_means)
+                                        np.savetxt(fname=os.path.join(dts_path,f'dt_stds_{i}.txt'),X=dt_stds)
+                                        x_T=np.arange(len(dt_means))
+                                        plt.errorbar(x_T,dt_means,yerr=dt_stds,label='dt')
+                                        plt.savefig(os.path.join(dts_path,f'dt_{i}.png'))
                                         plt.close()
                                     
                                     
@@ -543,9 +547,8 @@ def main():
                                 print(f"mean est:{ests.mean()}, std est:{ests.std()}")
                                 print(f"mean calls:{calls.mean()}")
                                 print(f"std. rel.:{std_rel}")
-                                print(f"std. rel. adj.:{std_rel*mean_calls}")
+                                print(f"std. rel. adj.:{std_rel_adj}")
                                 q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
-
                                 times=np.array(times)  
                                 ests=np.array(ests)
                                 log_ests=np.log(np.clip(ests,a_min=1e-250,a_max=1))
