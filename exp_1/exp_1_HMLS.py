@@ -100,9 +100,7 @@ parser=argparse.ArgumentParser()
 parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--min_rate',type=float,default=config.min_rate)
-parser.add_argument('--clip_s',type=str2bool,default=config.clip_s)
-parser.add_argument('--s_min',type=float,default=config.s_min)
-parser.add_argument('--s_max',type=float,default=config.s_max)
+
 parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_est)
 
@@ -254,13 +252,13 @@ def main():
                         if (not config.repeat_exp) and config.update_aggr_res and os.path.exists(aggr_res_path):
                             aggr_res_df = pd.read_csv(aggr_res_path)
                             same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method_name,'='),
-                            ('p_t',p_t,'='),('n_rep',config.n_rep,'='),('s',s,'='),
+                            ('p_t',p_t,'='),('n_rep',config.n_rep,'='),('alpha',config.alpha,'='),
                             ('N',N,'='),
                             ('T',T,'='),('ratio',ratio,'='),('last_particle',config.last_particle,'==')] )  
                             # if a similar experiment has been done in the current log directory we skip it
                             if len(same_exp_df)>0:
                                 K=int(N*ratio) if not config.last_particle else N-1
-                                print(f"Skipping HMLS run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T}")
+                                print(f"Skipping HMLS run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},ratio={ratio},alpha={config.alpha},n_rep={config.n_rep}")
                                 continue
                         loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
                         
@@ -273,7 +271,7 @@ def main():
                         
                         
                         K = int(N*(ratio)) #if not config.last_particle else int(N-1)
-                        print(f"Starting Hybrid-MLS run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},L={config.L},ratio={ratio}")
+                        print(f"Starting Hybrid-MLS run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},ratio={ratio}")
                         times= []
                         rel_error= []
                         ests = [] 
@@ -293,7 +291,7 @@ def main():
                             dt_gain=config.dt_gain,dt_min=config.dt_min,dt_max=config.dt_max,
                             GV_opt=config.GV_opt,sig_dt=config.sig_dt,
                             alpha=config.alpha,track_dt=config.track_dt,
-                            min_rate=config.min_rate,
+                            
                             )
 
                       
@@ -390,10 +388,10 @@ def main():
 
                         #with open(os.path.join(log_path,'results.txt'),'w'):
                         results={'p_t':p_t,'method':method_name,
-                        'N':N,'L':config.L,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,'lg_est_path':lg_est_path
+                        'N':N,'L':config.L,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'lg_est_path':lg_est_path
                         ,'min_rate':config.min_rate,'mean_est':ests.mean(),'std_log_est':log_ests.std(),'mean_log_est':mean_log_est,
                         'lg_q_1':lg_q_1,'lg_q_3':lg_q_3,"lg_med_est":lg_med_est
-                        ,'mean_time':times.mean()
+                        ,'mean_time':times.mean(),'alpha':config.alpha
                         ,'std_time':times.std(),'MSE':MSE,'MSE_rel_adj':MSE_rel_adj,'MSE_rel':MSE_rel,
                         'mean_calls':mean_calls,'last_particle':config.last_particle,
                         'std_calls':std_calls
