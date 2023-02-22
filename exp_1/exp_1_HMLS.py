@@ -24,7 +24,7 @@ class config:
     n_rep=200
     T_range=[10,20,50]
     N_range=[32,64,128,256,512,1024]
-    ratio_range=[0.1]
+    ratio_range=[0.1,0.85,0.95]
     p_range=[1e-6,1e-12]
     adapt_dt=False
     adapt_dt_mcmc=False
@@ -42,10 +42,8 @@ class config:
     
     
     verbose=0
-    min_rate=0.3
-    clip_s=True
-    s_min=8e-3
-    s_max=3
+    min_rate=0.2
+    
     n_max=2000
     decay=0.95
     gain_rate=1.0001
@@ -94,8 +92,7 @@ class config:
     correct_T=False
     last_particle=False
     adapt_kernel = False
-    repeat_exp = True
-    adapt_dt=False
+    repeat_exp = False
     FT=True
 
 parser=argparse.ArgumentParser()
@@ -296,6 +293,7 @@ def main():
                             dt_gain=config.dt_gain,dt_min=config.dt_min,dt_max=config.dt_max,
                             GV_opt=config.GV_opt,sig_dt=config.sig_dt,
                             alpha=config.alpha,track_dt=config.track_dt,
+                            min_rate=config.min_rate,
                             )
 
                       
@@ -405,7 +403,8 @@ def main():
                         'batch_opt':config.batch_opt,"d":d, "correct_T":config.correct_T,
                         "np_seed":config.np_seed,"torch_seed":config.torch_seed,
                             'q_1':q_1,'q_3':q_3,'med_est':med_est,
-                            "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,'sig_dt':config.sig_dt
+                            "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,'sig_dt':config.sig_dt,
+                        "GV_opt":config.GV_opt
                             }
                         exp_res.append(results)
                         results_df=pd.DataFrame([results])
