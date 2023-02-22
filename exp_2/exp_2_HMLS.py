@@ -92,7 +92,6 @@ class config:
     dt_min=1e-5
     dt_max=0.7
     v_min_opt=True
-    ess_opt=False
     only_duplicated=True
     np_seed=None
     lambda_0=0.5
@@ -170,7 +169,7 @@ parser.add_argument('--torch_seed',type=int, default=config.torch_seed)
 parser.add_argument('--np_seed',type=int, default=config.np_seed)
 parser.add_argument('--sigma', type=float,default=config.sigma)
 
-parser.add_argument('--ess_alpha',type=float,default=config.ess_alpha)
+
 
 parser.add_argument('--N_range',type=str2intList,default=config.N_range)
 parser.add_argument('--T',type=int,default=config.T)
@@ -178,6 +177,7 @@ parser.add_argument('--T_range',type=str2intList,default=config.T_range)
 parser.add_argument('--L',type=int,default=config.L)
 parser.add_argument('--L_range',type=str2intList,default=config.L_range)
 parser.add_argument('--alpha_range',type=str2floatList,default=config.alpha_range)
+parser.add_argument('--ratio_range',type=str2floatList,default=config.ratio_range)
 parser.add_argument('--v1_kernel',type=str2bool,default=config.v1_kernel)
 parser.add_argument('--track_accept',type=str2bool,default=config.track_accept)
 parser.add_argument('--track_calls',type=str2bool,default=config.track_calls)
@@ -196,7 +196,7 @@ parser.add_argument('--dt_max',type=float,default=config.dt_max)
 parser.add_argument('--adapt_dt_mcmc',type=str2bool,default=config.adapt_dt_mcmc)
 parser.add_argument('--update_aggr_res',type=str2bool,default=config.update_aggr_res)
 parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
-parser.add_argument('--ess_opt',type=str2bool,default=config.ess_opt)
+
 parser.add_argument('--lambda_0',type=float,default=config.lambda_0)
 parser.add_argument('--test2',type=str2bool,default =config.test2)
 parser.add_argument('--print_config',type=str2bool,default=config.print_config)
@@ -504,25 +504,24 @@ def main():
                                         plt.close()
                                         
 
-                                    if config.track_dt:
-                                        dt_logs=os.path.join(log_path,'dt_logs')
-                                        if not os.path.exists(dt_logs):
-                                            os.mkdir(path=dt_logs)
-
-                                        dt_means = dict_out['dt_means']
-                                        dt_stds = dict_out['dt_stds']
-                                        np.savetxt(fname=os.path.join(dt_logs,f'dt_means_{i}.txt'),X=dt_means)
-                                        np.savetxt(fname=os.path.join(dt_logs,f'dt_stds_{i}.txt'),X=dt_stds)
+                                    if (config.adapt_dt or config.adapt_step) and config.track_dt:
+                                        dt_means=res_dict['dt_means']
+                                        dt_stds=res_dict['dt_stds']
+                                        dts_path=os.path.join(log_path,'dts')
+                                        if not os.path.exists(dts_path):
+                                            os.mkdir(path=dts_path)
+                                        np.savetxt(fname=os.path.join(dts_path,f'dt_means_{i}.txt'),X=dt_means)
+                                        np.savetxt(fname=os.path.join(dts_path,f'dt_stds_{i}.txt'),X=dt_stds)
                                         x_T=np.arange(len(dt_means))
                                         plt.errorbar(x_T,dt_means,yerr=dt_stds,label='dt')
-                                        plt.savefig(os.path.join(dt_logs,f'dt_{i}.png'))
+                                        plt.savefig(os.path.join(dts_path,f'dt_{i}.png'))
                                         plt.close()
                                         
                                     
                                     
                                     times.append(t1)
                                     ests.append(p_est)
-                                    calls.append(res_dict['calls'])
+                                    calls.append(res_dict['Count_V'])
                                 times=np.array(times)
                                 ests = np.array(ests)
                                 calls=np.array(calls)
@@ -579,7 +578,7 @@ def main():
                                 "np_seed":config.np_seed,"torch_seed":config.torch_seed
                                 ,'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,'cores_number':config.cores_number,
                                 "d":config.d,
-                                "ess_opt":config.ess_opt, "linear":config.linear,
+                                 "linear":config.linear,
                                 "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
                                 "M_opt":config.M_opt,"adapt_step":config.adapt_step,
                                 "noise_dist":config.noise_dist,"lirpa_safe":lirpa_safe,"L_min":config.L_min,
