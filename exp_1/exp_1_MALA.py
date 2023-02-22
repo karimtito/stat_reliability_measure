@@ -29,19 +29,12 @@ class config:
     T_range=[10,20,50]
     only_duplicated=True
     v_min_opt=True
-    
-    
-    
-    
     L_range=[]
     min_rate=0.15
-    
     alpha=0.2
     alpha_range=[]
     ess_alpha=0.8
-    
     p_t=1e-6
-    
     N=100
     T=1
     save_config=False 
@@ -81,7 +74,6 @@ class config:
     np_seed=None
     lambda_0=0.5
     test2=False
-
     s_opt=False
     s=1
     clip_s=True
@@ -413,13 +405,17 @@ def main():
                                 plt.close()
                                 
 
-                            if config.adapt_dt and config.track_dt:
-                                dts=res_dict['dts']
-                                np.savetxt(fname=os.path.join(log_path,f'dts_{i}.txt')
-                                ,X=dts)
-                                x_T=np.arange(len(dts))
-                                plt.plot(x_T,dts)
-                                plt.savefig(os.path.join(log_path,f'dts_{i}.png'))
+                            if (config.adapt_dt or config.adapt_step) and config.track_dt:
+                                dt_means=res_dict['dt_means']
+                                dt_stds=res_dict['dt_stds']
+                                dts_path=os.path.join(log_path,'dts')
+                                if not os.path.exists(dts_path):
+                                    os.mkdir(path=dts_path)
+                                np.savetxt(fname=os.path.join(dts_path,f'dt_means_{i}.txt'),X=dt_means)
+                                np.savetxt(fname=os.path.join(dts_path,f'dt_stds_{i}.txt'),X=dt_stds)
+                                x_T=np.arange(len(dt_means))
+                                plt.errorbar(x_T,dt_means,yerr=dt_stds,label='dt')
+                                plt.savefig(os.path.join(dts_path,f'dt_{i}.png'))
                                 plt.close()
                             
                             
