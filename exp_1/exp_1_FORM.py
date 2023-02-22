@@ -92,6 +92,15 @@ args=parser.parse_args()
 for k,v in vars(args).items():
     setattr(config, k, v)
 
+#gradient descent in 1 dimension to find zero of a function f
+def find_zero_gd(f, grad_f, x0, step_size=1e-2, max_iter=1000, tol=1e-6):
+    x = x0
+    for i in range(max_iter):
+        x = x - step_size * grad_f(x)
+        if abs(f(x)) < tol:
+            break
+    return x
+
 def main():
     #nb_runs=config.n_rep
     nb_runs=1
@@ -195,7 +204,7 @@ def main():
                     finish_flags=[]
                 for _ in tqdm(range(config.n_rep)):
                     t=time()
-                    est = form_pyt.FORM_pyt()
+                    est = form_pyt.FORM_pyt(   dp_search_method=)
                     t=time()-t
                     
                 
