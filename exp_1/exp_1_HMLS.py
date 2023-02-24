@@ -273,7 +273,6 @@ def main():
                         K = int(N*(ratio)) #if not config.last_particle else int(N-1)
                         print(f"Starting Hybrid-MLS run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},ratio={ratio}")
                         times= []
-                        rel_error= []
                         ests = [] 
                         calls=[]
                         if config.track_finish:
