@@ -70,7 +70,7 @@ class config:
     tqdm_opt=True
     save_config = True
     print_config=True
-    update_aggr_res=False
+    update_aggr_res=True
     aggr_res_path = None
 
     track_accept=False
