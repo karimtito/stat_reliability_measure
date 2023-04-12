@@ -1,7 +1,5 @@
 import torch
-
 import torch.nn as nn
-
 from stat_reliability_measure.dev.utils import float_to_file_float
 from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,ConvNet,DenseNet3
 from torchvision import transforms,datasets,models as tv_models
