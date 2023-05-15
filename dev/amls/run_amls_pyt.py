@@ -3,224 +3,33 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-import argparse
 import os
 import json
 from stat_reliability_measure.home import ROOT_DIR
 from time import time
 from datetime import datetime
 import stat_reliability_measure.dev.torch_utils as t_u
+import stat_reliability_measure.dev.utils as utils
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
-#setting PRNG seeds for reproducibility
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, str2list
 from stat_reliability_measure.dev.utils import get_sel_df, print_config
 import stat_reliability_measure.dev.mls.amls_uniform as amls_mls
-
+from stat_reliability_measure.dev.amls.amls_utils import base_config,update_config
+import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
 str2intList=lambda x: str2list(in_str=x, type_out=int)
 low_str=lambda x: str(x).lower()
 
-method_name="MLS_SMC"
-class config:
-    dataset="mnist"
-    log_dir=ROOT_DIR+"/logs/mnist_tests"
-    model_dir=ROOT_DIR+"/models/mnist"
-    model_arch='dnn_2'
-    epsilons = [0.15]
-    N_range=[32,64,128,256,512,1024]
-    N_range_alt=[] 
-    T_range=[1,10,20,50,100,200,500,1000]
-    ratio_range=[0.1]
-    n_rep=100
-    a=0
-    verbose=0
-    min_rate=0.51
-    clip_s=True
-    s_min=8e-3
-    s_max=3
-    n_max=2000
-    x_min=None
-    x_max=None
-    x_mean=0
-    x_std=1
-    allow_zero_est=True
-    N=40
-    T=1
-    ratio=0.6
-    s=1
-    s_range = []
-    track_accept=False
-    d = 784
-    epsilon = 0.1
-    n_max=2000
-    tqdm_opt=True
-    eps_max=0.3
-    eps_min=0.1 
-    eps_num=5
-    allow_zero_est=True
-    save_config=True
-    print_config=True
-    update_aggr_res=True
-    aggr_res_path=None
-    gaussian_latent=True
-    project_kernel=True
-    allow_multi_gpu=True
-    input_start=0
-    input_stop=None
-    g_target=None
-    track_gpu=False
-    track_cpu=False
-    gpu_name=None
-    cpu_name=None
-    cores_number=None
-    device=None
-    torch_seed=0
-    np_seed=0
-    tf_seed=None
-    model_path=None
-    export_to_onnx=False
-    use_attack=False
-    attack='PGD'
-    lirpa_bounds=False
-    download=True
-    train_model=False
-    noise_dist='uniform'
-    batch_opt=True
-    track_finish=False
-    lirpa_cert=False
-    robust_model=False
-    robust_eps=0.1
-    load_batch_size=100 
-    nb_epochs= 10
-    adversarial_every=1
-    data_dir=ROOT_DIR+"/data"
-    p_ref_compute=False
-    force_train=False
-    last_particle=False
-    repeat_exp=True
 
-
-parser=argparse.ArgumentParser()
-parser.add_argument('--log_dir',default=config.log_dir)
-parser.add_argument('--n_rep',type=int,default=config.n_rep)
-parser.add_argument('--N',type=int,default=config.N)
-parser.add_argument('--verbose',type=float,default=config.verbose)
-parser.add_argument('--d',type=int,default=config.d)
-parser.add_argument('--min_rate',type=float,default=config.min_rate)
-parser.add_argument('--clip_s',type=str2bool,default=config.clip_s)
-parser.add_argument('--s_min',type=float,default=config.s_min)
-parser.add_argument('--s_max',type=float,default=config.s_max)
-parser.add_argument('--n_max',type=int,default=config.n_max)
-parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
-parser.add_argument('--T',type=int,default=config.T)
-parser.add_argument('--save_config',type=str2bool, default=config.save_config)
-parser.add_argument('--update_aggr_res',type=str2bool,default=config.update_aggr_res)
-parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
-parser.add_argument('--gaussian_latent',type=str2bool, default=config.gaussian_latent)
-parser.add_argument('--allow_multi_gpu',type=str2bool)
-parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
-parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
-parser.add_argument('--device',type=str, default=config.device)
-parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_est)
-parser.add_argument('--torch_seed',type=int, default=config.torch_seed)
-parser.add_argument('--np_seed',type=int, default=config.np_seed)
-parser.add_argument('--export_to_onnx',type=str2bool, default=config.export_to_onnx)
-parser.add_argument('--use_attack',type=str2bool,default=config.use_attack)
-parser.add_argument('--attack',type=str,default=config.attack)
-parser.add_argument('--epsilons',type=str2floatList,default=config.epsilons)
-parser.add_argument('--input_start',type=int,default=config.input_start)
-parser.add_argument('--input_stop',type=int,default=config.input_stop)
-parser.add_argument('--lirpa_bounds',type=str2bool, default=config.lirpa_bounds)
-parser.add_argument('--eps_min',type=float, default=config.eps_min)
-parser.add_argument('--eps_max',type=float, default=config.eps_max)
-parser.add_argument('--eps_num',type=int,default=config.eps_num)
-parser.add_argument('--train_model',type=str2bool,default=config.train_model)
-parser.add_argument('--noise_dist',type=str, default=config.noise_dist)
-parser.add_argument('--data_dir',type=str, default=config.data_dir)
-parser.add_argument('--a',type=float, default=config.a)
-parser.add_argument('--N_range',type=str2intList,default=config.N_range)
-parser.add_argument('--N_range_alt',type=str2intList,default=config.N_range_alt)
-parser.add_argument('--T_range',type=str2intList,default=config.T_range)
-parser.add_argument('--download',type=str2bool, default=config.download)
-parser.add_argument('--model_path',type=str,default=config.model_path)
-parser.add_argument('--ratio',type=float,default=config.ratio)
-parser.add_argument('--ratio_range',type=str2floatList,default=config.ratio_range)
-parser.add_argument('--s',type=float,default=config.s)
-parser.add_argument('--s_range ',type=str2floatList,default=config.s_range )
-parser.add_argument('--track_finish',type=str2bool,default=config.track_finish)
-parser.add_argument('--lirpa_cert',type=str2bool,default=config.lirpa_cert)
-parser.add_argument('--load_batch_size',type=int,default=config.load_batch_size)
-parser.add_argument('--model_arch',type=str,default = config.model_arch)
-parser.add_argument('--dataset',type=str,default = config.dataset)
-parser.add_argument('--robust_model',type=str2bool, default=config.robust_model)
-parser.add_argument('--nb_epochs',type=int,default=config.nb_epochs)
-parser.add_argument('--adversarial_every',type=int,default=config.adversarial_every)
-parser.add_argument('--force_train',type=str2bool,default=config.force_train)
-parser.add_argument('--repeat_exp',type=str2bool,default=config.repeat_exp)
-args=parser.parse_args()
-
-for k,v in vars(args).items():
-    setattr(config, k, v)
-
-def main():
-
-    if config.dataset!='mnist':
-        config.log_dir=config.log_dir.replace('mnist',config.dataset)
-        config.model_dir=config.model_dir.replace('mnist',config.dataset)
-
-    if config.model_arch is None:
-        config.model_arch = t_u.datasets_default_arch[config.dataset]
-
-    if len(config.epsilons)==0:
-        log_eps=np.linspace(start=np.log(config.eps_min),stop=np.log(config.eps_max),num=config.eps_num)
-        config.epsilons=np.exp(log_eps)
-
-    if config.input_stop is None:
-        config.input_stop=config.input_start+1
-
-    if config.noise_dist is not None:
-        config.noise_dist=config.noise_dist.lower()
-
-    if config.noise_dist not in ['uniform','gaussian']:
-        raise NotImplementedError("Only uniform and Gaussian distributions are implemented.")
-
-    if not config.allow_multi_gpu:
-        os.environ["CUDA_VISIBLE_DEVICES"]="0"
-
-    if config.np_seed is None:
-        config.np_seed=int(time.time())
-    np.random.seed(seed=config.np_seed)
-
-    if config.torch_seed is None:
-        config.torch_seed=int(time.time())
-    torch.manual_seed(seed=config.torch_seed)
-
-    if len(config.T_range)<1:
-        config.T_range=[config.T]
-    if len(config.N_range)<1:
-        config.N_range=[config.N]
-
-    if len(config.N_range_alt)<1:
-        config.N_range_alt=config.N_range
-    if len(config.s_range)<1:
-        config.s_range=[config.s]
-    if len(config.ratio_range)<1:
-        config.ratio_range=[config.ratio]
-
-
-    if config.track_gpu:
-        import GPUtil
-        gpus=GPUtil.getGPUs()
-        if len(gpus)>1:
-            print("Multi gpus detected, only the first GPU will be tracked.")
-        config.gpu_name=gpus[0].name
-
-    if config.track_cpu:
-        import cpuinfo
-        config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
-        config.cores_number=os.cpu_count()
-
-
+def run_amls_exp(model, X, y, epsilons=None, dataset_name = None,model_name=None, x_min=0,x_max=None, mask_opt=False,mask_vale=0,
+                 log_hist_=False, agrr_res_path=None, 
+                 log_txt_=False,dict_arg=None,config=None):
+    if config is None:
+        config = base_config
+    if dict_arg is not None:
+        for k,v in dict_arg.items():
+            setattr(config, k, v)
+    config=update_config(config)
     if config.device is None:
         config.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         if config.verbose>=5:
@@ -229,72 +38,40 @@ def main():
     else:
         device=config.device
 
-    d=config.d
-    #epsilon=config.epsilon
-
-
+    if not config.allow_multi_gpu:
+        os.environ["CUDA_VISIBLE_DEVICES"]="0"
+    torch.manual_seed(seed=config.torch_seed)
+    np.random.seed(seed=config.np_seed)
+    if config.aggr_res_path is None:
+        aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
+    else:
+        aggr_res_path=config.aggr_res_path
     if not os.path.exists(ROOT_DIR+'/logs'):
         print('logs not found')
         os.mkdir(ROOT_DIR+'/logs')
     if not os.path.exists(config.log_dir):
         os.mkdir(config.log_dir)
-
-    raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+method_name)
+    raw_logs_path=os.path.join(config.log_dir,'raw_logs/'+config.method_name)
     if not os.path.exists(raw_logs_path):
         os.mkdir(raw_logs_path)
     loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
-    log_name=method_name+'_'+'_'+loc_time
+    log_name=config.method_name+'_'+'_'+loc_time
     exp_log_path=os.path.join(raw_logs_path,log_name)
     if os.path.exists(path=exp_log_path):
         exp_log_path = exp_log_path+'_'+str(np.random.randint(low=0,high=9))
     os.mkdir(path=exp_log_path)
 
-    if config.epsilons is None:
-        log_min,log_max=np.log(config.eps_min),np.log(config.eps_max)
-        log_line=np.linspace(start=log_min,stop=log_max,num=config.eps_num)
-        config.epsilons=np.exp(log_line)
+    d = np.prod(X.shape[1:])
+    config.d = int(d)
 
-    if config.aggr_res_path is None:
-        aggr_res_path=os.path.join(config.log_dir,'agg_res.csv')
-    else:
-        aggr_res_path=config.aggr_res_path
-
-
-
-    
-
-    #loading data
-
-
-    num_classes=10
-    test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
-                    ,dataset=config.dataset,batch_size=config.load_batch_size,
-                x_mean=None,x_std=None)
-
-    model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
-        nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
-        download=config.download,dataset=config.dataset,force_train=config.force_train)
-    X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
-    if config.verbose>=2:
-        print(f"model accuracy on test batch:{accuracy}")
-
-    config.x_mean=t_u.datasets_means[config.dataset]
-    config.x_std=t_u.datasets_stds[config.dataset]
-    config_dict=print_config(config)
+    config_dict = print_config(config)
     path_config=os.path.join(exp_log_path,'config.json')
     with open(path_config,'w') as f:
-        f.write(json.dumps(config_dict, indent = 4))
-
-
-
-
-
-
-
-    #inf=float('inf')
-
-    x_min=0
-    x_max=1
+        f.write(json.dumps(config_dict, indent = 4,cls=utils.NpEncoder))
+    
+    X_correct,label_correct,accuracy,num_classes = t_u.get_x_y_accuracy_num_cl(X,y,model)
+    if config.verbose>=2:
+        print(f"model accuracy on test batch:{accuracy}")
     if config.use_attack:
 
         import foolbox as fb
@@ -304,14 +81,19 @@ def main():
     
         _, advs, success = attack(fmodel, X_correct[config.input_start:config.input_stop], 
         label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
-
-
     inp_indices=np.arange(start=config.input_start,stop=config.input_stop)
     i_exp=0
     param_ranges= [ inp_indices,config.T_range,config.N_range,config.s_range ,config.ratio_range,config.epsilons]
+    config.params=param_ranges
+    print(param_ranges)
     lenghts=np.array([len(L) for L in param_ranges])
     nb_exps= np.prod(lenghts)
-
+    method_name="MLS_SMC"
+    if model_name is None:
+        model_name=str(type(model))
+    if dataset_name is None:
+        dataset_name="dataset"
+    reuslts_df=pd.DataFrame({})
     for l in inp_indices:
         with torch.no_grad():
             x_0,y_0 = X_correct[l], label_correct[l]
@@ -352,8 +134,9 @@ def main():
                     ('N',N,'='),('T',T,'='),('s',s,'='),('last_particle',config.last_particle,'=='),
                     ('ratio',ratio,'=')] )  
                                 # if a similar experiment has been done in the current log directory we skip it
-                                if len(same_exp_df)>0:
-                                    print(f"Skipping {method_name} run {i_exp}/{nb_exps}, with model: {model_name}, img_idx:{l},eps:{epsilon},T:{T},N:{N},s:{s},K:{K}")
+                                if len(same_exp_df)>0 and config.verbose>0:
+                                    print(f"Skipping {method_name} run {i_exp}/{nb_exps}")
+                                    print(f"with model: {model_name}, img_idx:{l},eps:{epsilon},T:{T},N:{N},s:{s},K:{K}")
                                     continue
                             loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
                             log_name=method_name+'_e_'+float_to_file_float(config.epsilons[idx])+'_N_'+str(N)+'_T_'+str(T)+'_s_'+float_to_file_float(s)
@@ -364,7 +147,7 @@ def main():
                                             
                             
                             K=int(N*ratio) if not config.last_particle else N-1
-                            if config.verbose>=0:
+                            if config.verbose>0:
                                 print(f"with model: {model_name}, img_idx:{l},eps:{epsilon},T:{T},N:{N},s:{s},K:{K}")
                             if config.verbose>3:
                                 print(f"K/N:{K/N}")
@@ -380,6 +163,13 @@ def main():
                                 lg_p,nb_calls,max_val,x,levels=amls_mls.multilevel_uniform(prop=prop,
                                 count_particles=N,count_mh_steps=T,x_min=x_min,x_max=x_max,
                                 x_sample=x_0,sigma=epsilon,rho=ratio,CUDA=True,debug=(config.verbose>=1))
+
+                                amls_pyt.ImportanceSplittingPytBatch if config.adapt_kernel else amls_pyt.ImportanceSplittingPytBatch2
+                                amls_res=batch_func(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
+                            tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
+                            s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
+                            device=config.device,track_accept=config.track_accept,track_s=config.track_s,
+                            track_finish=config.track_finish)
                                 t=time()-t
                                 # we don't need adversarial examples and highest score
                                 del x
@@ -471,9 +261,7 @@ def main():
                             'image_idx':l,'dataset':config.dataset,
                                 'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
                             'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std_adj":ests.std()*mean_calls,
-                            'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),'est_path':est_path,'times_path':times_path,
-                            'std_est':ests.std(),'gpu_name':config.gpu_name,'cpu_name':config.cpu_name,
-                            'cores_number':config.cores_number,'g_target':config.g_target,"std_rel":std_rel, "std_rel_adj":std_rel_adj,
+                           'cores_number':config.cores_number,'g_target':config.g_target,"std_rel":std_rel, "std_rel_adj":std_rel_adj,
                             'freq_finished':freq_finished,'freq_zero_est':freq_zero_est,'unfinished_mean_time':unfinished_mean_time,
                             'unfinished_mean_est':unfinished_mean_est,"lg_est_path":lg_est_path,
                                 "mean_log_est":mean_log_est,"std_log_est":std_log_est,
@@ -501,6 +289,4 @@ def main():
                                     agg_res_df=pd.read_csv(aggr_res_path)
                                 agg_res_df = pd.concat([agg_res_df,results_df],ignore_index=True)
                                 agg_res_df.to_csv(aggr_res_path,index=False)
-
-if __name__=='__main__':
-    main()
+    return config,results_df,agg_res_df

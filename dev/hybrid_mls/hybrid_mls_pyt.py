@@ -108,7 +108,7 @@ exp_rate=1.
         SY = SX[ind_[0:K]] # Keep their scores in SY
         
         VY = VX[ind_[0:K]]
-        ind_L_Y = ind_L[ind_[0:K]]
+        ind_L_Y = ind_L[(ind_[0:K]).to(ind_L.device)]
         dt_Y = dt[ind_[0:K]]
         Lambda_Y = Lambda[ind_[0:K]]
         # step D: refresh samples

@@ -206,7 +206,7 @@ def main():
     #     with open(file=os.path.join(),mode='w') as f:
     #         f.write(config.json)
 
-    epsilon=config.epsilon
+    
     
     get_c_norm= lambda p:stat.norm.isf(p)
     i_run=0

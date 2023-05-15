@@ -377,7 +377,7 @@ datasets_dims={'mnist':784,'cifar10':3*1024,'cifar100':3*1024,'imagenet':3*224**
 datasets_num_c={'mnist':10,'cifar10':10,'imagenet':1000}
 datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465),'cifar100':[125.3/255.0, 123.0/255.0, 113.9/255.0]}
 datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010),'cifar100':[63.0/255.0, 62.1/255.0, 66.7/255.0]}
-datasets_supp_archs={'mnist':{'dnn2':dnn2,'dnn4':dnn4,'cnn_custom':CNN_custom},
+datasets_supp_archs={'mnist':{'dnn2':dnn2,'dnn_2':dnn2,'dnn_4':dnn4,'dnn4':dnn4,'cnn_custom':CNN_custom},
                     'cifar10':{'lenet':LeNet,'convnet':ConvNet,'dnn2':dnn2},
                     'cifar100':{'densenet':DenseNet3}}
 datasets_default_arch={'mnist':'dnn2', 'cifar10':'convnet', 'cifar100':'densenet'}
@@ -457,6 +457,14 @@ def get_correct_x_y(data_loader,device,model):
         correct_idx=y_pred==y
     return X[correct_idx],y[correct_idx],correct_idx.float().mean()
 
+def get_x_y_accuracy_num_cl(X,y,model):
+    with torch.no_grad():
+        logits=model(X)
+        num_classes=logits.shape[-1]
+        y_pred= torch.argmax(logits,-1)
+        correct_idx=y_pred==y
+    return X[correct_idx],y[correct_idx],correct_idx.float().mean(),num_classes
+
 supported_arch={'cnn_custom':CNN_custom,'dnn2':dnn2,'dnn4':dnn4,}
 def get_model_imagenet(model_arch,model_dir):
     torch.hub.set_dir(model_dir)
@@ -474,9 +482,10 @@ def get_model_imagenet(model_arch,model_dir):
     model = torch.nn.Sequential(normalizer, model).cuda(0).eval()
     return model,mean,std
 
-def get_model(model_arch, robust_model, robust_eps,nb_epochs,model_dir,data_dir,test_loader, device ,
-download,force_train=False,dataset='mnist',batch_size=100,lr=1E-1):
-    
+def get_model(model_arch, test_loader, device=None , robust_model=False, robust_eps=0.1,nb_epochs=10,model_dir='./',data_dir='./',
+download=True,force_train=False,dataset='mnist',batch_size=100,lr=1E-1):
+    if device is None:
+        device=device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
     input_shape=datasets_in_shape[dataset]
     print(f"input_shape:{input_shape}")
     if robust_model:
@@ -1100,7 +1109,7 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False,correct_kernel=False):
             delta_t = torch.clamp(delta_t[sel_ind]+sig_dt*torch.randn_like(delta_t),min=dt_min,max=dt_max,)
             noise_L=torch.rand(size=(N,),device=ind_L.device)
             
-            ind_L= torch.clamp(ind_L[sel_ind]+((noise_L>=(2/3)).float()-(noise_L<=1/3).float())*ones_L,min=L_min,max=L+1e-3)
+            ind_L= torch.clamp(ind_L[sel_ind.to(ind_L.device)]+((noise_L>=(2/3)).float()-(noise_L<=1/3).float())*ones_L,min=L_min,max=L+1e-3)
             
         if skip_mh:
             q=q_trial
