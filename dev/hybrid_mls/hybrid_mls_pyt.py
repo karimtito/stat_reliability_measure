@@ -9,7 +9,7 @@ def score(v,Lambda):
     s = -v/Lambda.reshape(v.shape)
     return s
     
-def HybridMLS(gen,V,gradV,tau,score=score,
+def HybridMLS(gen,V,gradV,tau,score=score,gibbs_kernel=None,
 N=2000,K=1000,s=1,decay=0.95,T = 30,L=1,n_max = 300, alpha = 0.2,alpha_q=0.95,
 verbose=1,device=None,track_accept=False,
 adapt_step=True,kappa_opt=False, alpha_p:float=0.1,FT:bool=True,
@@ -65,7 +65,7 @@ exp_rate=1.
         v_stds=[]
     
     exp_dist = torch.distributions.Exponential(rate=torch.tensor([exp_rate]))
-    gibbs_kernel = verlet_mcmc if not adapt_step else adapt_verlet_mcmc
+    
     # Internals 
     q = -stat.norm.ppf((1-alpha_q)/2) # gaussian quantile
     d =gen(1).shape[-1] # dimension of the random vectors
@@ -108,7 +108,7 @@ exp_rate=1.
         SY = SX[ind_[0:K]] # Keep their scores in SY
         
         VY = VX[ind_[0:K]]
-        ind_L_Y = ind_L[ind_[0:K]]
+        ind_L_Y = ind_L[(ind_[0:K]).to(ind_L.device)]
         dt_Y = dt[ind_[0:K]]
         Lambda_Y = Lambda[ind_[0:K]]
         # step D: refresh samples
@@ -124,7 +124,8 @@ exp_rate=1.
             Z=Z.unsqueeze(0)
         SZ=SY[ind]
         VZ=VY[ind]
-        
+        if gibbs_kernel is None:
+            gibbs_kernel = verlet_mcmc if not adapt_step else adapt_verlet_mcmc
         if adapt_step:
                 Z,VZ,nb_calls,dict_out=gibbs_kernel(q=Z,v_q=VZ,ind_L=ind_L_Z,beta=beta_j,gaussian=gaussian,
                     V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_Z,device=device,

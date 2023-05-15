@@ -3,8 +3,6 @@ from time import time
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
-import GPUtil
-import cpuinfo
 import scipy.stats as stat
 import argparse
 from tqdm import tqdm
@@ -14,6 +12,7 @@ from datetime import datetime
 import json
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, get_sel_df, print_config
 import stat_reliability_measure.dev.hybrid_mls.hybrid_mls_pyt as hmls_pyt
+from stat_reliability_measure.dev.torch_utils import adapt_verlet_mcmc,verlet_mcmc
 
 
 method_name="HMLS"
@@ -91,7 +90,7 @@ class config:
     cores_number=None
     correct_T=False
     last_particle=False
-    adapt_kernel = False
+    adapt_kernel = True
     repeat_exp = False
     FT=True
 
@@ -209,7 +208,6 @@ def main():
 
     loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
     log_name=method_name+'_'+'_'+loc_time
-
     exp_log_path=os.path.join(raw_logs_path,log_name)
 
     os.mkdir(exp_log_path)
@@ -237,11 +235,15 @@ def main():
         if config.verbose>=1.:
             print(f'c:{c}')
         e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
-        V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=None)
         
-        gradV= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
+        def V(X):
+            return torch.clamp(input=c-X[:,0], min=0, max=None)
+        def gradV(X):
+            return -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
         
-        norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
+        def norm_gen(N):
+            return torch.randn(size=(N,d)).to(device)
+        
         for T in config.T_range:
             for N in config.N_range: 
                 for s in config.s_range:
@@ -269,7 +271,7 @@ def main():
                         os.mkdir(path=log_path)
                         
                         
-                        
+                        gibbs_kernel = verlet_mcmc if not config.adapt_kernel else adapt_verlet_mcmc
                         K = int(N*(ratio)) #if not config.last_particle else int(N-1)
                         print(f"Starting Hybrid-MLS run {i_run}/{nb_runs}, with p_t= {p_t},N={N},K={K},T={T},ratio={ratio}")
                         times= []
@@ -280,7 +282,7 @@ def main():
                         for i in tqdm(range(config.n_rep)):
                             t=time()
                             amls_res=hmls_pyt.HybridMLS(norm_gen, V=V,gradV=gradV
-                             ,K=K, N=N, L=config.L,
+                             ,K=K, N=N, L=config.L,gibbs_kernel=gibbs_kernel,
                             tau=0 , n_max=config.n_max, T=T
                             ,verbose= config.verbose,
                             device=config.device,track_accept=config.track_accept,

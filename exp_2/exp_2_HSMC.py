@@ -419,6 +419,8 @@ def main():
     clip_min=0
     clip_max=1
     for l in inp_indices:
+        print(f"device:{device}")
+        print(f"config.device:{config.device}")
         with torch.no_grad():
         
             x_0,y_0 = X_correct[l], label_correct[l]
@@ -519,7 +521,7 @@ def main():
                                         
 
                                     if config.track_dt:
-                                        dts=res_dict['dts']
+                                        dts=res_dict['dt_means']
                                         np.savetxt(fname=os.path.join(log_path,f'dts_{i}.txt')
                                         ,X=dts)
                                         x_T=np.arange(len(dts))

@@ -12,13 +12,15 @@ import torch
 from stat_reliability_measure.home import ROOT_DIR
 from datetime import datetime
 from pathlib import Path
-from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList
+from stat_reliability_measure.dev.utils import float_to_file_float,str2bool,str2intList,str2floatList
+
+
 import stat_reliability_measure.dev.form.form_pyt as form_pyt
 
 
 method_name="FORM"
 class config:
-    n_rep=200
+    n_rep=1
     p_t=1e-15
     p_range=[]
     optim_steps=10
@@ -50,6 +52,13 @@ class config:
     correct_T=False
     last_particle=False
     adapt_kernel = False
+    search_method="gd"
+    step_size_range = []
+    step_size=0.1
+    tol=1e-3
+    max_iter=100
+    max_iter_range=[]
+    random_init=False
 
 parser=argparse.ArgumentParser()
 
@@ -57,16 +66,16 @@ parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 
 parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_est)
-
-parser.add_argument('--N',type=int,default=config.N)
-parser.add_argument('--N_range',type=str2intList,default=config.N_range)
+parser.add_argument('--random_init',type=str2bool, default=config.random_init)
 
 parser.add_argument('--p_t',type=float,default=config.p_t)
 parser.add_argument('--p_range',type=str2floatList,default=config.p_range)
-parser.add_argument('--batch_size',type=int,default=config.batch_size)
-parser.add_argument('--b_range',type=str2intList,default=config.b_range)
+parser.add_argument('--step_size',type=float,default=config.step_size)
+parser.add_argument('--step_size_range',type=str2floatList,default=config.step_size_range)
 
-
+parser.add_argument('--tol',type=float,default=config.tol)
+parser.add_argument('--max_iter',type=int,default=config.max_iter)
+parser.add_argument('--max_iter_range',type=str2intList,default=config.max_iter_range)
 parser.add_argument('--d',type=int,default=config.d)
 parser.add_argument('--epsilon',type=float, default=config.epsilon)
 parser.add_argument('--optim_steps',type=float, default=config.optim_steps)
@@ -93,23 +102,34 @@ for k,v in vars(args).items():
     setattr(config, k, v)
 
 #gradient descent in 1 dimension to find zero of a function f
-def find_zero_gd(f, grad_f, x0, step_size=1e-2, max_iter=1000, tol=1e-6):
+def find_zero_gd_pyt(f, grad_f, x0, obj='min', step_size=1e-2, max_iter=100, tol=1e-3,random_init=False):
     x = x0
+    
+    if random_init:
+        x = x0 + step_size*torch.randn_like(x0)
+    if x.dim() == 1:
+        x = x.unsqueeze(0)
+    f_calls = 0
+    sign= 1 if obj=='max' else -1
     for i in range(max_iter):
-        x = x - step_size * grad_f(x)
-        if abs(f(x)) < tol:
+        x = x + sign*step_size * grad_f(x)
+        f_calls += 2 # we count 2 calls for each gradient evaluation (forward and backward)
+        if sign*f(x) > -tol:
+            f_calls += 1 # we count one more call for the last function evaluation
             break
-    return x
+    if i == max_iter-1:
+        print('Warning: max_iter reached in find_zero_gd')
+    return x, f_calls
 
 def main():
     #nb_runs=config.n_rep
     nb_runs=1
-    if len(config.N_range)==0:
-        config.N_range=[config.N]
-    nb_runs*=len(config.N_range)
-    if len(config.b_range)==0:
-        config.b_range=[config.batch_size]
-    nb_runs*=len(config.b_range)
+
+    if len(config.step_size_range)==0:
+        config.step_size_range=[config.step_size]
+    if len(config.max_iter_range)==0:
+        config.max_iter_range=[config.max_iter]
+    nb_runs*=len(config.step_size_range)
     if len(config.p_range)==0:
         config.p_range=[config.p_t]
     nb_runs*=len(config.p_range)
@@ -152,49 +172,51 @@ def main():
         os.mkdir(raw_logs_path)
 
     loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
-    log_name=method_name+'_'+'_'+loc_time
-
-    exp_log_path=os.path.join(config.log_dir,method_name+'_t_'+loc_time.split('_')[0])
+    log_name=method_name+'_'+loc_time
+    print(log_name)
+    exp_log_path=os.path.join(raw_logs_path,log_name)
     os.mkdir(exp_log_path)
     exp_res = []
     config.json=vars(args)
     if config.print_config:
         print(config.json)
-    # if config.save_confi
-    # if config.save_config:
+    #if config.save_config:
     #     with open(file=os.path.join(),mode='w') as f:
     #         f.write(config.json)
 
     epsilon=config.epsilon
     e_1 = torch.Tensor([1]+[0]*(d-1),device=config.device)
+    zero_d = torch.zeros(d,device=config.device)
     get_c_norm= lambda p:stat.norm.isf(p)
     i_run=0
-
+    if config.search_method.lower() in ('gd','gradient_descent'):
+        dp_search_method= find_zero_gd_pyt
+    else:
+        raise NotImplementedError(f"Search method {config.search_method} not implemented")
     for p_t in config.p_range:
         c=get_c_norm(p_t)
         P_target=stat.norm.sf(c)
         if config.verbose>=5:
             print(f"P_target:{P_target}")
+            print(f"c:{c}")
         arbitrary_thresh=40 #pretty useless a priori but should not hurt results
-        def v_batch_pyt(X,c=c):
-            return torch.clamp(input=c-X[:,0],min=-arbitrary_thresh, max = None)
-        amls_gen = lambda N: torch.randn(size=(N,d),device=config.device)
-    
-        h_V_batch_pyt= lambda x: -v_batch_pyt(x)
-
-
-        for N in config.N_range: 
-            for bs in config.b_range:
+        V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=None)
             
-                loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+        grad_V= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
+
+
+        for max_iter in config.max_iter_range: 
+            for step_size in config.step_size_range:
+            
+                loc_time=datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
                 log_name=method_name+'_'+'_'+loc_time
-                log_name=method_name+f'_N_{N}_bs_{bs}_t_'+'_'+loc_time.split('_')[0]
+                log_name=method_name+f'_maxiter_{max_iter}_step_size_{step_size}_t_'.replace('.','_')+loc_time.split('.')[0]
                 log_path=os.path.join(exp_log_path,log_name)
                 os.mkdir(path=log_path)
                 i_run+=1
                 
                 
-                print(f"Starting FORM run {i_run}/{nb_runs}, with p_t= {p_t},N={N},batch size={bs}")
+                print(f"Starting FORM run {i_run}/{nb_runs}, with p_t= {p_t},Maxiter={max_iter},step size={step_size}")
                 
                 times= []
                 rel_error= []
@@ -204,14 +226,20 @@ def main():
                     finish_flags=[]
                 for _ in tqdm(range(config.n_rep)):
                     t=time()
-                    est = form_pyt.FORM_pyt(   dp_search_method=)
+                    approx_zero,f_calls = dp_search_method(f=V, grad_f=grad_V, x0=zero_d, step_size=step_size,
+                                                           tol=config.tol, max_iter=max_iter,random_init=config.random_init,)
+                    beta = torch.norm(approx_zero).cpu().numpy()
+                    est = stat.norm.cdf(-beta)
                     t=time()-t
-                    
+                    if config.verbose>=1:
+                        print(f"FORM finished in {t:.2f} seconds")
+                        
+                        print(f"FORM found p={est}, with beta={beta}, in {f_calls} function calls")
                 
                 
                     times.append(t)
                     ests.append(est)
-                    calls.append(N)
+                    calls.append(f_calls)
 
 
                 times=np.array(times)
@@ -258,8 +286,8 @@ def main():
                 plt.close()
 
                 #with open(os.path.join(log_path,'results.txt'),'w'):
-                results={'p_t':p_t,'method':method_name,'batch_size':bs,
-                'N':N,'n_rep':config.n_rep,'lg_est_path':lg_est_path
+                results={'p_t':p_t,'method':method_name,'step_size':step_size, 'max_iter':max_iter,
+                'n_rep':config.n_rep,'lg_est_path':lg_est_path
                 ,'mean_est':ests.mean(),'std_log_est':log_ests.std(),'mean_log_est':mean_log_est,
                 'lg_q_1':lg_q_1,'lg_q_3':lg_q_3,"lg_med_est":lg_med_est
                 ,'mean_time':times.mean()
