@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 import math
-
+import numpy as np
 # if CUDA:
 #   cuda_id = '0'
 #   os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
@@ -49,7 +49,8 @@ def multilevel_uniform(
     count_mh_steps=100,
     debug=True, stats=False,
     x_min=0, 
-    x_max=1,CUDA=True):
+    x_max=1,CUDA=True,
+    track_accept=False):
 
     # Calculate the mean of the normal distribution in logit space
     # We transform the input from [x_min, x_max] to [epsilon, 1 - epsilon], then to [logit(epsilon), logit(1 - epsilon)]
@@ -80,7 +81,7 @@ def multilevel_uniform(
     lg_p = 0
     max_val = -math.inf
     levels = []
-
+    acc_ratios=[]
     #print('Inside valid bounds', x_min, x_max)
     #utils.stats(x[0])
     #print((x >= x_min).all(dim=1) & (x <= x_max).all(dim=1))
@@ -139,7 +140,7 @@ def multilevel_uniform(
             acc_ratio = torch.zeros(count_particles).cuda()
         else:
             acc_ratio = torch.zeros(count_particles)
-
+        # Loop over MH steps
         for mh_idx in range(count_mh_steps):
             # Propose new sample
             # g_bottom = dist.Uniform(low=torch.max(x - width_proposal.unsqueeze(-1), prior.low), high=torch.min(x + width_proposal.unsqueeze(-1), prior.high))
@@ -190,10 +191,11 @@ def multilevel_uniform(
             mls_utils.stats(acc_ratio)
         #input()
 
+
         #print(acc_ratio.size())
         width_proposal = torch.where(acc_ratio > 0.124, width_proposal*width_inc, width_proposal)
         width_proposal = torch.where(acc_ratio < 0.124, width_proposal*width_dec, width_proposal)
-
+        acc_ratios.append(acc_ratio.cpu().numpy().mean())
         L_prev = L
         #input()
 
@@ -203,4 +205,7 @@ def multilevel_uniform(
     #count_calls+=count_particles
     #max_val = max(max_val, x.max().item())
     max_val = s_x.max().item() 
-    return lg_p,count_calls,max_val, x, levels #, code modification: we add a counter of calls to score function
+    dic_out={}
+    if track_accept:
+        dic_out['acc_ratios']=np.array(acc_ratios)
+    return lg_p,count_calls,max_val, x, levels,dic_out  #, code modification: we add a counter of calls to score function, aswell as an option to track acceptance ratios

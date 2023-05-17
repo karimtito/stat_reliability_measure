@@ -18,8 +18,7 @@ target_accept=0.574,accept_spread=0.1,dt_decay=0.999,dt_gain=None,
 dt_min=1e-5,dt_max=1e-2,L_min=1,
 track_v=False,track_dt=False,track_H=False
 , GV_opt=False,dt_d=1,skip_mh=False,scale_M=torch.tensor([1.]),gaussian=True, sig_dt=0.015,
-exp_rate=1.
-):
+exp_rate=1.):
     """
       Hybrid Importance splitting estimator using gradient information 
       via exponential auxiliary variables
@@ -45,7 +44,7 @@ exp_rate=1.
            -dic_out.['CI_est']: estimated confidence of interval
            -dic_out.['Xrare']: Examples of the rare event 
     """
-
+    exp_dist = torch.distributions.Exponential(rate=torch.tensor([exp_rate]))
     if device is None:
         device= "cuda:0" if torch.cuda.is_available() else "cpu"
     exp_gen = lambda N: exp_dist.sample((N,)).to(device)
@@ -64,7 +63,7 @@ exp_rate=1.
         v_means=[]
         v_stds=[]
     
-    exp_dist = torch.distributions.Exponential(rate=torch.tensor([exp_rate]))
+    
     
     # Internals 
     q = -stat.norm.ppf((1-alpha_q)/2) # gaussian quantile

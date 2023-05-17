@@ -362,7 +362,7 @@ for l in inp_indices:
                             finish_flags=[]
                         for i in tqdm(range(config.n_rep)):
                             t=time()
-                            lg_p,nb_calls,max_val,x,levels=amls_mls.multilevel_uniform(prop=prop,
+                            lg_p,nb_calls,max_val,x,levels,dic=amls_mls.multilevel_uniform(prop=prop,
                             count_particles=N,count_mh_steps=T,x_min=x_min,x_max=x_max,
                             x_sample=x_0,sigma=epsilon,rho=ratio,CUDA=True,debug=(config.verbose>=1))
                             t=time()-t
