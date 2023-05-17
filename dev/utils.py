@@ -94,6 +94,8 @@ def str2list(in_str,split_chr=',',type_out=None):
         l=[type_out(e) for e in l]
     return l
 
+def clean_vars(config):
+    return {key:config.__dict__[key] for key in config.__dict__.keys() if '__' not in key}
 
 def print_config(config):
     """prints and returns ditcionnary of configuration attributes
