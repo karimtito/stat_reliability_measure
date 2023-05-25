@@ -14,6 +14,7 @@ import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
 from stat_reliability_measure.dev.utils import get_sel_df, print_config
 from stat_reliability_measure.home import ROOT_DIR
+from stat_reliability_measure.exp_2.exp_config import exp_config
 
 
 
@@ -46,6 +47,7 @@ class config:
     x_max=1
     x_mean=0
     x_std=1
+    
     L_range=[]
 
     eps_max=0.3
@@ -511,12 +513,15 @@ def main():
                                     #finish_flag=res_dict['finished']
                                     
                                     if config.track_accept:
+                                        accept_logs=os.path.join(log_path,'accept_logs')
+                                        if not os.path.exists(accept_logs):
+                                            os.mkdir(path=accept_logs)
                                         accept_rates_mcmc=res_dict['accept_rates_mcmc']
-                                        np.savetxt(fname=os.path.join(log_path,f'accept_rates_mcmc_{i}.txt')
+                                        np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
                                         ,X=accept_rates_mcmc,)
                                         x_T=np.arange(len(accept_rates_mcmc))
                                         plt.plot(x_T,accept_rates_mcmc)
-                                        plt.savefig(os.path.join(log_path,f'accept_rates_mcmc_{i}.png'))
+                                        plt.savefig(os.path.join(accept_logs,f'accept_rates_mcmc_{i}.png'))
                                         plt.close()
                                         
 

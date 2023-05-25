@@ -15,7 +15,7 @@ from pathlib import Path
 from stat_reliability_measure.dev.utils import float_to_file_float,str2bool,str2intList,str2floatList
 
 
-import stat_reliability_measure.dev.form.form_pyt as form_pyt
+from stat_reliability_measure.dev.form.form_pyt import find_zero_gd_pyt
 
 
 method_name="FORM"
@@ -101,25 +101,7 @@ args=parser.parse_args()
 for k,v in vars(args).items():
     setattr(config, k, v)
 
-#gradient descent in 1 dimension to find zero of a function f
-def find_zero_gd_pyt(f, grad_f, x0, obj='min', step_size=1e-2, max_iter=100, tol=1e-3,random_init=False):
-    x = x0
-    
-    if random_init:
-        x = x0 + step_size*torch.randn_like(x0)
-    if x.dim() == 1:
-        x = x.unsqueeze(0)
-    f_calls = 0
-    sign= 1 if obj=='max' else -1
-    for i in range(max_iter):
-        x = x + sign*step_size * grad_f(x)
-        f_calls += 2 # we count 2 calls for each gradient evaluation (forward and backward)
-        if sign*f(x) > -tol:
-            f_calls += 1 # we count one more call for the last function evaluation
-            break
-    if i == max_iter-1:
-        print('Warning: max_iter reached in find_zero_gd')
-    return x, f_calls
+
 
 def main():
     #nb_runs=config.n_rep

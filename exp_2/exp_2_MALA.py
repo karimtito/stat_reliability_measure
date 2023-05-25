@@ -509,12 +509,15 @@ def main():
                                     #finish_flag=res_dict['finished']
                                     
                                     if config.track_accept:
+                                        accept_logs=os.path.join(log_path,'accept_logs')
+                                        if not os.path.exists(accept_logs):
+                                            os.mkdir(path=accept_logs)
                                         accept_rates_mcmc=res_dict['accept_rates_mcmc']
-                                        np.savetxt(fname=os.path.join(log_path,f'accept_rates_mcmc_{i}.txt')
+                                        np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
                                         ,X=accept_rates_mcmc,)
                                         x_T=np.arange(len(accept_rates_mcmc))
                                         plt.plot(x_T,accept_rates_mcmc)
-                                        plt.savefig(os.path.join(log_path,f'accept_rates_mcmc_{i}.png'))
+                                        plt.savefig(os.path.join(accept_logs,f'accept_rates_mcmc_{i}.png'))
                                         plt.close()
                                         
 

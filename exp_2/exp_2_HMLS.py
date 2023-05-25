@@ -448,14 +448,16 @@ def main():
                                 aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                                 if (not config.repeat_exp) and config.update_aggr_res and os.path.exists(aggr_res_path):
                                     aggr_res_df = pd.read_csv(aggr_res_path)
-                                    same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method,'='),
-                                    ('model_name',model_name,'='),('epsilon',epsilon,'='),('image_idx',l,'='),('n_rep',config.n_rep,'='),
-                        ('N',N,'='),('T',T,'='),('L',L,'='),('alpha',alpha,'='),
-                        ('ratio',ratio,'=')] )  
-                                    # if a similar experiment has been done in the current log directory we skip it
-                                    if len(same_exp_df)>0:
-                                        print(f"Skipping {method_name} run {run_nb}/{nb_runs}, with model: {model_name}, img_idx:{l},eps:{epsilon},ratio:{ratio},T:{T},alpha:{alpha},N:{N},L:{L}")
-                                        continue
+                                    same_method_df=get_sel_df(df=aggr_res_df,triplets=[('method',method,'=')])
+                                    if len(same_method_df)>0:
+                                        same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method,'='),
+                                        ('model_name',model_name,'='),('epsilon',epsilon,'='),('image_idx',l,'='),('n_rep',config.n_rep,'='),
+                            ('N',N,'='),('T',T,'='),('L',L,'='),('alpha',alpha,'='),
+                            ('ratio',ratio,'=')] )  
+                                        # if a similar experiment has been done in the current log directory we skip it
+                                        if len(same_exp_df)>0:
+                                            print(f"Skipping {method_name} run {run_nb}/{nb_runs}, with model: {model_name}, img_idx:{l},eps:{epsilon},ratio:{ratio},T:{T},alpha:{alpha},N:{N},L:{L}")
+                                            continue
                                 K=int(N*ratio)
                                 loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
                                 log_name=method_name+'_'+'_'+loc_time.replace(':','_')
@@ -495,12 +497,15 @@ def main():
                                     #finish_flag=res_dict['finished']
                                     
                                     if config.track_accept:
+                                        accept_logs=os.path.join(log_path,'accept_logs')
+                                        if not os.path.exists(accept_logs):
+                                            os.mkdir(path=accept_logs)
                                         accept_rates_mcmc=res_dict['accept_rates_mcmc']
-                                        np.savetxt(fname=os.path.join(log_path,f'accept_rates_mcmc_{i}.txt')
+                                        np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
                                         ,X=accept_rates_mcmc,)
                                         x_T=np.arange(len(accept_rates_mcmc))
                                         plt.plot(x_T,accept_rates_mcmc)
-                                        plt.savefig(os.path.join(log_path,f'accept_rates_mcmc_{i}.png'))
+                                        plt.savefig(os.path.join(accept_logs,f'accept_rates_mcmc_{i}.png'))
                                         plt.close()
                                         
 
