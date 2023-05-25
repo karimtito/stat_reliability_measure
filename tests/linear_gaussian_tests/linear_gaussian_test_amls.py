@@ -38,7 +38,7 @@ class config:
     s=1
     s_range= []
 
-    p_t=1e-15
+    p_t=1e-6
     p_range=[]
     
     d = 1024
@@ -172,9 +172,9 @@ if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
 loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
-    log_name=method_name+'_'+'_'+loc_time
+log_name=method_name+'_'+loc_time
 
-exp_log_path=os.path.join(config.log_dir,method_name+'_t_'+loc_time.split('_')[0])
+exp_log_path=os.path.join(config.log_dir,log_name)
 os.mkdir(exp_log_path)
 exp_res = []
 config.json=vars(args)
@@ -197,13 +197,13 @@ for p_t in config.p_range:
     arbitrary_thresh=40 #pretty useless a priori but should not hurt results
     def v_batch_pyt(X,c=c):
         return torch.clamp(input=c-X[:,0],min=-arbitrary_thresh, max = None)
-    def v_batch_ep(X, c=c):
-        return (c-X[:,0]).clip(min_ = -arbitrary_thresh, max_ = None)
+    # def v_batch_ep(X, c=c):
+    #     return (c-X[:,0]).clip(min_ = -arbitrary_thresh, max_ = 10000)
     amls_gen = lambda N: torch.randn(size=(N,d),device=config.device)
     normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 
-    normal_kernel_ep = lambda x,s : (x + s*x.normal(shaphe=x.shape))/np.sqrt(1+s**2)
+    #normal_kernel_ep = lambda x,s : (x + s*x.normal(shaphe=x.shape))/np.sqrt(1+s**2)
     h_V_batch_pyt= lambda x: -v_batch_pyt(x).reshape((x.shape[0],1))
-    h_V_batch_ep= lambda x: -v_batch_ep(x).reshape((x.shape[0],1))
+    #h_V_batch_ep= lambda x: -v_batch_ep(x).reshape((x.shape[0],1))
 
     for T in config.T_range:
         for N in config.N_range: 
@@ -230,13 +230,13 @@ for p_t in config.p_range:
                     for i in tqdm(range(config.n_rep)):
                         t=time()
                         if config.batch_opt:
-                            amls_res=amls_pyt.ImportanceSplittingPytBatch(amls_gen, normal_kernel_ep,K=K, N=N,s=s,  h=h_V_batch_ep, 
+                            amls_res=amls_pyt.ImportanceSplittingPytBatch(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
                         tau=1e-15 , n_max=config.n_max,clip_s=config.clip_s , T=T,
-                        s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
+                        s_min= config.s_min, s_max =config.s_max,verbose= config.verbose, 
                         device=config.device,track_accept=config.track_accept)
 
                         else:
-                            amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel_ep,K=K, N=N,s=s,  h=h_V_batch_ep, 
+                            amls_res = amls_pyt.ImportanceSplittingPyt(amls_gen, normal_kernel,K=K, N=N,s=s,  h=h_V_batch_pyt, 
                         tau=0 , n_max=config.n_max,clip_s=config.clip_s , T=T,
                         s_min= config.s_min, s_max =config.s_max,verbose= config.verbose,
                         device=config.device, )
