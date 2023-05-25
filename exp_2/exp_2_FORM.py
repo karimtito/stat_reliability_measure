@@ -16,12 +16,9 @@ from pathlib import Path
 from stat_reliability_measure.dev.utils import float_to_file_float,str2bool,str2intList,str2floatList,print_config
 import stat_reliability_measure.dev.torch_utils as t_u 
 
-import stat_reliability_measure.dev.form.form_pyt as form_pyt
-
+from stat_reliability_measure.dev.form.form_pyt import find_zero_gd_pyt 
 
 method_name="FORM"
-
-
 
 class config:
     n_rep=1
@@ -324,13 +321,9 @@ def main():
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_cert
                 lirpa_safe=get_lirpa_cert(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
                 num_classes=num_classes,device=config.device)
-
-            
-            
-            if config.gaussian_latent:
-                gen = lambda N: torch.randn(size=(N,d),device=config.device)
-            else:
-                gen= lambda N: (2*torch.rand(size=(N,d), device=device )-1)
+                lirpa_safe=lirpa_safe.item()
+                if config.verbose>=2:
+                    print(f"lirpa safe:{lirpa_safe}")
             low=torch.max(x_0-epsilon, torch.tensor([x_min]).cuda())
             high=torch.min(x_0+epsilon, torch.tensor([x_max]).cuda())  
             V = lambda X: t_u.V_pyt(X,x_0=x_0,model=model,low=low,high=high,target_class=y_0,gaussian_latent=config.gaussian_latent)
