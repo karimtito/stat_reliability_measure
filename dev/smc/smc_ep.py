@@ -174,6 +174,7 @@ debug=False,kappa_opt=False,
     beta=0
     reach_beta_inf=False
     scale_M=None
+    gradient_use= not (GK_opt or GV_opt)
     ## For
     while not reach_beta_inf:
         n += 1
@@ -186,6 +187,11 @@ debug=False,kappa_opt=False,
             X=ep.astensor(gen(N)) #Sampling initial random vectors and converting them to EagerPy
             
             v=V(X)
+            if gradient_use:
+                grad_v=gradV(X)
+            else:
+                grad_v=None
+            
             
 
             d=X.shape[-1]
@@ -201,6 +207,8 @@ debug=False,kappa_opt=False,
             if only_duplicated and nb_to_renew>0:
                 Y=X[to_renew]
                 v_y=v[to_renew]
+                if gradient_use:
+                    grad_v_y=grad_v[to_renew]
                 ind_L_y=ind_L[to_renew]
                 dt_y=dt[to_renew]
             else:
@@ -218,7 +226,7 @@ debug=False,kappa_opt=False,
             else:
                 
                 if adapt_step:
-                    Y,v_y,nb_calls,dict_out=adapt_verlet_mcmc_ep(q=Y,v_q=v_y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
+                    Y,v_y,grad_v_y,nb_calls,dict_out=adapt_verlet_mcmc_ep(q=Y,v_q=v_y,grad_V_q=grad_v_y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
                         V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_y,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
                         alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,L_min=L_min,
                         gaussian_verlet=GV_opt,dt_min=dt_min,skip_mh=skip_mh)
@@ -233,7 +241,7 @@ debug=False,kappa_opt=False,
                             print(f"New dt mean:{dt.mean().item()}, dt std:{ep_std(dt).item()}")
                             print(f"New L mean: {ind_L.mean().item()}, L std:{ep_std(ind_L).item()}")
                 else:
-                    Y,v_y,nb_calls,dict_out=verlet_mcmc_ep(q=Y,beta=beta,gaussian=gaussian,
+                    Y,v_y,grad_v_y,nb_calls,dict_out=verlet_mcmc_ep(q=Y,grad_V_q=grad_v_y,beta=beta,gaussian=gaussian,
                                         V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
                                         scale_M=scale_M)
                     if track_H:
@@ -259,9 +267,14 @@ debug=False,kappa_opt=False,
             if only_duplicated and nb_to_renew>0:
                 X[to_renew]=Y
                 v[to_renew]=v_y
+                if gradient_use:
+                    grad_v[to_renew]=grad_v_y
             else:
                 X=Y
                 v=v_y
+                if gradient_use:
+                    grad_v=grad_v_y
+
                 
 
 

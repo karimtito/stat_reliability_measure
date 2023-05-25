@@ -75,8 +75,13 @@ exp_rate=1.):
     X = gen(N) # generate N samples
     Lambda = exp_gen(N)
     VX = V(X)
-    SX = score(VX,Lambda) # compute their scores
     Count_V = N # Number of calls to function score
+    SX = score(VX,Lambda) # compute their scores
+    gradient_use=not (GV_opt)
+    if gradient_use:
+        grad_VX = gradV(X)
+        Count_V += 2*N # Each call to the gradient costs 2 calls to V
+    
     
     #step B: find new threshold
     ind_= torch.argsort(input=SX,dim=0,descending=True).squeeze(-1)
@@ -90,7 +95,7 @@ exp_rate=1.):
     if verbose>=1:
         print('Iter = ',n, ' tau_j = ', tau_j.item(), "beta_j",beta_j, "V_mean",V_mean.item(),  " Calls = ", Count_V)
     assert dt_d==1 or dt_d==d,"dt dimension can be 1 (isotropic diff.) or d (anisotropic diff.)"
-    dt_scalar =alpha*TimeStepPyt(V,X,gradV)
+    dt_scalar =alpha*TimeStepPyt(v_x=VX,grad_v_x=grad_VX)
     dt= torch.clamp(dt_scalar*torch.ones(size=(N,dt_d),device=device)+sig_dt*torch.randn(size=(N,dt_d),device=device),min=dt_min,max=dt_max)
     ind_L=torch.randint(low=L_min,high=L,size=(N,)).float() if L_min<L else L*torch.ones(size=(N,))
   
@@ -123,10 +128,14 @@ exp_rate=1.):
             Z=Z.unsqueeze(0)
         SZ=SY[ind]
         VZ=VY[ind]
+        if GV_opt:
+            grad_VZ=None
+        else:
+            grad_VZ=grad_VX[ind]
         if gibbs_kernel is None:
             gibbs_kernel = verlet_mcmc if not adapt_step else adapt_verlet_mcmc
         if adapt_step:
-                Z,VZ,nb_calls,dict_out=gibbs_kernel(q=Z,v_q=VZ,ind_L=ind_L_Z,beta=beta_j,gaussian=gaussian,
+                Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,v_q=VZ,grad_V_q=grad_VZ,ind_L=ind_L_Z,beta=beta_j,gaussian=gaussian,
                     V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_Z,device=device,
                     save_H=track_H,save_func=None,scale_M=scale_M,
                     alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,L_min=L_min,
@@ -142,7 +151,7 @@ exp_rate=1.):
                         print(f"New dt mean:{dt.mean().item()}, dt std:{dt.std().item()}")
                         print(f"New L mean: {ind_L.mean().item()}, L std:{ind_L.std().item()}")
         else:
-            Z,VZ,nb_calls,dict_out=gibbs_kernel(q=Z,beta=beta_j,gaussian=gaussian,
+            Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,grad_V_q=grad_VZ,beta=beta_j,gaussian=gaussian,
                                 V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
                                 scale_M=scale_M,GV_opt=GV_opt,verbose=verbose)
             if track_H:
@@ -184,6 +193,7 @@ exp_rate=1.):
         X[K:N,:] = Z # copy paste the new samples of Z into X
         SX[K:N] = SZ
         VX[K:N] = VZ
+        grad_VX[K:N] = grad_VZ
         dt[K:N] = dt_Z
         ind_L[K:N] = ind_L_Z
         # step B: Find new threshold

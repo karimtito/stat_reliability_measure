@@ -137,7 +137,7 @@ track_accept=False,track_beta=False,return_log_p=False,gaussian=False,
 adapt_dt=False,
 track_calls=True,track_dt=False,track_H=False,track_v_means=False,track_ratios=False,
 target_accept=0.574,accept_spread=0.1,dt_decay=0.999,dt_gain=None,
-dt_min=1e-5,dt_max=1e-2,v_min_opt=False,lambda_0=1,
+dt_min=1e-5,dt_max=1e-2,v_min_opt=True,lambda_0=1,
 debug=False,kappa_opt=False,
  track_ess=False,M_opt=False,adapt_step=False,alpha_p=0.1,FT=False,sig_dt=0.015,L_min=1,only_duplicated=False,
  GK_opt=False,GV_opt=False,dt_d=1,skip_mh=False):
@@ -167,6 +167,8 @@ debug=False,kappa_opt=False,
          P_est: estimated probability
         
     """
+    assert v_min_opt ,"v_min_opt must be True, otherwise all the samples can be killed at the same time"
+    gradient_use= not (GK_opt or GV_opt)
     #cpu/gpu switch
     if device is None: 
         device= "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -196,8 +198,8 @@ debug=False,kappa_opt=False,
         betas=[]
     if track_v_means: 
         v_means=[]
-    if track_calls:
-        Count_v=0
+    
+    Count_v=0
     if track_ratios:
         g_s=[g_prod]
     
@@ -218,26 +220,34 @@ debug=False,kappa_opt=False,
             X=gen(N)
             #p=torch.randn_like(X)
             v=V(X)
+            Count_v+=N
+            if gradient_use:
+                grad_v=gradV(X)
+                Count_v+=2*N # each call to gradV costs 2 calls to V
+
             
 
             d=X.shape[-1]
             assert dt_d==1 or dt_d==d,"dt dimension can be 1 (isotropic diff.) or d (anisotropic diff.)"
-            dt_scalar =alpha*TimeStepPyt(V,X,gradV)
+            dt_scalar =alpha*TimeStepPyt(v_x=v,grad_v_x=grad_v)
             
             dt= torch.clamp(dt_scalar*torch.ones(size=(N,dt_d),device=device)+sig_dt*torch.randn(size=(N,dt_d),device=device),min=dt_min,max=dt_max)
-            ind_L=torch.randint(low=L_min,high=L,size=(N,)).float() if L_min<L else L*torch.ones(size=(N,))
-            if track_calls:
-                Count_v = 3*N #N calls to V + 2*N calls to grad_V
+            ind_L=torch.randint(low=L_min,high=L,size=(N,),).to(device).float() if L_min<L else L*torch.ones(size=(N,),device=device)
+            
     
         else:
             if only_duplicated and nb_to_renew>0:
                 Y=X[to_renew]
                 v_y=v[to_renew]
+                if gradient_use:
+                    grad_v_y=grad_v[to_renew]
                 ind_L_y=ind_L[to_renew]
                 dt_y=dt[to_renew]
             else:
                 Y=X
                 v_y=v
+                if gradient_use:
+                    grad_v_y=grad_v
                 ind_L_y=ind_L
                 dt_y=dt
             if M_opt:
@@ -250,7 +260,7 @@ debug=False,kappa_opt=False,
             else:
                 
                 if adapt_step:
-                    Y,v_y,nb_calls,dict_out=mcmc_func(q=Y,v_q=v_y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
+                    Y,v_y,grad_v_y,nb_calls,dict_out=mcmc_func(q=Y,v_q=v_y,grad_V_q=grad_v_y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
                         V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_y,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
                         alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,L_min=L_min,
                         gaussian_verlet=GV_opt,dt_min=dt_min,skip_mh=skip_mh)
@@ -265,7 +275,7 @@ debug=False,kappa_opt=False,
                             print(f"New dt mean:{dt.mean().item()}, dt std:{dt.std().item()}")
                             print(f"New L mean: {ind_L.mean().item()}, L std:{ind_L.std().item()}")
                 else:
-                    Y,v_y,nb_calls,dict_out=verlet_mcmc(q=Y,beta=beta,gaussian=gaussian,
+                    Y,v_y,grad_v_y,nb_calls,dict_out=verlet_mcmc(q=Y,grad_V_q=grad_v_y,beta=beta,gaussian=gaussian,
                                         V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
                                         scale_M=scale_M)
                     if track_H:
