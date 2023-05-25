@@ -14,9 +14,10 @@ def norm_batch_tensor(x,d):
     y = x.reshape(x.shape[:1]+(d,))
     return y.norm(dim=-1)
 
-def TimeStepPyt(V,X,gradV,p=1,p_p=2):
-    V_mean= V(X).mean()
-    V_grad_norm_mean = ((torch.norm(gradV(X),dim = 1,p=p_p)**p).mean())**(1/p)
+def TimeStepPyt(v_x,grad_v_x,p=1,p_p=2):
+    """computes the initial time step for the langevin/hmc kernel"""
+    V_mean= v_x.mean()
+    V_grad_norm_mean = ((torch.norm(grad_v_x,dim = 1,p=p_p)**p).mean())**(1/p)
     with torch.no_grad():
         result=V_mean/V_grad_norm_mean
     return result
@@ -146,14 +147,17 @@ def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_si
     return X_new
 
 
-def verlet_kernel1(X, gradV, delta_t, beta,L,
+def verlet_kernel1(X, gradV, delta_t, beta,L,grad_V_q=None,
 ind_L=None,p_0=None,lambda_=0, 
 gaussian=True,kappa_opt=False,scale_M=None,GV=False):
     """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
 
     """
+    grad_calls=0
     if ind_L is None:
         ind_L=L*torch.ones(size=(X.shape[0],),dtype=torch.int16)
+    #assert ind_L.shape[0]==X.shape[0]
+    assert torch.min(ind_L).item()>=1
     q_t = torch.clone(X)
     # if no initial momentum is given we draw it randomly from gaussian distribution
     if scale_M is None:
@@ -171,13 +175,16 @@ gaussian=True,kappa_opt=False,scale_M=None,GV=False):
         kappa=torch.ones_like(q_t)
     k=1
     i_k=ind_L>=k
-    while (i_k).sum()>0:
+    if not GV and grad_V_q is None:
+        grad_V_q=gradV(q_t[i_k]).detach()
+        grad_calls+=2*i_k.sum().item()
+    while i_k.sum().item()>0:
         #I. Verlet scheme
         #computing half-point momentum
         #p_t.data = p_t-0.5*dt*gradV(X).detach() / norms(gradV(X).detach())
         
         if not GV:
-            p_t.data[i_k] = p_t[i_k]-0.5*beta*delta_t[i_k]*gradV(q_t[i_k]).detach() 
+            p_t.data[i_k] = p_t[i_k]-0.5*beta*delta_t[i_k]*grad_V_q
         
         
         p_t.data[i_k] = p_t[i_k]- 0.5*delta_t[i_k]*kappa[i_k]*q_t.data[i_k]
@@ -188,20 +195,23 @@ gaussian=True,kappa_opt=False,scale_M=None,GV=False):
         assert not q_t.isnan().any(),"Nan values detected in q"
         #updating momentum again
         if not GV:
-            p_t.data[i_k] = p_t[i_k] -0.5*beta*delta_t[i_k]*gradV(q_t[i_k]).detach()
+            grad_V_q=gradV(q_t[i_k]).detach()
+            grad_calls+=2*i_k.sum().item()
+            p_t.data[i_k] = p_t[i_k] -0.5*beta*delta_t[i_k]*grad_V_q
         p_t.data[i_k] =p_t[i_k] -0.5*kappa[i_k]*delta_t[i_k]*q_t.data[i_k]
         #II. Optional smoothing of momentum memory
         p_t.data[i_k] = torch.exp(-lambda_*delta_t[i_k])*p_t[i_k]
         k+=1
         i_k=ind_L>=k
-    return q_t.detach(),p_t
+    return q_t.detach(),p_t,grad_calls,grad_V_q
 
-def verlet_kernel2(X, gradV, delta_t, beta,L,
+def verlet_kernel2(X, gradV, delta_t, beta,L, grad_V_q=None,
     ind_L=None,p_0=None,lambda_=0, gaussian=True,
     kappa_opt=False,scale_M=None,GV=False):
     """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
 
     """
+    grad_calls = 0
     if ind_L is None:
         ind_L=L*torch.ones(size=(X.shape[0],),dtype=torch.int16)
     q_t = torch.clone(X)
@@ -220,25 +230,30 @@ def verlet_kernel2(X, gradV, delta_t, beta,L,
         kappa=1
     k=1
     i_k=ind_L>=k
-    while (i_k).sum()>0:
+    if not GV and grad_V_q is None:
+        grad_V_q = gradV(q_t[i_k]).detach()
+        grad_calls += 2*i_k.sum().item()
+    while (i_k).sum().item()>0:
         #I. Verlet scheme
         #computing half-point momentum
         #p_t.data = p_t-0.5*dt*gradV(X).detach() / norms(gradV(X).detach())
         if not GV:
-            p_t.data[i_k] = p_t[i_k]-0.5*beta*delta_t[i_k]*kappa[i_k]*gradV(q_t[i_k]).detach() 
+            p_t.data[i_k] = p_t[i_k]-0.5*beta*delta_t[i_k]*kappa[i_k]*grad_V_q
         
         p_t.data[i_k] -= 0.5*delta_t[i_k]*kappa[i_k]*q_t.data[i_k]
         #updating position
         q_t.data[i_k] = (q_t[i_k] + grad_q(p_t[i_k],delta_t[i_k]))
         #updating momentum again
         if not GV:
-            p_t.data[i_k] = p_t[i_k] -0.5*beta*kappa[i_k]*delta_t[i_k]*gradV(q_t[i_k]).detach()
+            grad_V_q=gradV(q_t[i_k]).detach()
+            grad_calls+=2*i_k.sum().item()
+            p_t.data[i_k] = p_t[i_k] -0.5*beta*kappa[i_k]*delta_t[i_k]*grad_V_q
         p_t.data[i_k] -= 0.5*kappa[i_k]*delta_t[i_k]*q_t.data[i_k]
         #II. Optional smoothing of momentum memory
         p_t.data[i_k] = torch.exp(-lambda_*delta_t[i_k])*p_t[i_k]
         k+=1
         i_k=ind_L>=k
-    return q_t.detach(),p_t
+    return q_t.detach(),p_t,grad_calls,grad_V_q
 
 
 
@@ -959,7 +974,8 @@ save_y=False,kappa_opt=True):
 
 
 
-def verlet_mcmc(q,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
+def verlet_mcmc(q,beta:float,gaussian:bool,V,gradV,T:int,delta_t,
+                grad_V_q=None,L:int=1,
 kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussian_verlet=False,ind_L=None):
     """ Simple implementation of Hamiltonian dynanimcs MCMC 
 
@@ -995,9 +1011,9 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussia
     if save_func is not None:
         saved=[save_func(q,p)]
     for i  in range(T):
-        q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=0,L=L,kappa_opt=kappa_opt,
+        q_trial,p_trial,grad_calls,grad_V_q=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=0,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M,ind_L=ind_L,GV=gaussian_verlet)
-        nb_calls+=ind_L.sum().item()
+        nb_calls+=2*grad_calls # we count each gradient call as 2 function calls
         H_trial= Hamiltonian(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian)
         nb_calls+=N
         
@@ -1026,10 +1042,11 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussia
         dict_out['saved']=saved
     v_q=V(q)
     nb_calls+=N
-    return q,v_q,nb_calls,dict_out
+    return q,v_q,grad_V_q,nb_calls,dict_out
 
 
-def adapt_verlet_mcmc(q,v_q,ind_L,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
+def adapt_verlet_mcmc(q,v_q,ind_L,beta:float,gaussian:bool,V,gradV,T:int,delta_t,
+                      grad_V_q=None,L:int=1,
 kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,alpha_p:float=0.1,prop_d=0.1,FT=False,dt_max=None,dt_min=None,sig_dt=0.015,
 verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False,correct_kernel=False):
     """ Simple implementation of Hamiltonian dynanimcs MCMC 
@@ -1080,10 +1097,10 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False,correct_kernel=False):
     i=0
     #torch.multinomial(input=)
     while (prod_correl>alpha_p).sum()>=prop_d*d and i<T_max:
-        q_trial,p_trial=verlet_mixer(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
+        q_trial,p_trial,grad_calls,grad_V_q=verlet_mixer(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
         
-        nb_calls+=4*ind_L.sum().item()-N # for each particle each vertlet integration step requires two oracle calls (gradients)
+        nb_calls+= 2*grad_calls
         H_trial= Hamiltonian(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
         nb_calls+=N # N new potentials are computed 
         delta_H=torch.clamp(-(H_trial-H_old),max=0)
@@ -1154,12 +1171,12 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False,correct_kernel=False):
     v_q=V(q)
     #no new potential computation 
     
-    return q,v_q,nb_calls,dict_out
+    return q,v_q,grad_V_q,nb_calls,dict_out
 
 
 def Hamiltonian2(X,p,beta,v_x=None,V=None,scale_M=1,gaussian=True):
     if v_x is None:
-        assert V is not None
+        assert V is not None, "either v_x or V must be provided"
         with torch.no_grad():
             U = beta*V(X) +0.5*torch.sum(X**2,dim=1) if gaussian else beta*V(X)
     else:
@@ -1169,7 +1186,7 @@ def Hamiltonian2(X,p,beta,v_x=None,V=None,scale_M=1,gaussian=True):
 
 
 
-def adapt_verlet_mcmc2(q,v_q,ind_L,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
+def adapt_verlet_mcmc2(q,v_q,ind_L,beta:float,gaussian:bool,V,gradV,T:int,delta_t,grad_V_q=None,L:int=1,
 kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,alpha_p:float=0.1,prop_d=0.1,FT=False,dt_max=None,dt_min=None,sig_dt=0.015,
 verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     """ Simple implementation of Hamiltonian dynanimcs MCMC 
@@ -1220,10 +1237,10 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     prod_correl=torch.ones(size=(d,),device=q.device)
     i=0
     while (prod_correl>alpha_p).sum()>=prop_d*d and i<T_max:
-        q_trial,p_trial=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
+        q_trial,p_trial,grad_calls,grad_V_q=verlet_kernel1(X=q,gradV=gradV,grad_V_q=grad_V_q, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
-        # for each particle each vertlet integration step requires two gradient computations
-        nb_calls+=4*(ind_L).sum().item()-N 
+        
+        nb_calls+=2*grad_calls #counting each call to the gradient as 2 calls to the potential
         v_trial=V(q_trial)
         nb_calls+=N             # we compute the potential of the new particle                        
         H_trial= Hamiltonian2(X=q_trial, p=p_trial,v_x=v_trial,beta=beta,gaussian=gaussian,scale_M=scale_M)
@@ -1300,6 +1317,6 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
         dict_out['ind_L']=ind_L
     
     
-    return q,v_q,nb_calls,dict_out
+    return q,v_q,grad_V_q,nb_calls,dict_out
 
 
