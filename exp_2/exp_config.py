@@ -1,8 +1,10 @@
-
+from stat_reliability_measure.home import ROOT_DIR
 
 class exp_config:
     dataset='mnist'
+    data_dir=ROOT_DIR+"/data"
     model_arch=None  
+    model_dir=None 
     epsilons = [0.15]
     save_config=False 
     print_config=True
@@ -23,10 +25,20 @@ class exp_config:
 
     gaussian_latent=True
 
-    model_dir=None 
+    
     noise_dist='uniform'
     d=None
     verbose=0
     log_dir=None
     aggr_res_path = None
     update_aggr_res=True
+    batch_opt=True
+    track_finish=False
+    lirpa_cert=False
+    robust_model=False
+    robust_eps=0.1
+    load_batch_size=100 
+    nb_epochs= 15
+    adversarial_every=1
+    
+
