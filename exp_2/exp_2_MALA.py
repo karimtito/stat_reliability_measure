@@ -408,8 +408,8 @@ def main():
 
 
     config_dict=print_config(config)
-    path_config=os.path.join(exp_log_path,'config.json')
-    with open(path_config,'w') as f:
+    config_path=os.path.join(exp_log_path,'config.json')
+    with open(config_path,'w') as f:
         f.write(json.dumps(config_dict, indent = 4))
     inp_indices=np.arange(start=config.input_start,stop=config.input_stop)
     normal_dist=torch.distributions.Normal(loc=0, scale=1.)
@@ -600,7 +600,10 @@ def main():
                                 "skip_mh":config.skip_mh,"GV_opt":config.GV_opt,
                                 'q_1':q_1,'q_3':q_3,'med_est':med_est,"lg_est_path":lg_est_path,
                                 "mean_log_est":mean_log_est,"std_log_est":std_log_est,
-                                "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,}
+                                "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
+                                "log_path":log_path,"log_name":log_name,
+                                
+                                }
                                 exp_res.append(results)
                                 results_df=pd.DataFrame([results])
                                 results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)

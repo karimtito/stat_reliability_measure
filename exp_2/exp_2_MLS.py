@@ -281,8 +281,8 @@ def main():
     config.x_mean=t_u.datasets_means[config.dataset]
     config.x_std=t_u.datasets_stds[config.dataset]
     config_dict=print_config(config)
-    path_config=os.path.join(exp_log_path,'config.json')
-    with open(path_config,'w') as f:
+    config_path=os.path.join(exp_log_path,'config.json')
+    with open(config_path,'w') as f:
         f.write(json.dumps(config_dict, indent = 4))
 
 
@@ -480,7 +480,8 @@ def main():
                                 "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
                             'np_seed':config.np_seed,'torch_seed':config.torch_seed,'pgd_success':pgd_success,'p_l':p_l,
                             'p_u':p_u,'noise_dist':config.noise_dist,'datetime':loc_time,
-                            'q_1':q_1,'q_3':q_3,'med_est':med_est}
+                            'q_1':q_1,'q_3':q_3,'med_est':med_est,
+                            "log_path":log_path,"config_path":config_path,}
                             results_df=pd.DataFrame([results])
                             results_df.to_csv(os.path.join(log_path,'results.csv'),)
                             if config.aggr_res_path is None:

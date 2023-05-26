@@ -410,8 +410,8 @@ def main():
 
 
     config_dict=print_config(config)
-    path_config=os.path.join(exp_log_path,'config.json')
-    with open(path_config,'w') as f:
+    config_path=os.path.join(exp_log_path,'config.json')
+    with open(config_path,'w') as f:
         f.write(json.dumps(config_dict, indent = 4))
     inp_indices=np.arange(start=config.input_start,stop=config.input_stop)
     normal_dist=torch.distributions.Normal(loc=0, scale=1.)
