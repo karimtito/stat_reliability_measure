@@ -1,8 +1,9 @@
 from stat_reliability_measure.home import ROOT_DIR
-
+from pathlib import Path
 class exp_config:
     dataset='mnist'
     data_dir=ROOT_DIR+"/data"
+    log_dir=Path.joinpath(ROOT_DIR,"logs/exp_2_mnist")
     model_arch=None  
     model_dir=None 
     epsilons = [0.15]
@@ -29,7 +30,7 @@ class exp_config:
     noise_dist='uniform'
     d=None
     verbose=0
-    log_dir=None
+    
     aggr_res_path = None
     update_aggr_res=True
     batch_opt=True

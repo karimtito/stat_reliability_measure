@@ -15,7 +15,7 @@ from stat_reliability_measure.home import ROOT_DIR
 
 class config:
     dataset='imagenet'
-    log_dir=ROOT_DIR+"/logs/imagenet_tests"
+    log_dir=ROOT_DIR+"/logs/exp_3"
     model_dir=ROOT_DIR+"/models/imagenet"
     model_arch="torchvision_mobilenet_v2"
     N_range=[64,128,256,512]

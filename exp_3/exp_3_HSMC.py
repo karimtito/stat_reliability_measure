@@ -324,7 +324,7 @@ d=config.d
 #epsilon=config.epsilon
 
 if config.log_dir is None:
-    config.log_dir=os.path.join(ROOT_DIR+'/logs',config.dataset+'_tests')
+    config.log_dir=os.path.join(ROOT_DIR+'/logs','exp_3')
 if not os.path.exists(ROOT_DIR+'/logs'):
     os.mkdir(ROOT_DIR+'/logs')  
 if not os.path.exists(config.log_dir):

@@ -23,7 +23,7 @@ method_name="MLS_SMC"
 
 class config:
     dataset="imagenet"
-    log_dir=ROOT_DIR+"/logs/imagenet_tests"
+    log_dir=ROOT_DIR+"/logs/exp_3"
     model_dir=ROOT_DIR+"/models/imagenet"
     model_arch='torchvision_mobilenet_v2'
     T_range=[10,20,50,100,200]

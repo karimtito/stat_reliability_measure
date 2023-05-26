@@ -23,7 +23,7 @@ low_str=lambda x: str(x).lower()
 method_name="MLS_SMC"
 class config:
     dataset="mnist"
-    log_dir=ROOT_DIR+"/logs/mnist_tests"
+    log_dir=ROOT_DIR+"/logs/exp_2_mnist"
     model_dir=ROOT_DIR+"/models/mnist"
     model_arch='dnn_2'
     epsilons = [0.15]

@@ -205,7 +205,7 @@ def main():
         config.opt_steps_list = [config.optim_steps]
     nb_runs*=len(config.opt_steps_list)
     if config.log_dir is None:
-        config.log_dir=os.path.join(ROOT_DIR+'/logs',config.dataset+'_tests')
+        config.log_dir=os.path.join(ROOT_DIR+'/logs','exp_2_'+config.dataset)
     if config.noise_dist not in ['uniform','gaussian']:
         raise NotImplementedError("Only uniform and Gaussian distributions are implemented.")
     if config.track_gpu:

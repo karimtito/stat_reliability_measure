@@ -162,7 +162,7 @@ for k,v in vars(args).items():
 
 def main():
     if config.log_dir is None:
-        config.log_dir=os.path.join(ROOT_DIR,f"logs/{config.dataset}_tests")
+        config.log_dir=os.path.join(ROOT_DIR,f"logs/exp_2_{config.dataset}")
 
     if config.model_dir is None:
         config.model_dir=os.path.join(ROOT_DIR,f"models/{config.dataset}")
