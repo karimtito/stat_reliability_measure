@@ -294,8 +294,8 @@ def main():
     if config.dt_gain is None:
         config.dt_gain=1/config.dt_decay
     config_dict=print_config(config)
-    path_config=os.path.join(exp_log_path,'config.json')
-    with open(path_config,'w') as f:
+    config_path=os.path.join(exp_log_path,'config.json')
+    with open(config_path,'w') as f:
         f.write(json.dumps(config_dict, indent = 4))
 
     param_ranges = [config.N_range,config.T_range,config.alpha_range,config.p_range,config.e_range]

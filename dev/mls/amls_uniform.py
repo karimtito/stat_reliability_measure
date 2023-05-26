@@ -120,7 +120,10 @@ def multilevel_uniform(
         if count_keep == 0:
             s_x = prop(x).squeeze(-1)
             max_val = s_x.max().item() 
-            return -math.inf,count_calls,max_val, x, levels
+            dic_out = {}
+            if track_accept:
+                dic_out['acc_ratios']=acc_ratios
+            return -math.inf,count_calls,max_val, x, levels,dic_out
 
         lg_p += torch.log(count_keep.float()).item() - math.log(count_particles)
         #print('term', torch.log(count_keep.float()).item() - math.log(count_particles))
@@ -205,7 +208,7 @@ def multilevel_uniform(
     #count_calls+=count_particles
     #max_val = max(max_val, x.max().item())
     max_val = s_x.max().item() 
-    dic_out={}
+    dic_out={'one':1}
     if track_accept:
         dic_out['acc_ratios']=np.array(acc_ratios)
     return lg_p,count_calls,max_val, x, levels,dic_out  #, code modification: we add a counter of calls to score function, aswell as an option to track acceptance ratios

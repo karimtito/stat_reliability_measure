@@ -160,7 +160,7 @@ gain_thresh=0.01):
     K_last = (SX>=tau).sum().item() # count the nb of score above the target threshold
 
     #Estimation
-
+    P_est = (K_last/N)*(K/N)**n # estimate the probability of failure
     
     if tau_j>tau:
         Var_est = P_est**2*(P_est**(-1/N)-1)    

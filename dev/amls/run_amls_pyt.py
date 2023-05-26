@@ -65,8 +65,8 @@ def run_amls_exp(model, X, y, epsilons=None, dataset_name = None,model_name=None
     config.d = int(d)
 
     config_dict = print_config(config)
-    path_config=os.path.join(exp_log_path,'config.json')
-    with open(path_config,'w') as f:
+    config_path=os.path.join(exp_log_path,'config.json')
+    with open(config_path,'w') as f:
         f.write(json.dumps(config_dict, indent = 4,cls=utils.NpEncoder))
     
     X_correct,label_correct,accuracy,num_classes = t_u.get_x_y_accuracy_num_cl(X,y,model)

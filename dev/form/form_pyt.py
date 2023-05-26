@@ -49,5 +49,33 @@ def find_zero_gd_pyt(f, grad_f, x0, obj='min', step_size=1e-2, max_iter=100, tol
         print('Warning: max_iter reached in find_zero_gd')
     return x, f_calls
 
-def design_point_search(f, grad_f, x_0, step_size=1e-2,max_iter=100):
-    """ Finds the design point using HL-RF algorithm """
+def mpp_search(f, grad_f, x_0,max_iter=100,stop_cond_type='grad_norm',stop_eps=1e-3):
+    """ Search algorithm for the Most Probable Point (MPP) 
+        according to 'Probabilistc Engineering Design' source from University of Missouri  """
+    x=x_0 
+    grad_fx = grad_f(x)
+    f_calls+=2
+    beta=torch.norm(x)
+    k= 0
+    stop_cond=False
+    while k<max_iter &  ~stop_cond: 
+        k+=1
+        a = grad_fx/torch.norm(grad_fx)
+        beta_new = beta + f(x)/torch.norm(grad_fx)
+        f_calls+=1
+        x_new=-a*beta
+        grad_f_xnew = grad_f(x_new)
+        f_calls+=2
+        if stop_cond_type not in ['grad_norm']:
+            raise NotImplementedError(f"Method {stop_cond_type} is not implemented.")
+        if stop_cond_type=='grad_norm':
+            stop_cond = torch.norm(grad_fx-grad_f_xnew)<stop_eps
+        beta=beta_new
+        x=x_new
+        grad_fx=grad_f_xnew
+    if k==max_iter:
+        print("Warning: maximum number of iteration has been reached")
+    return x, f_calls
+
+        
+            

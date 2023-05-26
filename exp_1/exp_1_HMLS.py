@@ -215,8 +215,8 @@ def main():
     config.json=vars(args)
     #if config.print_config:
     config_dict=print_config(config)
-    path_config=os.path.join(exp_log_path,'config.json')
-    with open(path_config,'w') as f:
+    config_path=os.path.join(exp_log_path,'config.json')
+    with open(config_path,'w') as f:
         f.write(json.dumps(config_dict, indent = 4))
     # if config.save_confi
     # if config.save_config:
