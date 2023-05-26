@@ -66,7 +66,7 @@ class config:
     dt_gain=None
     dt_min=1e-3
     dt_max=0.5
-    v_min_opt=False
+    v_min_opt=True
     ess_opt=False
     only_duplicated=False
     np_seed=None
@@ -263,8 +263,7 @@ if not os.path.exists(raw_logs_path):
     os.mkdir(raw_logs_path)
 
 loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
-    log_name=method_name+'_'+'_'+loc_time
-log_name=method_name+'_'+'_'+loc_time
+log_name=method_name+'_'+loc_time
 exp_log_path=os.path.join(raw_logs_path,log_name)
 if os.path.exists(exp_log_path):
     exp_log_path = exp_log_path +'_'+ str(np.random.randint(low=0,high=9))
