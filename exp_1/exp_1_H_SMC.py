@@ -300,7 +300,7 @@ def main():
     config_dict=print_config(config)
     config_path=os.path.join(exp_log_path,'config.json')
     with open(config_path,'w') as f:
-        f.write(json.dumps(config_dict, indent = 4))
+        f.write(json.dumps(config_dict, indent = 4, cls=utils.CustomEncoder))
 
     param_ranges = [config.N_range,config.T_range,config.alpha_range,config.p_range,config.e_range]
     param_lens=np.array([len(l) for l in param_ranges])

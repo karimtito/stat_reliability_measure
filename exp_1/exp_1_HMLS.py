@@ -188,6 +188,7 @@ def main():
         config.gpu_name=gpus[0].name
 
     if config.track_cpu:
+        import cpuinfo
         config.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
         config.cores_number=os.cpu_count()
 
@@ -217,7 +218,7 @@ def main():
     config_dict=print_config(config)
     config_path=os.path.join(exp_log_path,'config.json')
     with open(config_path,'w') as f:
-        f.write(json.dumps(config_dict, indent = 4))
+        f.write(json.dumps(config_dict, indent = 4, cls=utils.CustomEncoder))
     # if config.save_confi
     # if config.save_config:
     #     with open(file=os.path.join(),mode='w') as f:
@@ -256,7 +257,7 @@ def main():
                             same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method_name,'='),
                             ('p_t',p_t,'='),('n_rep',config.n_rep,'='),('alpha',config.alpha,'='),
                             ('N',N,'='),
-                            ('T',T,'='),('ratio',ratio,'='),('last_particle',config.last_particle,'==')] )  
+                            ('T',T,'='),('ratio',ratio,'='),] )  
                             # if a similar experiment has been done in the current log directory we skip it
                             if len(same_exp_df)>0:
                                 K=int(N*ratio) if not config.last_particle else N-1
@@ -407,7 +408,7 @@ def main():
                             }
                         exp_res.append(results)
                         results_df=pd.DataFrame([results])
-                        results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
+                        #results_df.to_csv(os.path.join(log_path,'results.csv'),index=False)
                         if config.aggr_res_path is None:
                             aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
                         else:

@@ -200,7 +200,7 @@ def main():
     config_dict=print_config(config)
     config_path=os.path.join(exp_log_path,'config.json')
     with open(config_path,'w') as f:
-        f.write(json.dumps(config_dict, indent = 4))
+        f.write(json.dumps(config_dict, indent = 4, cls=utils.CustomEncoder))
     # if config.save_confi
     # if config.save_config:
     #     with open(file=os.path.join(),mode='w') as f:
