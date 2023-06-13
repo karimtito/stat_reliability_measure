@@ -14,13 +14,13 @@ import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
 from stat_reliability_measure.dev.utils import get_sel_df, print_config
 from stat_reliability_measure.home import ROOT_DIR
+from stat_reliability_measure.exp_2.exp_config
 
 
 
 method_name="HMLS"
 class config:
-    dataset='mnist'
-    model_arch=None  
+ 
     epsilons = [0.15]
     N_range=[32,64,128,256,512,1024]
     T_range=[1,5,10,20,50]
@@ -61,7 +61,7 @@ class config:
     train_model=False
     
     
-    noise_dist='uniform'
+
     d=None
     verbose=0
     log_dir=None
@@ -147,18 +147,14 @@ class config:
     force_train=False
     killing=True
     repeat_exp=False
+
 parser=argparse.ArgumentParser()
-parser.add_argument('--log_dir',default=config.log_dir)
-parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
-parser.add_argument('--d',type=int,default=config.d)
-
 parser.add_argument('--min_rate',type=float,default=config.min_rate)
 parser.add_argument('--alpha',type=float,default=config.alpha)
 parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
-
 parser.add_argument('--save_config',type=str2bool, default=config.save_config)
 parser.add_argument('--allow_multi_gpu',type=str2bool)
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
@@ -168,9 +164,6 @@ parser.add_argument('--allow_zero_est',type=str2bool, default=config.allow_zero_
 parser.add_argument('--torch_seed',type=int, default=config.torch_seed)
 parser.add_argument('--np_seed',type=int, default=config.np_seed)
 parser.add_argument('--sigma', type=float,default=config.sigma)
-
-
-
 parser.add_argument('--N_range',type=str2intList,default=config.N_range)
 parser.add_argument('--T',type=int,default=config.T)
 parser.add_argument('--T_range',type=str2intList,default=config.T_range)
@@ -196,7 +189,6 @@ parser.add_argument('--dt_max',type=float,default=config.dt_max)
 parser.add_argument('--adapt_dt_mcmc',type=str2bool,default=config.adapt_dt_mcmc)
 parser.add_argument('--update_aggr_res',type=str2bool,default=config.update_aggr_res)
 parser.add_argument('--v_min_opt',type=str2bool,default=config.v_min_opt)
-
 parser.add_argument('--lambda_0',type=float,default=config.lambda_0)
 parser.add_argument('--test2',type=str2bool,default =config.test2)
 parser.add_argument('--print_config',type=str2bool,default=config.print_config)
@@ -207,7 +199,7 @@ parser.add_argument('--adapt_step',type=str2bool,default=config.adapt_step)
 parser.add_argument('--FT',type=str2bool,default=config.FT)
 parser.add_argument('--sig_dt', type=float,default=config.sig_dt)
 parser.add_argument('--load_batch_size',type=int,default=config.load_batch_size)
-parser.add_argument('--model_arch',type=str,default = config.model_arch)
+parser.add_argument('--model_arch',type=str,default = exp_config.model_arch)
 parser.add_argument('--robust_model',type=str2bool, default=config.robust_model)
 parser.add_argument('--nb_epochs',type=int,default=config.nb_epochs)
 parser.add_argument('--adversarial_every',type=int,default=config.adversarial_every)
@@ -224,7 +216,7 @@ parser.add_argument('--g_target',type=float,default=config.g_target)
 parser.add_argument('--kappa_opt',type=str2bool,default=config.kappa_opt)
 parser.add_argument('--only_duplicated',type=str2bool,default=config.only_duplicated)
 parser.add_argument('--force_train',type=str2bool,default=config.force_train)
-parser.add_argument('--dataset',type=str, default=config.dataset)
+parser.add_argument('--dataset',type=str, default=exp_config.dataset)
 parser.add_argument('--input_start',type=int, default=config.input_start)
 parser.add_argument('--input_stopt',type=int, default=config.input_stop)
 parser.add_argument('--repeat_exp',type=str2bool,default=config.repeat_exp)
@@ -234,21 +226,21 @@ for k,v in vars(args).items():
     setattr(config, k, v)
 
 def main():
-    if config.model_dir is None:
-        config.model_dir=os.path.join(ROOT_DIR+"/models/",config.dataset)
+    if exp_config.model_dir is None:
+        exp_config.model_dir=os.path.join(ROOT_DIR+"/models/",exp_config.dataset)
 
-    if config.model_arch is None:
-        config.model_arch = t_u.datasets_default_arch[config.dataset]
+    if exp_config.model_arch is None:
+        exp_config.model_arch = t_u.datasets_default_arch[exp_config.dataset]
 
-    if not os.path.exists(config.model_dir):
-        os.mkdir(config.model_dir)
+    if not os.path.exists(exp_config.model_dir):
+        os.mkdir(exp_config.model_dir)
 
-    config.d = t_u.datasets_dims[config.dataset]
-    color_dataset=config.dataset in ('cifar10','cifar100','imagenet') 
+    exp_config.d = t_u.datasets_dims[exp_config.dataset]
+    color_dataset=exp_config.dataset in ('cifar10','cifar100','imagenet') 
    
 
   
-    prblm_str=config.dataset
+    prblm_str=exp_config.dataset
 
 
     method_name="HLMS"
@@ -262,10 +254,10 @@ def main():
     if len(config.N_range)==0:
         config.N_range= [config.N]
 
-    if config.noise_dist is not None:
-        config.noise_dist=config.noise_dist.lower()
+    if exp_config.noise_dist is not None:
+        exp_config.noise_dist=exp_config.noise_dist.lower()
 
-    if config.noise_dist not in ['uniform','gaussian']:
+    if exp_config.noise_dist not in ['uniform','gaussian']:
         raise NotImplementedError("Only uniform and Gaussian distributions are implemented.")
 
     if len(config.T_range)==0:
@@ -317,7 +309,7 @@ def main():
     #epsilon=config.epsilon
 
     if config.log_dir is None:
-        config.log_dir=os.path.join(ROOT_DIR+'/logs','exp_2_'+config.dataset)
+        config.log_dir=os.path.join(ROOT_DIR+'/logs','exp_2_'+exp_config.dataset)
     if not os.path.exists(ROOT_DIR+'/logs'):
         os.mkdir(ROOT_DIR+'/logs')  
     if not os.path.exists(config.log_dir):
@@ -365,22 +357,22 @@ def main():
     mh_str="adjusted" 
     method=method_name
     save_every = 1
-    num_classes=t_u.datasets_num_c[config.dataset.lower()]
-    print(f"Running reliability experiments on architecture {config.model_arch} trained on {config.dataset}.")
+    num_classes=t_u.datasets_num_c[exp_config.dataset.lower()]
+    print(f"Running reliability experiments on architecture {exp_config.model_arch} trained on {exp_config.dataset}.")
     print(f"Testing uniform noise pertubatin with epsilon in {config.epsilons}")
     test_loader = t_u.get_loader(train=False,data_dir=config.data_dir,download=config.download
-    ,dataset=config.dataset,batch_size=config.load_batch_size,
+    ,dataset=exp_config.dataset,batch_size=config.load_batch_size,
             x_mean=None,x_std=None)
 
-    model, model_shape,model_name=t_u.get_model(config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
-        nb_epochs=config.nb_epochs,model_dir=config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
-        download=config.download,dataset=config.dataset, force_train=config.force_train)
+    model, model_shape,model_name=t_u.get_model(exp_config.model_arch, robust_model=config.robust_model, robust_eps=config.robust_eps,
+        nb_epochs=config.nb_epochs,model_dir=exp_config.model_dir,data_dir=config.data_dir,test_loader=test_loader,device=config.device,
+        download=config.download,dataset=exp_config.dataset, force_train=config.force_train)
     X_correct,label_correct,accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=device,model=model)
     if config.verbose>=2:
         print(f"model accuracy on test batch:{accuracy}")
 
-    config.x_mean=t_u.datasets_means[config.dataset]
-    config.x_std=t_u.datasets_stds[config.dataset]
+    config.x_mean=t_u.datasets_means[exp_config.dataset]
+    config.x_std=t_u.datasets_stds[exp_config.dataset]
     x_min=0
     x_max=1
     if config.use_attack:
@@ -395,7 +387,7 @@ def main():
     config_dict=print_config(config)
     config_path=os.path.join(exp_log_path,'config.json')
     with open(config_path,'w') as f:
-        f.write(json.dumps(config_dict, indent = 4))
+        f.write(json.dumps(config_dict, indent = 4, cls=utils.CustomEncoder))
     inp_indices=np.arange(start=config.input_start,stop=config.input_stop)
     normal_dist=torch.distributions.Normal(loc=0, scale=1.)
     run_nb=0
@@ -419,11 +411,11 @@ def main():
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
                 # Step 2: define perturbation. Here we use a Linf perturbation on input image.
                 p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
-                num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)
+                num_classes=num_classes,noise_dist=exp_config.noise_dist,a=config.a,device=config.device)
                 p_l,p_u=p_l.item(),p_u.item()
             lirpa_safe=None
             if config.lirpa_cert:
-                assert config.noise_dist.lower()=='uniform',"Formal certification only makes sense for uniform distributions"
+                assert exp_config.noise_dist.lower()=='uniform',"Formal certification only makes sense for uniform distributions"
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_cert
                 lirpa_safe=get_lirpa_cert(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
                 num_classes=num_classes,device=config.device)
@@ -570,7 +562,7 @@ def main():
                                 results={"method":method_name,'T':T,'N':N,'L':L,
                                 "ratio":ratio,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
                                 "method":method,'adapt_dt':config.adapt_dt,"epsilon":epsilon,
-                                "model_name":model_name,"dataset":config.dataset
+                                "model_name":model_name,"dataset":exp_config.dataset
                                 ,"image_idx":l, 
                                 'mean_calls':calls.mean(),'std_calls':calls.std()
                                 ,'mean_time':times.mean(),'std_time':times.std()
@@ -586,7 +578,7 @@ def main():
                                  "linear":config.linear,
                                 "dt_min":config.dt_min,"dt_max":config.dt_max, "FT":config.FT,
                                 "M_opt":config.M_opt,"adapt_step":config.adapt_step,
-                                "noise_dist":config.noise_dist,"lirpa_safe":lirpa_safe,"L_min":config.L_min,
+                                "noise_dist":exp_config.noise_dist,"lirpa_safe":lirpa_safe,"L_min":config.L_min,
                                 "skip_mh":config.skip_mh,"GV_opt":config.GV_opt,
                                 'q_1':q_1,'q_3':q_3,'med_est':med_est,"lg_est_path":lg_est_path,
                                 "mean_log_est":mean_log_est,"std_log_est":std_log_est,

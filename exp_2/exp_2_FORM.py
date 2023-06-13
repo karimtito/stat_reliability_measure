@@ -17,15 +17,14 @@ from stat_reliability_measure.dev.utils import float_to_file_float,str2bool,str2
 import stat_reliability_measure.dev.torch_utils as t_u 
 
 from stat_reliability_measure.dev.form.form_pyt import find_zero_gd_pyt 
-
+from stat_reliability_measure.exp_2.exp_config import exp_config,parser
 method_name="FORM"
 
+
 class config:
-    n_rep=1
-    dataset='mnist'
     epsilon=1e-15
-    epsilons=[]
-    model_arch=None 
+
+
     optim_steps=10
     opt_steps_list = []
     verbose=0
@@ -144,7 +143,12 @@ parser.add_argument('--repeat_exp',type=str2bool,default=config.repeat_exp)
 
 args=parser.parse_args()
 for k,v in vars(args).items():
-    setattr(config, k, v)
+    if hasattr(config,k):
+        setattr(config, k, v)
+    elif hasattr(exp_config,k):
+        setattr(exp_config, k, v)
+    else:
+        raise ValueError(f"unknown config parameter {k}")
 
 #gradient descent in 1 dimension to find zero of a function f
 def find_zero_gd_pyt(f, grad_f, x0, obj='min', step_size=1e-2, max_iter=100, tol=1e-3,random_init=False):
@@ -288,7 +292,7 @@ def main():
     config_dict=print_config(config)
     config_path=os.path.join(exp_log_path,'config.json')
     with open(config_path,'w') as f:
-        f.write(json.dumps(config_dict, indent = 4))
+        f.write(json.dumps(config_dict, indent = 4, cls=utils.CustomEncoder))
     inp_indices=np.arange(start=config.input_start,stop=config.input_stop)
     normal_dist=torch.distributions.Normal(loc=0, scale=1.)
     run_nb=0
