@@ -14,7 +14,7 @@ from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intLis
 from stat_reliability_measure.dev.utils import print_config
 from scipy.special import betainc
 from stat_reliability_measure.home import ROOT_DIR
-
+from pathlib import Path
 
 
 method_name="H_SMC"
@@ -48,7 +48,7 @@ class config:
     print_config=True
     d=1024
     verbose=0
-    log_dir=ROOT_DIR+'/logs/linear_gaussian_tests'
+    log_dir=ROOT_DIR+'/logs/exp_1_linear_gaussian'
     aggr_res_path = None
     update_aggr_res=True
     sigma=1

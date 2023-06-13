@@ -72,7 +72,7 @@ class config:
     torch_seed=0
     np_seed=0
 
-    log_dir=ROOT_DIR+"/logs/linear_gaussian_tests"
+    log_dir=ROOT_DIR+"/logs/exp_1_linear_gaussian"
     batch_opt=True
     allow_multi_gpu=True
     track_gpu=False

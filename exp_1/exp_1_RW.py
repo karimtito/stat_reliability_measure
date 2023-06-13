@@ -41,7 +41,7 @@ class config:
     print_config=True
     d=1024
     verbose=0
-    log_dir=ROOT_DIR+'/logs/linear_gaussian_tests'
+    log_dir=ROOT_DIR+"/logs/exp_1_linear_gaussian"
     aggr_res_path = None
     update_aggr_res=True
     sigma=1
