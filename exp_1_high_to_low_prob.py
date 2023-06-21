@@ -90,7 +90,7 @@ def main():
     aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
     if not os.path.exists(aggr_res_path):
         print(f"Completion rate: 0%")
-        cols=['p_t','method','N','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est','s',
+        cols=['p_t','method','N','ratio','rho','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est','s',
             'bias','mean abs error','batch_size','mean_rel_error','std_est','freq underest','gpu_name','cpu_name','ratio',
             'ess_alpha','L']
         aggr_res_df= pd.DataFrame(columns=cols)
@@ -110,8 +110,10 @@ def main():
             import exp_1.exp_1_RW as exp
         elif method.lower() in ('mala_smc','mala'):
             import exp_1.exp_1_MALA as exp
-        # elif method=='FORM':
-        #     import exp_1.exp_1_FORM as exp_1_FORM
+        elif method.lower() in ('hmls_smc','hmls'):
+            import exp_1.exp_1_HMLS as exp
+        elif method=='FORM':
+            import exp_1.exp_1_FORM as exp
         else:
             raise NotImplementedError(f"Method {method} is not implemented yet.")
         for key,value in config.params_dic[method].items():
