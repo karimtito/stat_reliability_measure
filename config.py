@@ -53,7 +53,7 @@ class Config:
     def build_parser(self,description='configuration'):
         parser = argparse.ArgumentParser(description=description)
         for key in vars(self).keys():
-            if ('_range' in key) or  ('_list' in key) or (key=='epsilons'):
+            if ('_range' in key) or  ('_list' in key):
                 # if the key is a range or list and the value is empty 
                 # then the type is the type of the first element of the list
                 if len(vars(self)[key])==0:
@@ -157,7 +157,7 @@ class Exp1config(ExpConfig):
             self.noise_dist=self.noise_dist.lower()
 
         if self.noise_dist not in ['uniform','gaussian']:
-            raise NotImplementedError("Only uniform and Gaussian distributions are implemented.")
+            raise NotImplementedError("Only uniform and Gaussian noise distributions are implemented.")
         if not self.allow_multi_gpu:
             os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
@@ -168,8 +168,8 @@ class Exp1config(ExpConfig):
 
         if len(self.device)==0:
             self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-            if self.verbose>=5:
-                print(self.device)
+            if self.verbose>=1:
+                print(f"PyTorch running on device: {self.device}")
 
 
         if len(self.log_dir)==0:
@@ -235,7 +235,7 @@ class Exp2Config(ExpConfig):
                 'robust_eps':0.1,'load_batch_size':128,'nb_epochs': 15,'adversarial_every':1,}
     #p_ref_compute = False
     def __init__(self,config_dict=default_dict,X=None,y=None,model=None,epsilon_range=[],
-                dataset_name='',aggr_res_path='',model_name='',verbose=0.,**kwargs):
+                dataset_name='mnist',aggr_res_path='',model_name='',verbose=0.,**kwargs):
         if X is not None:
             self.X=X
         if y is not None:
@@ -249,6 +249,7 @@ class Exp2Config(ExpConfig):
         self.verbose=verbose
         vars(self).update(kwargs)
         super().__init__()
+
     def update(self, method_name=''):
         super().update()
         self.method_name = method_name
