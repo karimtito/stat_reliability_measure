@@ -4,8 +4,8 @@ import torch
 import math
 from stat_reliability_measure.dev.utils import dichotomic_search
 
-def TestImportanceSplittingPyt(gen,kernel,h,tau,N=2000,s=1,decay=0.95
-            ,p_c=10**(-5),T = 30,n_max = 5000, alpha_est = 0.95, alpha_test=0.99,
+def HypTestImportanceSplittingPyt(gen,kernel,h,tau,N=2000,s=1,decay=0.95
+    ,p_c=10**(-5),T = 30,n_max = 5000, alpha_est = 0.95, alpha_test=0.99,
 verbose=1, track_rejection=False, rejection_ctrl = True,  gain_rate = 1.0001, 
 prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
 reject_forget_rate =1, gain_forget_rate=1,check_every=10,accept_ratio=0.9,
@@ -160,7 +160,7 @@ gain_thresh=0.01):
     K_last = (SX>=tau).sum().item() # count the nb of score above the target threshold
 
     #Estimation
-    P_est = (K_last/N)*(K/N)**n # estimate the probability of failure
+    P_est = (K_last/N)*((N-1)/N)**n # estimate the probability of failure
     
     if tau_j>tau:
         Var_est = P_est**2*(P_est**(-1/N)-1)    
