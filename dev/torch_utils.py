@@ -5,11 +5,14 @@ from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,C
 from torchvision import transforms,datasets,models as tv_models
 from torch.utils.data import DataLoader
 import timm
+from home import ROOT_DIR
 from torch import optim
 import os
 import math
 import numpy as np
-
+import matplotlib.pyplot as plt
+import json
+from pathlib import Path
 def norm_batch_tensor(x,d):
     y = x.reshape(x.shape[:1]+(d,))
     return y.norm(dim=-1)
@@ -333,14 +336,16 @@ def compute_h_pyt(model, input_, target_class):
 
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 norm_dist_pyt = torch.distributions.Normal
-def V_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None, gaussian_prior=False):
+def V_pyt(x_,x_0,model,target_class,low=0.0,high=1.0,gaussian_latent=True,reshape=True,input_shape=None, noise_dist='gaussian',
+          noise_scale=1.0,):
+    gaussian_prior=noise_dist=='gaussian' or noise_dist=='normal'
     with torch.no_grad():
         if input_shape is None:
             input_shape=x_0.shape
-        if gaussian_latent:
+        if gaussian_latent and not gaussian_prior:
             u=normal_dist.cdf(x_)
         else:
-            u=x_
+            u=noise_scale*x_+x_0
         if reshape:
             u=torch.reshape(u,(u.shape[0],)+input_shape)
 
@@ -352,8 +357,9 @@ def V_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,i
     v = compute_V_pyt(model=model,input_=x_p,target_class=target_class)
     return v
 
-def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None,gaussian_prior=False):
-   
+def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None, noise_dist='gaussian',
+              noise_scale=1.0,):
+    gaussian_prior = noise_dist=='gaussian' or noise_dist=='normal'
     if input_shape is None:
         input_shape=x_0.shape
     if gaussian_latent and not gaussian_prior:
@@ -461,6 +467,15 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
                          
     return data_loader
 
+def plot_tensor(x):
+    if 'cuda' in str(x.device):
+        x=x.cpu()
+    if len(x.shape)==4:
+        x=x.squeeze(0)
+    if len(x.shape)==3:
+        x=x.permute(1,2,0)
+    plt.imshow(x)
+    plt.show()
 
 def get_correct_x_y(data_loader,device,model):
     for X,y in data_loader:
@@ -470,7 +485,7 @@ def get_correct_x_y(data_loader,device,model):
         logits=model(X)
         y_pred= torch.argmax(logits,-1)
         correct_idx=y_pred==y
-    return X[correct_idx],y[correct_idx],correct_idx.float().mean()
+    return X[correct_idx],y[correct_idx],correct_idx.float().mean().item()
 
 def get_x_y_accuracy_num_cl(X,y,model):
     with torch.no_grad():
@@ -487,7 +502,7 @@ def get_model_imagenet(model_arch,model_dir):
     std = [0.229, 0.224, 0.225]
     normalizer = transforms.Normalize(mean=mean, std=std)
     if model_arch.lower().startswith("torchvision"):
-        model = getattr(tv_models, model_arch[len("torchvision_"):])(pretrained=True)
+        model = getattr(tv_models, model_arch[len("torchvision_"):])(weights="IMAGENET1K_V2")
     else:
         model = timm.create_model(model_arch, pretrained=True)
         mean = model.default_cfg["mean"]
@@ -1318,5 +1333,12 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     
     
     return q,v_q,grad_V_q,nb_calls,dict_out
+
+def get_imagenet_dict():
+    json_path = Path(ROOT_DIR) / "data/ImageNet/imagenet-simple-labels.json"
+    with open(json_path, 'r') as f:
+        imagenet_dict = json.load(f)
+    return imagenet_dict
+
 
 
