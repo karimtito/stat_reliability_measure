@@ -52,7 +52,7 @@ def run_amls_exp(model, X, y, epsilons=None, dataset_name = None,model_name=None
     if not os.path.exists(raw_logs_path):
         os.mkdir(raw_logs_path)
     loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
-    log_name=config.method_name+'_'+'_'+loc_time
+    log_name=config.method_name+'_'+loc_time
     exp_log_path=os.path.join(raw_logs_path,log_name)
     if os.path.exists(path=exp_log_path):
         exp_log_path = exp_log_path+'_'+str(np.random.randint(low=0,high=9))
@@ -63,7 +63,7 @@ def run_amls_exp(model, X, y, epsilons=None, dataset_name = None,model_name=None
     config_dict = print_config(config)
     config_path=os.path.join(exp_log_path,'config.json')
     with open(config_path,'w') as f:
-        f.write(json.dumps(config_dict, indent = 4))
+        f.write(json.dumps(config_dict, indent = 4, cls=utils.CustomEncoder))
     
     X_correct,label_correct,accuracy,num_classes = t_u.get_x_y_accuracy_num_cl(X,y,model)
     if config.verbose>=2:
