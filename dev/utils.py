@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import json
+import pathlib
 
 
 datasets_dims={'mnist':784,'cifar10':3*1024,'cifar100':3*1024,'imagenet':3*224**2}
@@ -8,7 +9,7 @@ datasets_num_c={'mnist':10,'cifar10':10,'imagenet':1000}
 datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465),'cifar100':[125.3/255.0, 123.0/255.0, 113.9/255.0]}
 datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010),'cifar100':[63.0/255.0, 62.1/255.0, 66.7/255.0]}
 
-class NpEncoder(json.JSONEncoder):
+class CustomEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer):
             return int(obj)
@@ -16,7 +17,9 @@ class NpEncoder(json.JSONEncoder):
             return float(obj)
         if isinstance(obj, np.ndarray):
             return obj.tolist()
-        return super(NpEncoder, self).default(obj)
+        if isinstance(obj, pathlib.Path):
+            return str(obj)
+        return super(CustomEncoder, self).default(obj)
 
 def dichotomic_search(f, a, b, thresh=0, n_max =50):
     """Implementation of dichotomic search of minimum solution for an increasing function
@@ -94,23 +97,51 @@ def str2list(in_str,split_chr=',',type_out=None):
         l=[type_out(e) for e in l]
     return l
 
-def clean_vars(config):
-    return {key:config.__dict__[key] for key in config.__dict__.keys() if '__' not in key}
+def clean_vars(object):
+    """returs a dictionnary of 'clean' attributes of object"""
+    vars_=vars(object)
+    return {key:vars_[key] for key in vars_.keys() if '__' not in key}
 
-def print_config(config):
-    """prints and returns ditcionnary of configuration attributes
+def simple_vars(object,simple_types=[int,bool,float,str]):
+    """returns a dictionnary of 'simple' attributes of object"""
+    vars_=vars(object)
+    return {key:vars_[key] for key in vars_.keys() if type(vars_[key]) in simple_types}
+
+def range_vars(object,):
+    vars_=vars(object)
+    return {key:vars_[key] for key in vars_.keys() if '_range' in key}
+
+def clean_attr_dict(object):
+    """returns ditcionnary of 'clean' attributes of object as a dictionnary
 
     Args:
-        config (_type_): _description_
+        object (any): object to be cleaned
 
     Returns:
-        dict: dictionnary containing only useful attributes of config
+        dict: dictionnary containing only 'clean' attributes of object
     """
-    config_dict=config.__dict__
-    clean_keys= [key for key in config_dict.keys() if '__' not in key and key!='json']+['__module__']
+    config_dict=object.__dict__
+    clean_keys= [key for key in config_dict.keys() if '__' not in key and key!='json']
     clean_dict = {key: config_dict[key] for key in clean_keys}
-    print(f"configuration:\n {clean_dict}")
     return clean_dict
+
+def pars_type(x):
+    pars_type_dict={int:str2intList,float:str2floatList,str:str2list,bool:str2boolList}
+    t = type(x)
+    if t in pars_type_dict.keys():
+        return t
+    if t==list:
+        # if list, we try to infer the type of the elements
+        if len(x)==0:
+            return str2list
+        t_0 = type(x[0])
+        if t_0 in pars_type_dict.keys():
+            return pars_type_dict[t_0]
+        else:
+            raise ValueError(f"cannot infer valid type for list {x} (type(x)={type(x)})")
+    else:
+        raise ValueError(f"cannot infer valid type for {x} (type(x)={type(x)})")
+    
 
 def get_sel_df(df,cols=None,vals=None,conds=None,triplets=None):
     cvc_flag=(cols is not None and vals is not None and (len(cols)==len(vals)))
@@ -146,6 +177,14 @@ def get_sel_df(df,cols=None,vals=None,conds=None,triplets=None):
     mask=mask.apply(bool)
     return df[mask]
 
+
+def range_dict_to_lists(range_dict):
+    l = []
+    for k in range_dict.keys():
+        l.append([(k.replace('_range',''),e) for e in range_dict[k]])
+    return l
+
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
 str2intList=lambda x: str2list(in_str=x, type_out=int)
+str2boolList=lambda x: str2list(in_str=x, type_out=bool)
 low_str=lambda x: str(x).lower()
