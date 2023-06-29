@@ -3,7 +3,7 @@ import math
 import numpy as np
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
 from stat_reliability_measure.dev.torch_utils import TimeStepPyt, adapt_verlet_mcmc, adapt_verlet_mcmc2, apply_gaussian_kernel,verlet_mcmc
-from stat_reliability_measure.dev.utils import pars_type, range_vars, simple_vars
+from stat_reliability_measure.dev.utils import valid_pars_type, range_vars, simple_vars
 from stat_reliability_measure.config import Config
 import itertools
 from stat_reliability_measure.dev.torch_utils import V_pyt, gradV_pyt
@@ -623,7 +623,8 @@ debug=False,kappa_opt=False,
 
 
 class SMCSamplerConfig(Config):
-    default_dict={'N_range': [32,64,128,256,512,1024],
+    default_dict={"method_name":'SMC',
+        'N_range': [32,64,128,256,512,1024],
                  'T_range':[1,5,10,20,50],
                   'ess_alpha_range':[0.85],
     'alpha_range':[],
@@ -636,7 +637,6 @@ class SMCSamplerConfig(Config):
     
     default_dict.update({'min_rate':0.15,'T':1,
     'N':100,
-    
     'n_max':10000,
     'track_accept':True,
     'track_calls':True,
@@ -673,7 +673,6 @@ class SMCSamplerConfig(Config):
     'sig_dt':0.02,
     'L_min':1,
     'GK_opt':False,
-    'GV_opt':False,
     'g_target':0.8,
     'skip_mh':False,
     'killing':True})
@@ -681,67 +680,26 @@ class SMCSamplerConfig(Config):
     def __init__(self,config_dict=default_dict):
         vars(self).update(config_dict)
         super().__init__()
-    
+   
+            
     def add_parsargs(self,parser):
+    
         for key in vars(self).keys():
             if ('_range' in key) or  ('_list' in key):
                 # if the key is a range or list and the value is empty 
                 # then the type is the type of the first element of the list
                 if len(vars(self)[key])==0:
-                    ptype = pars_type([vars(self)[key.replace('_range','').replace('_list','')]])
+                    ptype,valid = valid_pars_type([vars(self)[key.replace('_range','').replace('_list','')]])
                 else:
-                    ptype = pars_type(vars(self)[key])
+                    ptype,valid = valid_pars_type(vars(self)[key])
             elif 'pars' in key or 'config' in key:
                 continue
             else:
                 # else the type is the type of the default value
-                ptype = pars_type(vars(self)[key])
-            parser.add_argument('--'+key,type=ptype,default=vars(self)[key])
-        
-        # parser.add_argument('--N',type=int,default=self.N)
-        # parser.add_argument('--min_rate',type=float,default=self.min_rate)
-        # parser.add_argument('--alpha',type=float,default=self.alpha)
-        # parser.add_argument('--n_max',type=int,default=self.n_max)
-        # parser.add_argument('--ess_alpha',type=float,default=self.ess_alpha)
-        # parser.add_argument('--e_range','--ess_range',type=str2floatList,default=self.e_range)
-        # parser.add_argument('--N_range',type=str2intList,default=self.N_range)
-        # parser.add_argument('--T',type=int,default=self.T)
-        # parser.add_argument('--T_range',type=str2intList,default=self.T_range)
-        # parser.add_argument('--L',type=int,default=self.L)
-        # parser.add_argument('--L_range',type=str2intList,default=self.L_range)
-        # parser.add_argument('--alpha_range',type=str2floatList,default=self.alpha_range)
-        # parser.add_argument('--v1_kernel',type=str2bool,default=self.v1_kernel)
-        # parser.add_argument('--track_accept',type=str2bool,default=self.track_accept)
-        # parser.add_argument('--track_calls',type=str2bool,default=self.track_calls)
-        # parser.add_argument('--track_beta',type=str2bool,default=self.track_beta)
-        # parser.add_argument('--track_ess',type=str2bool,default=self.track_calls)
-        # parser.add_argument('--track_v_means',type=str2bool,default=self.track_v_means)
-        # parser.add_argument('--track_ratios',type=str2bool,default=self.track_ratios)
-        # parser.add_argument('--mh_opt',type=str2bool,default=self.mh_opt)
-        # parser.add_argument('--adapt_dt',type=str2bool,default=self.adapt_dt)
-        # parser.add_argument('--target_accept',type=float,default=self.target_accept)
-        # parser.add_argument('--accept_spread',type=float,default=self.accept_spread)
-        # parser.add_argument('--dt_decay',type=float,default=self.dt_decay)
-        # parser.add_argument('--dt_gain',type=float,default=self.dt_gain)
-        # parser.add_argument('--dt_min',type=float,default=self.dt_min)
-        # parser.add_argument('--dt_max',type=float,default=self.dt_max)
-        # parser.add_argument('--adapt_dt_mcmc',type=str2bool,default=self.adapt_dt_mcmc)
-        # parser.add_argument('--v_min_opt',type=str2bool,default=self.v_min_opt)
-        # parser.add_argument('--ess_opt',type=str2bool,default=self.ess_opt)
-        # parser.add_argument('--lambda_0',type=float,default=self.lambda_0)
-        # parser.add_argument('--track_dt',type=str2bool,default=self.track_dt)
-        # parser.add_argument('--adapt_func',type=str,default=self.adapt_func)
-        # parser.add_argument('--M_opt',type=str2bool,default=self.M_opt)
-        # parser.add_argument('--adapt_step',type=str2bool,default=self.adapt_step)
-        # parser.add_argument('--FT',type=str2bool,default=self.FT)
-        # parser.add_argument('--sig_dt', type=float,default=self.sig_dt)
-        # parser.add_argument('--L_min',type=int,default=self.L_min)
-        # parser.add_argument('--GK_opt',type=str2bool,default=self.GK_opt)
-        # parser.add_argument('--GV_opt',type=str2bool,default=self.GV_opt)
-        # parser.add_argument('--skip_mh',type=str2bool,default=self.skip_mh)
-        # parser.add_argument('--g_target',type=float,default=self.g_target)
-        # parser.add_argument('--kappa_opt',type=str2bool,default=self.kappa_opt)
-        # parser.add_argument('--only_duplicated',type=str2bool,default=self.only_duplicated)
+                ptype,valid = valid_pars_type(vars(self)[key])
+            if valid:
+                parser.add_argument('--'+key,type=ptype,default=vars(self)[key])
+    
         return parser
     
     def update(self):
@@ -769,8 +727,17 @@ class SMCSamplerConfig(Config):
             self.method_name="MALA_SMC"
         else:
             self.method_name="H_SMC"
+        
         if self.dt_gain==-1:
             self.dt_gain=1/self.dt_decay
+    def get_method_name(self):
+        if self.GV_opt:
+            self.method_name="RW_SMC"
+        elif self.L==1:
+            self.method_name="MALA_SMC"
+        else:
+            self.method_name="H_SMC"
+        return self.method_name
     def V_classif(self,X):
         assert hasattr(self,'exp_config'), "exp_config not defined"
         return V_pyt(X,x_0=self.exp_config.x_0,model=self.exp_config.model,low=self.exp_config.low,high=self.exp_config.high,target_class=self.exp_config.y_0
