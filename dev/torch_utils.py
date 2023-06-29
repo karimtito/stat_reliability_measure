@@ -4,7 +4,7 @@ from stat_reliability_measure.dev.utils import float_to_file_float
 from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,ConvNet,DenseNet3
 from torchvision import transforms,datasets,models as tv_models
 from torch.utils.data import DataLoader
-import timm
+
 from home import ROOT_DIR
 from torch import optim
 import os
@@ -402,6 +402,7 @@ datasets_supp_archs={'mnist':{'dnn2':dnn2,'dnn_2':dnn2,'dnn_4':dnn4,'dnn4':dnn4,
                     'cifar10':{'lenet':LeNet,'convnet':ConvNet,'dnn2':dnn2},
                     'cifar100':{'densenet':DenseNet3}}
 datasets_default_arch={'mnist':'dnn2', 'cifar10':'convnet', 'cifar100':'densenet'}
+defaults_datasets=['mnist','cifar10','cifar100','imagenet']
 def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=None,x_std=None): 
     assert dataset in supported_datasets,f"support datasets are in {supported_datasets}"
     if dataset=='mnist':
@@ -495,6 +496,16 @@ def get_x_y_accuracy_num_cl(X,y,model):
         correct_idx=y_pred==y
     return X[correct_idx],y[correct_idx],correct_idx.float().mean(),num_classes
 
+def get_model_accuracy(X,y,model):
+    """return model accuracy on supervised data (X,y)"""
+    with torch.no_grad():
+        logits=model(X)
+        y_pred= torch.argmax(logits,-1)
+        correct_idx=y_pred==y
+    return correct_idx.float().mean()
+
+
+
 supported_arch={'cnn_custom':CNN_custom,'dnn2':dnn2,'dnn4':dnn4,}
 def get_model_imagenet(model_arch,model_dir):
     torch.hub.set_dir(model_dir)
@@ -504,6 +515,7 @@ def get_model_imagenet(model_arch,model_dir):
     if model_arch.lower().startswith("torchvision"):
         model = getattr(tv_models, model_arch[len("torchvision_"):])(weights="IMAGENET1K_V2")
     else:
+        import timm
         model = timm.create_model(model_arch, pretrained=True)
         mean = model.default_cfg["mean"]
         std = model.default_cfg["std"]
@@ -1279,12 +1291,9 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
                 print(f"ind_L:{ind_L}")
             
             sel_ind=torch.multinomial(input=lambda_i,num_samples=N,replacement=True,)
-            
             delta_t = torch.clamp(delta_t[sel_ind]+sig_dt*torch.randn_like(delta_t),min=dt_min,max=dt_max,)
             noise_L=torch.rand(size=(N,),device=ind_L.device)
-            
             ind_L= torch.clamp(ind_L[sel_ind]+((noise_L>=(2/3)).float()-(noise_L<=1/3).float())*ones_L,min=L_min,max=L+1e-3)
-            
         alpha=torch.rand(size=(N,),device=device)
         accept=torch.exp(delta_H)>alpha
         nb_accept=accept.sum().item()
@@ -1301,28 +1310,18 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
             mu_new,sig_new=o_new.mean(0),o_new.std(0)
             correl=((o_new-mu_new)*(o_old-mu_old)).mean(0)/(sig_old*sig_new)
             prod_correl*=correl
-
-    
-        
-        
-
-
         p = torch.randn_like(q)
         if scale_M is not None:
             p = sqrt_M*p
         H_old= Hamiltonian2(X=q, p=p,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
-        
         if save_H:
             H_[i+1] = H_old.mean()
-        
-
         if save_func is not None:
             saved.append(save_func(q,p))
         i+=1
     if verbose:
         print(f"T_final={i}")
     dict_out={'acc_rate':acc/(i*N),'T_final':i}
-
     if save_H:
         dict_out['H']=H_
     if save_func is not None:
@@ -1330,8 +1329,6 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     if FT:
         dict_out['dt']=delta_t
         dict_out['ind_L']=ind_L
-    
-    
     return q,v_q,grad_V_q,nb_calls,dict_out
 
 def get_imagenet_dict():
@@ -1339,6 +1336,13 @@ def get_imagenet_dict():
     with open(json_path, 'r') as f:
         imagenet_dict = json.load(f)
     return imagenet_dict
+
+def idx_zero(tensor):
+    """ returns idx where tensor is null"""
+    return (tensor==0.)
+def idx_negative(tensor):
+    """ returns idx where tensor is negative"""
+    return (tensor<0)
 
 
 
