@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 import json
 import pathlib
-
+import pandas as pd
 
 datasets_dims={'mnist':784,'cifar10':3*1024,'cifar100':3*1024,'imagenet':3*224**2}
 datasets_num_c={'mnist':10,'cifar10':10,'imagenet':1000}
@@ -102,10 +102,13 @@ def clean_vars(object):
     vars_=vars(object)
     return {key:vars_[key] for key in vars_.keys() if '__' not in key}
 
-def simple_vars(object,simple_types=[int,bool,float,str]):
+def simple_vars(object,simple_types=[int,bool,float,str,np.float32,np.float64,np.int32,np.int16],key_filtr='config'):
     """returns a dictionnary of 'simple' attributes of object"""
     vars_=vars(object)
-    return {key:vars_[key] for key in vars_.keys() if type(vars_[key]) in simple_types}
+    s_vars = {key:vars_[key] for key in vars_.keys() if type(vars_[key]) in simple_types}
+    if len(key_filtr)>0:
+        s_vars = {key:s_vars[key] for key in s_vars.keys() if key_filtr not in key }
+    return s_vars
 
 def range_vars(object,):
     vars_=vars(object)
@@ -125,25 +128,24 @@ def clean_attr_dict(object):
     clean_dict = {key: config_dict[key] for key in clean_keys}
     return clean_dict
 
-def pars_type(x):
+def valid_pars_type(x):
     pars_type_dict={int:str2intList,float:str2floatList,str:str2list,bool:str2boolList}
     t = type(x)
     if t in pars_type_dict.keys():
-        return t
+        return t,True
     if t==list:
         # if list, we try to infer the type of the elements
         if len(x)==0:
             return str2list
         t_0 = type(x[0])
         if t_0 in pars_type_dict.keys():
-            return pars_type_dict[t_0]
+            return pars_type_dict[t_0],True
         else:
-            raise ValueError(f"cannot infer valid type for list {x} (type(x)={type(x)})")
+            return t_0,False
     else:
-        raise ValueError(f"cannot infer valid type for {x} (type(x)={type(x)})")
-    
+        return t,False
 
-def get_sel_df(df,cols=None,vals=None,conds=None,triplets=None):
+def get_sel_df(df,cols=None,vals=None,conds=None,triplets=None,verbose=0):
     cvc_flag=(cols is not None and vals is not None and (len(cols)==len(vals)))
     triplet_flag=triplets is not None
     assert triplet_flag or cvc_flag,"triplets or (cols,vals,conds) should be not empty"
@@ -160,20 +162,25 @@ def get_sel_df(df,cols=None,vals=None,conds=None,triplets=None):
     else:
         iterator = triplets
     for (col,val,cond) in iterator:
-        if cond.lower() in ['eq','equal','same','==','=']:
-            mask*=(df[col]==val).apply(float)
-        elif cond.lower() in ['supeq','superequal','>=']:
-            mask*=(df[col]>=val).apply(float)
-        elif cond.lower() in ['infeq','inferequal','<=']:
-            mask*=(df[col]<=val).apply(float)
-        elif cond.lower() in ['inf','inferior','<']:
-            mask*=(df[col]<val).apply(float)
-        elif cond.lower() in ['sup','superior','>']:
-            mask*=(df[col]>val).apply(float)
-        if cond.lower() in ['neq','nonequal','!=']:
-            mask*=(df[col]!=val).apply(float)
-        elif cond.lower() in ['contains','cont']:
-            mask*=(df[col].apply(lambda x: val in x)).apply(float)
+        if col not in df.columns:
+            if verbose>1:
+                print(f"parameter {col} was not found in DataFrame. Returning an empty DataFrame.")
+            return pd.DataFrame({})
+        else:
+            if cond.lower() in ['eq','equal','same','==','=']:
+                mask*=(df[col]==val).apply(float)
+            elif cond.lower() in ['supeq','superequal','>=']:
+                mask*=(df[col]>=val).apply(float)
+            elif cond.lower() in ['infeq','inferequal','<=']:
+                mask*=(df[col]<=val).apply(float)
+            elif cond.lower() in ['inf','inferior','<']:
+                mask*=(df[col]<val).apply(float)
+            elif cond.lower() in ['sup','superior','>']:
+                mask*=(df[col]>val).apply(float)
+            if cond.lower() in ['neq','nonequal','!=']:
+                mask*=(df[col]!=val).apply(float)
+            elif cond.lower() in ['contains','cont']:
+                mask*=(df[col].apply(lambda x: val in x)).apply(float)
     mask=mask.apply(bool)
     return df[mask]
 
