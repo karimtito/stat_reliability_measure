@@ -1,7 +1,7 @@
 from stat_reliability_measure.home import ROOT_DIR
 from pathlib import Path
 from stat_reliability_measure.dev.utils import CustomEncoder
-from stat_reliability_measure.dev.utils import pars_type,simple_vars
+from stat_reliability_measure.dev.utils import valid_pars_type,simple_vars
 import stat_reliability_measure.dev.torch_utils as t_u
 import argparse
 import git
@@ -11,10 +11,11 @@ from datetime import datetime
 import numpy as np
 import torch
 import json
+from dev.utils import float_to_file_float
 
 class Config:
 
-    def __init__(self,config_dict={'config_name':'Default'}):
+    def __init__(self,config_dict={}):
         
         if len(config_dict)> 0:
             self.__dict__.update(config_dict)
@@ -24,28 +25,33 @@ class Config:
     def __str__(self):
         str_ = str("config(")
 
-        l = list(vars(self).keys())
+        l = list(simple_vars(self).keys())
         l.sort()
         for key in l:
             if 'parser' in key:
                 continue
             if isinstance(vars(self)[key],dict):
                 continue
+            elif type(vars(self)[key]) in [float,np.float32,np.float64]:
+                str_+=f" {key}={float_to_file_float(vars(self)[key])},"
             else:
-                str_+=f"{key}={vars(self)[key]},"
+                str_+=f" {key}={vars(self)[key]},"
         str_+=")"
         return str_
     def __repr__(self):
         str_ = str("config(")
-        l = list(vars(self).keys())
+
+        l = list(simple_vars(self).keys())
         l.sort()
         for key in l:
             if 'parser' in key:
                 continue
             if isinstance(vars(self)[key],dict):
                 continue
+            elif type(vars(self)[key]) in [float,np.float32,np.float64]:
+                str_+=f" {key}={float_to_file_float(vars(self)[key])},"
             else:
-                str_+=f"{key}={vars(self)[key]},"
+                str_+=f" {key}={vars(self)[key]},"
         str_+=")"
         return str_
     def get_parser(self):
@@ -58,18 +64,19 @@ class Config:
                 # then the type is the type of the first element of the list
                 if len(vars(self)[key])==0:
                     place_holder_list=[vars(self)[key.replace('_range','').replace('_list','')]]
-                    ptype = pars_type(place_holder_list)
+                    ptype,valid = valid_pars_type(place_holder_list)
                 else:
-                    ptype = pars_type(vars(self)[key])
+                    ptype,valid = valid_pars_type(vars(self)[key])
             else:
                 # else the type is the type of the default value
-                ptype = pars_type(vars(self)[key])
-            parser.add_argument('--'+key,type=ptype,default=vars(self)[key])
+                ptype,valid= valid_pars_type(vars(self)[key])
+            if valid:
+                parser.add_argument('--'+key,type=ptype,default=vars(self)[key])
         self.parser = parser
     
     def print_config(self):
  
-        print(f"{self.config_name} configuration:/n {self}")
+        print(f"{self.config_name} configuration: /n {self}")
 
     def to_json(self,path=None):
         if path is not None:
@@ -83,13 +90,14 @@ class ExpConfig(Config):
                   'verbose':0,'aggr_res_path':'',
                   'update_aggr_res':True,'save_config':False,
                   'print_config_opt':True,'track_finish':False,
-                  'track_gpu':False,'allow_multi_gpu':False,
+                  'track_gpu':False,'allow_multi_gpu':True,
                   'track_cpu':False,'save_img':False,
                   'save_text':False,'device':'',
                   'tqdm_opt':True,'clip_min':0.,
                   'clip_max':1.,'force_train':False,
                   'repeat_exp':False,'data_dir':ROOT_DIR+"/data",
-                  'noise_scale':0.1,'exp_name':'',}
+                  'noise_scale':0.1,'exp_name':'',
+                  'notebook':False,}
 
     def __init__(self,config_dict=default_dict):   
         vars(self).update(config_dict)
@@ -107,7 +115,8 @@ class ExpConfig(Config):
             """if the numpy seed is not set, then it is set to the current time"""
             self.np_seed=int(time())
         np.random.seed(seed=self.np_seed)
-
+        if not self.allow_multi_gpu:
+            os.environ["CUDA_VISIBLE_DEVICES"]="0"
         if self.track_gpu:
             import GPUtil
             gpus=GPUtil.getGPUs()
@@ -158,20 +167,11 @@ class Exp1config(ExpConfig):
 
         if self.noise_dist not in ['uniform','gaussian']:
             raise NotImplementedError("Only uniform and Gaussian noise distributions are implemented.")
-        if not self.allow_multi_gpu:
-            os.environ["CUDA_VISIBLE_DEVICES"]="0"
-
         
-
-        
-
-
         if len(self.device)==0:
             self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
             if self.verbose>=1:
                 print(f"PyTorch running on device: {self.device}")
-
-
         if len(self.log_dir)==0:
             self.log_dir=os.path.join(ROOT_DIR+'/logs','exp_2_'+self.dataset)
         if not os.path.exists(ROOT_DIR+'/logs'):
@@ -180,8 +180,6 @@ class Exp1config(ExpConfig):
             os.mkdir(self.log_dir)
         if len(self.aggr_res_path)==0:
             self.aggr_res_path=os.path.join(self.log_dir,'aggr_res.csv')
-       
-        
         self.raw_logs = os.path.join(self.log_dir,'raw_logs/')
         if not os.path.exists(self.raw_logs):
             os.mkdir(self.raw_logs)
@@ -230,8 +228,9 @@ class Exp2Config(ExpConfig):
                 'eps_num':5,'epsilon':-1.,'input_start':0,'input_stop':-1,'n_rep':100,'model_path':'',
                 'export_to_onnx':False,'use_attack':False,'attack':'PGD',
                 'lirpa_bounds':False,'download':True,'train_model_epochs':10,
-                'gaussian_latent':True,'noise_dist':'uniform','x_min':0.,
-                'x_max':1.,'x_mean':0,'x_std':1,'lirpa_cert':False,'robust_model':False,
+                'gaussian_latent':True,'noise_dist':'uniform','x_min':0.,'mask_opt':False,
+        
+                'x_max':1.,'x_mean':0.,'x_std':1.,'lirpa_cert':False,'robust_model':False,
                 'robust_eps':0.1,'load_batch_size':128,'nb_epochs': 15,'adversarial_every':1,}
     #p_ref_compute = False
     def __init__(self,config_dict=default_dict,X=None,y=None,model=None,epsilon_range=[],
@@ -258,27 +257,18 @@ class Exp2Config(ExpConfig):
             self.model_dir=os.path.join(ROOT_DIR+"/models/",self.dataset)
         if not os.path.exists(self.model_dir):
             os.mkdir(self.model_dir)
-        
-       
         #color_dataset=self.dataset in ('cifar10','cifar100','imagenet')
         #prblm_str=self.dataset
         if self.input_stop==-1:
             self.input_stop=self.input_start+1
         else:
             assert self.input_start<self.input_stop,"/!\ input start must be strictly lower than input stop"
-
         if len(self.noise_dist)==0:
             self.noise_dist=self.noise_dist.lower()
-
         if self.noise_dist not in ['uniform','gaussian']:
             raise NotImplementedError("Only uniform and Gaussian distributions are implemented.")
         if not self.allow_multi_gpu:
             os.environ["CUDA_VISIBLE_DEVICES"]="0"
-
-
-        
-
-
         if len(self.device)==0:
             self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
             if self.verbose>=5:
@@ -301,8 +291,9 @@ class Exp2Config(ExpConfig):
         raw_logs_path=os.path.join(self.log_dir,'raw_logs/'+self.method_name)
         if not os.path.exists(raw_logs_path):
             os.mkdir(raw_logs_path)
-        loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
-        log_name=self.method_name+'_'+loc_time
+        self.loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+        
+        log_name=self.method_name+'_'+self.loc_time
         exp_log_path=os.path.join(raw_logs_path,log_name)
         log_path_prop = exp_log_path
         k=1
@@ -337,7 +328,7 @@ class Exp2Config(ExpConfig):
         if not hasattr(self,"model"):
             if len(self.model_arch)==0:
                 self.model_arch = t_u.datasets_default_arch[self.dataset]
-            model, self.model_shape,self.model_name=t_u.get_model(self.model_arch, robust_model=self.robust_model, robust_eps=self.robust_eps,
+            self.model, self.model_shape,self.model_name=t_u.get_model(self.model_arch, robust_model=self.robust_model, robust_eps=self.robust_eps,
                 nb_epochs=self.nb_epochs,model_dir=self.model_dir,data_dir=self.data_dir,test_loader=test_loader,device=self.device,
                 download=self.download,dataset=self.dataset, force_train=self.force_train,
                 )
@@ -348,11 +339,11 @@ class Exp2Config(ExpConfig):
         self.x_mean=t_u.datasets_means[self.dataset]
         self.x_std=t_u.datasets_stds[self.dataset]
         if not hasattr(self,"X"):
-            self.X,self.y,self.sample_accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=self.device,model=model)
+            self.X,self.y,self.sample_accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=self.device,model=self.model)
 
         else:
             """compute the accuracy of the model on the sample batch"""
-            self.sample_accuracy=t_u.get_x_y_accuracy_num_cl(model=model,X=self.X,y=self.y,device=self.device)
+            self.sample_accuracy=t_u.get_model_accuracy(model=self.model,X=self.X[self.input_start:self.input_stop],y=self.y[self.input_start:self.input_stop])
         self.d= np.prod(self.X.shape[1:])
         if self.verbose >=1:
             print(f"model accuracy on sample batch:{self.sample_accuracy}")
@@ -375,14 +366,30 @@ class Exp2Config(ExpConfig):
         self.x_0=self.X[0]
         self.y_0=self.y[0]
         self.low=torch.max(self.x_0-self.epsilon, torch.tensor([self.x_min]).to(self.device))
-        self.high=torch.min(self.x_0+self.epsilon, torch.tensor([self.x_max]).to(self.device)) 
-        self.model = model 
+        self.high=torch.min(self.x_0+self.epsilon, torch.tensor([self.x_max]).to(self.device))
+        if self.mask_opt:
+            try:
+                if self.mask_cond is not None:
+                    idx = self.mask_cond(self.x_0)
+                    self.low[idx]=self.x_0[idx]
+                    self.high[idx]=self.x_0[idx]
+            except AttributeError:
+                pass
+            try:
+                if self.mask_idx is not None:
+                    self.low[self.mask_idx]=self.x_0[self.mask_idx]
+                    self.high[self.mask_idx]=self.x_0[self.mask_idx]
+            except AttributeError:
+                pass
+                
         return 
       
     
 class SamplerConfig(Config):
-    """configuration for the sampler"""
-    pass
+    def __init__(self,):
+        super().__init__()
+        return
+    
 
 
 
