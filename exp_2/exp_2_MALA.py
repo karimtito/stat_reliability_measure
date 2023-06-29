@@ -28,7 +28,8 @@ def main():
         else:
             raise ValueError(f"unknown method_config parameter {k}")
     method_config.update()
-    exp_config.update(method_name = method_config.method_name)
+    exp_config.update(method_name = method_config.get_method_name())
+
     method_config.exp_config=exp_config
     param_ranges = [method_config.N_range,method_config.T_range,method_config.L_range,method_config.ess_alpha_range,method_config.alpha_range,
                     exp_config.epsilon_range]
@@ -65,6 +66,7 @@ def main():
             
             
             exp_config.epsilon = exp_config.epsilon_range[idx]
+
             if exp_config.use_attack:
                 pgd_success= (exp_config.attack_success[idx][l]).item()
             p_l,p_u=None,None
@@ -82,6 +84,7 @@ def main():
                 num_classes=exp_config.num_classes,device=exp_config.device)
             lists_cart= cartesian_product(*method_param_lists)
             for method_params in lists_cart:
+                exp_config.method_name=method_config.get_method_name()
                 if exp_config.update_aggr_res and os.path.exists(exp_config.aggr_res_path):
                     aggr_res_df = pd.read_csv(exp_config.aggr_res_path)
                 vars(method_config).update(method_params)
@@ -111,6 +114,8 @@ def main():
                                     if len(same_exp_df)>0:
                                         print(f"Skipping {method_config.method_name} run {run_nb}/{nb_runs}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+str(method_params).replace('{','').replace('}','').replace("'",''))
                                         continue
+                                    else:
+                                        print(f"No similar experiment found")
                                 except KeyError:
                                     if exp_config.verbose>=5:
                                         print(f"No similar experiment found for {method_config.method_name} run {run_nb}/{nb_runs}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+str(method_params).replace('{','').replace('}','').replace("'",''))
@@ -133,7 +138,7 @@ def main():
                     log_path_prop = log_path+'_'+str(k) 
                     k+=1 
                 log_path = log_path_prop
-                os.mkdir(path=log_path)
+                os.makedirs(log_path,exist_ok=True)
                 times=[]
                 ests = []
                 calls = []
