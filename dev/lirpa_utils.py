@@ -1,10 +1,11 @@
 from auto_LiRPA import BoundedModule, BoundedTensor
 from auto_LiRPA.perturbations import *
 import auto_LiRPA.operators
+from time import time
 
 
 def get_lirpa_bounds(x_0,y_0,model,epsilon,num_classes,noise_dist,a,device):
-
+    t = time()
     with torch.no_grad():
         image=x_0.view(1,1,28,28)
         bounded_model=BoundedModule(model,global_input=torch.zeros_like(input=image),bound_opts={"conv_mode": "patches"})
@@ -60,11 +61,13 @@ def get_lirpa_bounds(x_0,y_0,model,epsilon,num_classes,noise_dist,a,device):
         pre_p_l=1-torch.prod(1-gamma_l)/(1-gamma_l[y_0]) 
         p_l=torch.clamp(pre_p_l,min=0,max=1) 
         p_u=torch.clamp(gamma_u.sum()-gamma_u[y_0],min=0,max=1)
-        return (p_l,p_u)
+        time_lirpa=time()-t
+        return (p_l,p_u), time_lirpa
 
 
 #TODO complete lirpa certification 
 def get_lirpa_cert(x_0,y_0,model,epsilon,num_classes,device,method='CROWN'):
+    t=time()
     N=x_0.shape[0]
     image=x_0.view(N,1,28,28)
     bounded_model=BoundedModule(model,global_input=torch.zeros_like(input=image),bound_opts={"conv_mode": "patches"})
@@ -76,7 +79,7 @@ def get_lirpa_cert(x_0,y_0,model,epsilon,num_classes,device,method='CROWN'):
     bounded_image = BoundedTensor(image, ptb)
     with torch.no_grad():
         lb,ub = bounded_model.compute_bounds(x=(bounded_image),method=method)
-      
+    
     lirpa_safe=lb[:,y_0]>=ub.max(1) 
-
-    return lirpa_safe
+    time_lirpa = time()-t
+    return lirpa_safe,time_lirpa
