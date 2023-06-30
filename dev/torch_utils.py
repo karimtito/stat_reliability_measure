@@ -5,7 +5,7 @@ from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,C
 from torchvision import transforms,datasets,models as tv_models
 from torch.utils.data import DataLoader
 
-from home import ROOT_DIR
+from stat_reliability_measure.home import ROOT_DIR
 from torch import optim
 import os
 import math
