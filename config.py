@@ -115,8 +115,8 @@ class ExpConfig(Config):
             """if the numpy seed is not set, then it is set to the current time"""
             self.np_seed=int(time())
         np.random.seed(seed=self.np_seed)
-        if not self.allow_multi_gpu:
-            os.environ["CUDA_VISIBLE_DEVICES"]="0"
+        # if not self.allow_multi_gpu:
+        #     os.environ["CUDA_VISIBLE_DEVICES"]="0"
         if self.track_gpu:
             import GPUtil
             gpus=GPUtil.getGPUs()
@@ -267,8 +267,8 @@ class Exp2Config(ExpConfig):
             self.noise_dist=self.noise_dist.lower()
         if self.noise_dist not in ['uniform','gaussian']:
             raise NotImplementedError("Only uniform and Gaussian distributions are implemented.")
-        if not self.allow_multi_gpu:
-            os.environ["CUDA_VISIBLE_DEVICES"]="0"
+        # if not self.allow_multi_gpu:
+        #     os.environ["CUDA_VISIBLE_DEVICES"]="0"
         if len(self.device)==0:
             self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
             if self.verbose>=5:
@@ -381,8 +381,13 @@ class Exp2Config(ExpConfig):
                     self.high[self.mask_idx]=self.x_0[self.mask_idx]
             except AttributeError:
                 pass
-                
         return 
+    
+    def score(self,x):
+            y = self.model(x)
+            y_diff = torch.cat((y[:,:self.y_0], y[:,(self.y_0+1):]),dim=1) - y[:,self.y_0].unsqueeze(-1)
+            y_diff, _ = y_diff.max(dim=1)
+            return y_diff #.max(dim=1)
       
     
 class SamplerConfig(Config):
