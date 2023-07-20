@@ -23,6 +23,7 @@ class MLS_SMC_Config(SamplerConfig):
         vars(self).update(config_dict)
         self.K=int(self.N*self.ratio)
         super().__init__(**kwargs)
+        
     
 
    
@@ -41,3 +42,5 @@ class MLS_SMC_Config(SamplerConfig):
             self.s_range=[self.s]
         self.K=int(self.N*self.ratio)
         return 
+    
+    
