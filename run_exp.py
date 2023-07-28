@@ -10,36 +10,43 @@ import stat_reliability_measure.dev.utils as utils
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, str2list
 from stat_reliability_measure.dev.utils import get_sel_df, simple_vars, range_vars, range_dict_to_lists
 import stat_reliability_measure.dev.mls.amls_uniform as amls_mls
-from stat_reliability_measure.dev.amls.amls_utils import MLS_SMC_Config
+from dev.amls.amls_config import MLS_SMC_Config
 import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
 import stat_reliability_measure.dev.mls.amls_uniform as amls_webb
-from dev.smc.smc_pyt import SMCSamplerConfig, SamplerSMC
+from stat_reliability_measure.dev.mls.webb_config import MLS_Webb_Config
+from dev.smc.smc_pyt import SamplerSMC
+from dev.smc.smc_config import SMCSamplerConfig
 from config import Exp2Config
 from itertools import product as cartesian_product
 
 
 
-method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_WEBB_Config,
-                    'mala':SMCSamplerConfig,
+method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,'mls_webb':MLS_Webb_Config,
+                    'mala':SMCSamplerConfig,'amls_batch':MLS_SMC_Config,
                     'hmc':SMCSamplerConfig,'smc':SMCSamplerConfig,}
-method_func_dict={'amls':amls_pyt,'mala':SamplerSMC,
-                  'amls_webb': amls_webb,
-                    'hmc':SamplerSMC,'smc':SamplerSMC,}
+method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,'rw_smc':SamplerSMC,
+                  'amls_webb': amls_webb.multilevel_uniform,
+                    'hmc':SamplerSMC,'smc':SamplerSMC,'amls_batch':amls_pyt.ImportanceSplittingPytBatch}
 
-def run_stat_rel_exp(model, X, y, method='amls', epsilon_range=[], noise_dist='uniform',dataset_name = 'dataset',
+def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_dist='uniform',dataset_name = 'dataset',
                  model_name='model',
-                 verbose=0.1, x_min=0,x_max=1., mask_opt=False,mask_idx=None,mask_cond=None,
-                 log_hist_=True, aggr_res_path='',
+                 verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None,mask_cond=None,
+                 log_hist_=True, aggr_res_path='',batch_opt=False,
                  log_txt_=True,exp_config=None,method_config=None,**kwargs):
     """ Running reliability experiments on neural network model with supervised data (X,y)
         values 
     """
+    method=method.lower()
+    if method=='amls' and batch_opt:
+        method='amls_batch'
+        if verbose>0:
+            print("batch option is only available for amls_batch method")
     if mask_opt: 
         assert (mask_idx is not None) or (mask_cond is not None), "if using masking option, either 'mask_idx' or 'mask_cond' should be given"
     if method_config is None:
 
         method_config = method_config_dict[method]()
-        method_config.verbose=verbose
+        
     if exp_config is None:
         exp_config=Exp2Config(model=model,X=X,y=y,
         dataset_name=dataset_name,model_name=model_name,epsilon_range=epsilon_range,
@@ -48,7 +55,7 @@ def run_stat_rel_exp(model, X, y, method='amls', epsilon_range=[], noise_dist='u
     else:
         exp_config.model,exp_config.X,exp_config.y,=model,X,y
         exp_config.dataset, exp_config.model_name, exp_config.epsilon_range=dataset_name,model_name,epsilon_range
-        exp_config.aggr_res_path, exp_config.verbose=aggr_res_path ,verbose
+        exp_config.aggr_res_path, exp_config.verbose=aggr_res_path ,float(verbose)
         exp_config.noise_dist,exp_config.x_min,exp_config.x_max, = noise_dist,x_min,x_max,
         if mask_opt:
             exp_config.mask_opt=mask_opt
@@ -68,17 +75,13 @@ def run_stat_rel_exp(model, X, y, method='amls', epsilon_range=[], noise_dist='u
         else:
             raise ValueError(f"unknown configuration parameter {k}")
     method_config.update()
+    
     exp_config.update(method_name=method_config.method_name)
-    
-
     method_config.exp_config=exp_config
+
     param_ranges = [v for k,v in range_vars(method_config).items()]
-
-    
-    param_lens=np.array([len(l) for l in param_ranges])
-
-    param_cart = cartesian_product(param_ranges)
-  
+    print(param_ranges)
+    param_lens=np.array([len(l) for l in param_ranges])  
     nb_exps= np.prod(param_lens)*len(exp_config.epsilon_range)*exp_config.nb_inputs
     if verbose>0:
         print(f"Running reliability experiments on architecture {exp_config.model_arch} trained on {exp_config.dataset}.")
@@ -93,13 +96,15 @@ def run_stat_rel_exp(model, X, y, method='amls', epsilon_range=[], noise_dist='u
     method_config.config_path=os.path.join(exp_config.exp_log_path,'method_config.json')
     method_config.to_json()
     method_range_dict = range_vars(method_config)
+    print(method_range_dict)
     method_param_lists = range_dict_to_lists(range_dict=method_range_dict)
+
     i_exp=0
     
     if verbose>1.0:
         print(f"Experiment range parameters: {method_param_lists}")
     
-    method_name="MLS_SMC"
+    method_name=method_config.method_name
     results_df=pd.DataFrame({})
     if exp_config.aggr_res_path is None:
         aggr_res_path=os.path.join(exp_config.log_dir,'agg_res.csv')
@@ -122,7 +127,7 @@ def run_stat_rel_exp(model, X, y, method='amls', epsilon_range=[], noise_dist='u
 
     for l in range(len(exp_config.X)):
         with torch.no_grad():
-            x_0,y_0 = exp_config.X[l], exp_config.y[l]
+            x_clean,y_clean = exp_config.X[l], exp_config.y[l]
         for idx in range(len(exp_config.epsilon_range)):
             
             
@@ -132,19 +137,15 @@ def run_stat_rel_exp(model, X, y, method='amls', epsilon_range=[], noise_dist='u
             if exp_config.lirpa_bounds:
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
                 # Step 2: define perturbation. Here we use a Linf perturbation on input image.
-                p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=exp_config.epsilon,
+                p_l,p_u=get_lirpa_bounds(x_clean=x_clean,y_clean=y_clean,model=model,epsilon=exp_config.epsilon,
                 num_classes=exp_config.num_classes,noise_dist=exp_config.noise_dist,a=exp_config.a,device=exp_config.device)
                 exp_config.p_l,exp_config.p_u=p_l.item(),p_u.item()
             if exp_config.lirpa_cert:
                 from dev.lirpa_utils import get_lirpa_cert
-                exp_config.lirpa_safe,exp_config.time_lirpa_safe=get_lirpa_cert(x_0=x_0,y_0=y_0,
+                exp_config.lirpa_safe,exp_config.time_lirpa_safe=get_lirpa_cert(x_clean=x_clean,y_clean=y_clean,
                                 epsilon = exp_config.epsilon, num_classes=exp_config.num_classes                                                
                                 ,model=model, device=exp_config.device)
-            def prop(x):
-                y = model(x)
-                y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)
-                y_diff, _ = y_diff.max(dim=1)
-                return y_diff #.max(dim=1)
+        
                 
             lists_cart= cartesian_product(*method_param_lists)
             for method_params in lists_cart:
@@ -152,7 +153,10 @@ def run_stat_rel_exp(model, X, y, method='amls', epsilon_range=[], noise_dist='u
                 
                 vars(method_config).update(method_params)
                 method_keys= list(simple_vars(method_config).keys())
-                method_vals = list(simple_vars(method_config).values())
+                method_vals= list(simple_vars(method_config).values())
+                clean_method_args_str = str(method_params).replace('{','').replace('}','').replace("'",'').replace('(',"").replace(')',"")
+                print(f"method_keys:{method_keys}")
+                print(f"method_vals:{method_vals}")
                 aggr_res_path=os.path.join(exp_config.log_dir,'aggr_res.csv')
                 if exp_config.update_aggr_res and os.path.exists(exp_config.aggr_res_path):
                     aggr_res_df = pd.read_csv(exp_config.aggr_res_path)
@@ -160,29 +164,33 @@ def run_stat_rel_exp(model, X, y, method='amls', epsilon_range=[], noise_dist='u
                     if os.path.exists(exp_config.aggr_res_path):
                         aggr_res_df = pd.read_csv(exp_config.aggr_res_path)
                         if 'exp_id' in aggr_res_df.columns:
-                            print('exp_id found')
+                            
                             last_exp_id = int(aggr_res_df['exp_id'].max())
                         else:
                             last_exp_id = -1
                     else:
                         last_exp_id = -1
+                    
                     if not exp_config.repeat_exp and os.path.exists(exp_config.aggr_res_path):
                         aggr_res_df = pd.read_csv(exp_config.aggr_res_path)
                         if len(aggr_res_df)>0:
                             same_method_df = get_sel_df(df=aggr_res_df,triplets=[('method_name',method_config.method_name,'=')])
                             if len(same_method_df)>0:
+                                print("Experiment already done for method: "+method_config.method_name)
                                 try:
+                                    triplets=[('model_name',exp_config.model_name,'='),('epsilon',exp_config.epsilon,'='),
+                                    ('image_idx',l,'='),('n_rep',exp_config.n_rep,'='),('noise_dist',exp_config.noise_dist,'=')]
+
                                     same_exp_df = get_sel_df(df=same_method_df, cols=method_keys, vals=method_vals, 
-                                    triplets =[('model_name',exp_config.model_name,'='),('epsilon',exp_config.epsilon,'='),
-                                    ('image_idx',l,'='),('n_rep',exp_config.n_rep,'='),('noise_dist',exp_config.noise_dist,'=')])
+                                    triplets =triplets)
                                     # if a similar experiment has been done in the current log directory we skip it
 
                                     if len(same_exp_df)>0:
-                                        print(f"Skipping {method_config.method_name} run {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+str(method_params).replace('{','').replace('}','').replace("'",''))
+                                        print(f"Skipping {method_config.method_name} run {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+clean_method_args_str)
                                         continue
                                 except KeyError:
-                                    if exp_config.verbose>=5:
-                                        print(f"No similar experiment found for {method_config.method_name} run {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+str(method_params).replace('{','').replace('}','').replace("'",''))
+                                    if exp_config.verbose>=1:
+                                        print(f"No similar experiment found for {method_config.method_name} run {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+clean_method_args_str)
                                     exp_config.exp_id = last_exp_id+1
                             else:
                                 exp_config.exp_id = last_exp_id+1
@@ -190,26 +198,30 @@ def run_stat_rel_exp(model, X, y, method='amls', epsilon_range=[], noise_dist='u
                             exp_config.exp_id = last_exp_id+1
                     else:
                         exp_config.exp_id = last_exp_id+1
+                    if not hasattr(exp_config,'exp_id'):
+                        exp_config.exp_id=last_exp_id+1
                 loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
-                log_name=method_name+'_e_'+float_to_file_float(exp_config.epsilon_range[idx])+f'_n_{exp_config.n_rep}'+'_N_'+str(method_config.N)+'_T_'+str(method_config.T)+'_s_'+str(method_config.s)+'_K_'+str(method_config.K)+'_r_'+float_to_file_float(method_config.ratio)+'_'+loc_time
+                log_name=method_name+'_e_'+float_to_file_float(exp_config.epsilon_range[idx])+f'_n_{exp_config.n_rep}'+loc_time
                
                 log_path=os.path.join(exp_config.exp_log_path,log_name)
                 
-                print(f"Starting {method_name} run {i_exp}/{nb_exps}")
+                print(f"Starting {method_name} estimation {i_exp}/{nb_exps}")
                                 
-                
-                K=int(method_config.N*method_config.ratio) if not method_config.last_particle else method_config.N-1
+             
                 if exp_config.verbose>0:
-                    print(f"with model: {model_name}, img_idx:{l},eps:{exp_config.epsilon},T:{method_config.T},N:{method_config.N},s:{method_config.s},K:{method_config.K}")
-                if exp_config.verbose>3:
-                    print(f"K/N:{method_config.K/float(method_config.N)})")
+                    print(f"with model: {model_name}, img_idx:{l},eps:{exp_config.epsilon},")
+              
                 times= []
                 rel_error= []
                 ests = [] 
                 log_ests=[]
                 calls=[]
-                if method_config.track_finish:
+                
+                if hasattr(method_config,'track_finish') and method_config.track_finish:
                     finish_flags=[]
+                    track_finish=True
+                else:
+                    track_finish = False
                 if exp_config.tqdm_opt:
                     if exp_config.notebook:
                         from tqdm.notebook import tqdm
@@ -219,37 +231,60 @@ def run_stat_rel_exp(model, X, y, method='amls', epsilon_range=[], noise_dist='u
                 else: 
                     iterator = range(exp_config.n_rep)
 
+                exp_required = {'verbose':exp_config.verbose}
+                if hasattr(method_config,'requires_epsilon') and method_config.requires_epsilon:
+                    exp_required['epsilon']=exp_config.epsilon
+                if hasattr(method_config,'requires_model') and method_config.requires_model:
+                    exp_required['model']=exp_config.model
+                if hasattr(method_config,'requires_score') and method_config.requires_score:
+                    exp_required['score']=exp_config.score 
+                if hasattr(method_config,'requires_x_clean') and method_config.requires_x_clean:
+                    exp_required['x_clean']=exp_config.x_clean
+                if hasattr(method_config,'requires_h') and method_config.requires_h:
+                    exp_required['h']=exp_config.h
+                if hasattr(method_config,'requires_V') and method_config.requires_V:
+                    exp_required['V']=exp_config.V
+                if hasattr(method_config,'requires_V') and method_config.requires_V:
+                    exp_required['gradV']=exp_config.gradV
+                if hasattr(method_config,'requires_y_clean') and method_config.requires_y_clean:
+                    exp_required['y_clean']=exp_config.y_clean
+                if hasattr(method_config,'requires_gen') and method_config.requires_gen:
+                    exp_required['gen']=exp_config.gen
+                #selecting only method configuration variables relevent to the estimation function
+                func_args_vars = {k:simple_vars(method_config)[k] for k in simple_vars(method_config).keys() if ('require' not in k) and ('track' not in k) and ('name' not in k)}
+                args_dict = {**func_args_vars,**exp_required}
+                method_config.update()
                 for i in iterator:
                     t=time()
-                    lg_p,nb_calls,max_val,x,levels,dict_out=estimation_func(model=model,**vars(method_config),)
-
-
+                    p_est,dict_out=estimation_func(**args_dict,)
                     t=time()-t
-                    # we don't need adversarial examples and highest score
-                    del x
-                    del max_val
-                    log_ests.append(lg_p)
-                    est=np.exp(lg_p)
-                    if exp_config.verbose>1:
-                        print(f"Est:{est}")
-                   
-                    if method_config.track_accept:
-                        accept_logs=os.path.join(log_path,'accept_logs')
-                        if not os.path.exists(accept_logs):
-                            os.mkdir(path=accept_logs)
-                        accept_rates=dict_out['acc_ratios']
-                        np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
-                        ,X=accept_rates)
-                        x_T=np.arange(len(accept_rates))
-                        plt.plot(x_T,accept_rates)
-                        plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
-                        plt.close()
-                        exp_config.mean_acc_ratio = np.array(dict_out['acc_ratios']).mean()
-                    if method_config.track_finish:
-                        finish_flags.append(levels[-1]>=0)
+                    
+                    
+                    nb_calls=dict_out['nb_calls']
+                    ests.append(p_est)
+                    log_est= np.log(p_est) if p_est>0 else -250.
+                    log_ests.append(log_est)
                     times.append(t)
-                    ests.append(est)
                     calls.append(nb_calls)
+                    if exp_config.verbose>1:
+                        print(f"Est:{p_est}")
+                    if hasattr(method_config,'track_accept'):
+                        if method_config.track_accept:
+                            accept_logs=os.path.join(log_path,'accept_logs')
+                            if not os.path.exists(accept_logs):
+                                os.mkdir(path=accept_logs)
+                            accept_rates=dict_out['acc_ratios']
+                            np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
+                            ,X=accept_rates)
+                            x_T=np.arange(len(accept_rates))
+                            plt.plot(x_T,accept_rates)
+                            plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
+                            plt.close()
+                            exp_config.mean_acc_ratio = np.array(dict_out['acc_ratios']).mean()
+                    if track_finish:
+                        finish_flags.append(dict_out['finish_flag'])
+                    
+                    del dict_out
     
                 times=np.array(times)
                 ests = np.array(ests)
@@ -268,14 +303,14 @@ def run_stat_rel_exp(model, X, y, method='amls', epsilon_range=[], noise_dist='u
                 print(f"std. re.:{std_rel}")
                 print(f"std. rel. adj.:{std_rel_adj}")
                 
-                if method_config.track_finish:
+                if track_finish:
                     finish_flags=np.array(finish_flags)
                     freq_finished=finish_flags.mean()
                     freq_zero_est=(ests==0).mean()
                 else:
                     freq_zero_est,freq_finished=None,None
                 #finished=np.array(finish_flag)
-                if method_config.track_finish and freq_finished<1:
+                if track_finish and freq_finished<1:
                     unfinish_est=ests[~finish_flags]
                     unfinish_times=times[~finish_flags]
                     unfinished_mean_est=unfinish_est.mean()

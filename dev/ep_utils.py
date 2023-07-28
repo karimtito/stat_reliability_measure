@@ -84,9 +84,9 @@ save_Ys=False,scale_M=1):
     return Y,VY,nb_calls,dict_out
 
 
-def score_function_ep(X,y_0,model):
+def score_function_ep(X,y_clean,model):
     y = apply_native_to_ep(f=model,x=X)
-    y_diff = ep.concatenate([y[:,:y_0], y[:,(y_0+1):]],axis=1) - y[:,y_0].reshape((-1,1))
+    y_diff = ep.concatenate([y[:,:y_clean], y[:,(y_clean+1):]],axis=1) - y[:,y_clean].reshape((-1,1))
     s, _ = y_diff.max(axis=1)
     return s
 

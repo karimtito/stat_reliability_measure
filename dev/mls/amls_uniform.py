@@ -41,20 +41,32 @@ import torch.distributions as dist
 from stat_reliability_measure.dev.mls import mls_utils
 
 def multilevel_uniform(
-    prop,
-    x_sample,
-    sigma=1.,
-    rho=0.1,
-    count_particles=1000,
-    count_mh_steps=100,
-    debug=True, stats=False,
+    score,
+    x_clean,
+    epsilon=1.,
+    ratio=0.1,
+    N=1000,
+    T=100,
+    
+    verbose=True, stats=False,
     x_min=0, 
     x_max=1,CUDA=True,
-    track_accept=False):
+    track_accept=False,
+    
+    save_x=False,
+    save_levels=True,
+    track_finish=False 
+    ):
 
     # Calculate the mean of the normal distribution in logit space
     # We transform the input from [x_min, x_max] to [epsilon, 1 - epsilon], then to [logit(epsilon), logit(1 - epsilon)]
     # Then we can do the sampling on (-inf, inf)
+    debug= verbose >=2 
+    x_sample = x_clean 
+    sigma = epsilon 
+    rho = ratio
+    count_particles = N
+    count_mh_steps = T
     if CUDA:
         prior = dist.Uniform(low=torch.max(x_sample-sigma, torch.tensor([x_min]).cuda()), high=torch.min(x_sample+sigma, torch.tensor([x_max]).cuda()))
     else:
@@ -98,7 +110,7 @@ def multilevel_uniform(
             break
 
         # Calculate current level
-        s_x = prop(x).squeeze(-1)
+        s_x = score(x).squeeze(-1)
 
         count_calls+=count_particles
         max_val = max(max_val, s_x.max().item())
@@ -118,12 +130,20 @@ def multilevel_uniform(
 
         # Terminate if change in level is below some threshold
         if count_keep == 0:
-            s_x = prop(x).squeeze(-1)
+            s_x = score(x).squeeze(-1)
             max_val = s_x.max().item() 
-            dic_out = {}
+            dict_out = {}
+            
+            dict_out['nb_calls'] = count_calls
+            dict_out['max_val'] = max_val
+            if save_x:
+                dict_out['x'] = x
+            if save_levels:
+                dict_out['levels'] = levels
             if track_accept:
-                dic_out['acc_ratios']=acc_ratios
-            return -math.inf,count_calls,max_val, x, levels,dic_out
+                dict_out['acc_ratios']=np.array(acc_ratios)
+            p_est=np.exp(lg_p) if lg_p != -math.inf else 0
+            return p_est, dict_out
 
         lg_p += torch.log(count_keep.float()).item() - math.log(count_particles)
         #print('term', torch.log(count_keep.float()).item() - math.log(count_particles))
@@ -150,7 +170,7 @@ def multilevel_uniform(
             # #g_bottom = dist.Normal(x, width_proposal.unsqueeze(-1))
 
             # x_maybe = g_bottom.sample()
-            # s_x = prop(x_maybe).squeeze(-1)
+            # s_x = score(x_maybe).squeeze(-1)
             # count_calls+=count_particles
             # # Calculate log-acceptance ratio
             # g_top = dist.Uniform(low=torch.max(x_maybe - width_proposal.unsqueeze(-1), prior.low), high=torch.min(x_maybe + width_proposal.unsqueeze(-1), prior.high)
@@ -172,7 +192,7 @@ def multilevel_uniform(
             validate_args=False)
 
             x_maybe = g_bottom.sample()
-            s_x = prop(x_maybe).squeeze(-1)
+            s_x = score(x_maybe).squeeze(-1)
             count_calls+=count_particles
             # Calculate log-acceptance ratio
             g_top = dist.Uniform(low=torch.max(x_maybe - width_proposal.view(-1,1,1,1)*(x_max-x_min), prior.low), high=torch.min(x_maybe + width_proposal.view(-1,1,1,1)*(x_max-x_min), prior.high),
@@ -203,12 +223,20 @@ def multilevel_uniform(
         #input()
 
     # We return both the estimate of the log-probability of the integral and the set of adversarial examples
-    s_x = prop(x).squeeze(-1)
+    s_x = score(x).squeeze(-1)
     #we dont' count this computations since they are not used for estimation
     #count_calls+=count_particles
     #max_val = max(max_val, x.max().item())
     max_val = s_x.max().item() 
-    dic_out={'one':1}
+    dict_out={}
+    dict_out['nb_calls'] = count_calls
+    dict_out['max_val'] = max_val
+    if save_x:
+        dict_out['x'] = x
+    if save_levels:
+        dict_out['levels'] = levels
     if track_accept:
-        dic_out['acc_ratios']=np.array(acc_ratios)
-    return lg_p,count_calls,max_val, x, levels,dic_out  #, code modification: we add a counter of calls to score function, aswell as an option to track acceptance ratios
+        dict_out['acc_ratios']=np.array(acc_ratios)
+    p_est=min(np.exp(lg_p),1.) if lg_p != -math.inf else 0
+
+    return p_est,dict_out  #, code modification: we add a counter of calls to score function, aswell as an option to track acceptance ratios

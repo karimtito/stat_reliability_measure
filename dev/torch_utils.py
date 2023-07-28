@@ -96,9 +96,9 @@ def epoch(loader, model, opt=None,device='cpu'):
         total_loss += loss.item() * X.shape[0]
     return total_err / len(loader.dataset), total_loss / len(loader.dataset)
 
-def score_function(X,y_0,model):
+def score_function(X,y_clean,model):
     y = model(X)
-    y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)
+    y_diff = torch.cat((y[:,:y_clean], y[:,(y_clean+1):]),dim=1) - y[:,y_clean].unsqueeze(-1)
     s, _ = y_diff.max(dim=1)
     return s
 
@@ -295,7 +295,7 @@ def compute_V_grad_pyt(model, input_, target_class,L=0):
     if input_.requires_grad!=True:
         input_.requires_grad=True
     #input_.retain_grad()
-    s=score_function(X=input_,y_0=target_class,model=model)
+    s=score_function(X=input_,y_clean=target_class,model=model)
     v=torch.clamp(L-s,min=0)
 
     
@@ -319,33 +319,50 @@ def compute_V_pyt2(model, input_, target_class,L=0):
 def compute_V_pyt(model, input_, target_class,L=0):
     """Return potentials for given inputs, model and target classes"""
     with torch.no_grad():
-        s=score_function(X=input_, y_0=target_class, model=model)
+        s=score_function(X=input_, y_clean=target_class, model=model)
         v=torch.clamp(L-s,min=0)
     return v 
 
-def compute_h_pyt(model, input_, target_class):
+def compute_h_pyt(model, input_, target_class,L=0):
     """Return potentials for given inputs, model and target classes"""
     with torch.no_grad():
-        logits = model(input_) 
-        val, ind= torch.topk(logits,k=2)
-        output=val[:,0]-val[:,1]
-        mask=ind[:,0]==target_class
-        other=val[:,0]-logits[:,target_class]
-        v=torch.where(condition=mask, input=output,other=other)
-    return v 
-
+        s=score_function(X=input_, y_clean=target_class, model=model)
+        
+    return s
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 norm_dist_pyt = torch.distributions.Normal
-def V_pyt(x_,x_0,model,target_class,low=0.0,high=1.0,gaussian_latent=True,reshape=True,input_shape=None, noise_dist='gaussian',
+
+def h_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None, noise_dist='gaussian',
           noise_scale=1.0,):
     gaussian_prior=noise_dist=='gaussian' or noise_dist=='normal'
     with torch.no_grad():
         if input_shape is None:
-            input_shape=x_0.shape
+            input_shape=x_clean.shape
         if gaussian_latent and not gaussian_prior:
             u=normal_dist.cdf(x_)
         else:
-            u=noise_scale*x_+x_0
+            u=noise_scale*x_+x_clean
+        if reshape:
+            u=torch.reshape(u,(u.shape[0],)+input_shape)
+
+        
+        x_p = u if gaussian_prior else low+(high-low)*u 
+        if gaussian_prior:
+            x_p=torch.maximum(x_p,low.view(low.size()+(1,1)))
+            x_p=torch.minimum(x_p,high.view(high.size()+(1,1)))
+    h = compute_h_pyt(model=model,input_=x_p,target_class=target_class)
+    return h
+        
+def V_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None, noise_dist='gaussian',
+          noise_scale=1.0,):
+    gaussian_prior=noise_dist=='gaussian' or noise_dist=='normal'
+    with torch.no_grad():
+        if input_shape is None:
+            input_shape=x_clean.shape
+        if gaussian_latent and not gaussian_prior:
+            u=normal_dist.cdf(x_)
+        else:
+            u=noise_scale*x_+x_clean
         if reshape:
             u=torch.reshape(u,(u.shape[0],)+input_shape)
 
@@ -357,11 +374,11 @@ def V_pyt(x_,x_0,model,target_class,low=0.0,high=1.0,gaussian_latent=True,reshap
     v = compute_V_pyt(model=model,input_=x_p,target_class=target_class)
     return v
 
-def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None, noise_dist='gaussian',
+def gradV_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None, noise_dist='gaussian',
               noise_scale=1.0,):
     gaussian_prior = noise_dist=='gaussian' or noise_dist=='normal'
     if input_shape is None:
-        input_shape=x_0.shape
+        input_shape=x_clean.shape
     if gaussian_latent and not gaussian_prior:
         u=normal_dist.cdf(x_)
     else:
@@ -719,7 +736,7 @@ target_accept:float, accept_spread:float,d_t_decay:float,d_t_gain:float,debug:bo
 
 
 def normal_kernel(x,s):
-    return (x + s*torch.randn_like(x))/math.sqrt(1+s**2)
+    return (x + s*torch.randn_like(x))/torch.math.sqrt(1+s**2)
 
 def gaussian_kernel(x,dt,scale_M=1):
     kappa= 1. / (1 + torch.sqrt(1 - dt**2*(1/scale_M)))

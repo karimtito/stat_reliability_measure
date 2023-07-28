@@ -4,10 +4,10 @@ import auto_LiRPA.operators
 from time import time
 
 
-def get_lirpa_bounds(x_0,y_0,model,epsilon,num_classes,noise_dist,a,device):
+def get_lirpa_bounds(x_clean,y_clean,model,epsilon,num_classes,noise_dist,a,device):
     t = time()
     with torch.no_grad():
-        image=x_0.view(1,1,28,28)
+        image=x_clean.view(1,1,28,28)
         bounded_model=BoundedModule(model,global_input=torch.zeros_like(input=image),bound_opts={"conv_mode": "patches"})
     # Step 2: define perturbation. Here we use a Linf perturbation on input image.
         
@@ -56,20 +56,20 @@ def get_lirpa_bounds(x_0,y_0,model,epsilon,num_classes,noise_dist,a,device):
         else:
             raise NotImplementedError("Only uniform and Gaussian distributions are implemented for lirpa bounds.")
         
-        #y_0_flag= torch.arange(num_classes,device=device)==y_0
+        #y_clean_flag= torch.arange(num_classes,device=device)==y_clean
          
-        pre_p_l=1-torch.prod(1-gamma_l)/(1-gamma_l[y_0]) 
+        pre_p_l=1-torch.prod(1-gamma_l)/(1-gamma_l[y_clean]) 
         p_l=torch.clamp(pre_p_l,min=0,max=1) 
-        p_u=torch.clamp(gamma_u.sum()-gamma_u[y_0],min=0,max=1)
+        p_u=torch.clamp(gamma_u.sum()-gamma_u[y_clean],min=0,max=1)
         time_lirpa=time()-t
         return (p_l,p_u), time_lirpa
 
 
 #TODO complete lirpa certification 
-def get_lirpa_cert(x_0,y_0,model,epsilon,num_classes,device,method='CROWN'):
+def get_lirpa_cert(x_clean,y_clean,model,epsilon,num_classes,device,method='CROWN'):
     t=time()
-    N=x_0.shape[0]
-    image=x_0.view(N,1,28,28)
+    N=x_clean.shape[0]
+    image=x_clean.view(N,1,28,28)
     bounded_model=BoundedModule(model,global_input=torch.zeros_like(input=image),bound_opts={"conv_mode": "patches"})
 # Step 2: define perturbation. Here we use a Linf perturbation on input image.
     
@@ -80,6 +80,6 @@ def get_lirpa_cert(x_0,y_0,model,epsilon,num_classes,device,method='CROWN'):
     with torch.no_grad():
         lb,ub = bounded_model.compute_bounds(x=(bounded_image),method=method)
     
-    lirpa_safe=lb[:,y_0]>=ub.max(1) 
+    lirpa_safe=lb[:,y_clean]>=ub.max(1) 
     time_lirpa = time()-t
     return lirpa_safe,time_lirpa

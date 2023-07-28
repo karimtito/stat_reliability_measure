@@ -21,7 +21,7 @@ def MC_simulation_from_raw(raw_name,model,N=10,batch_size=5,c_1=1.15,c_2=1150):
         - scores: list of scores (list)
          - img_norm_diffs: list of image norm differences (list)
             - img_rgb_diffs: list of image rgb differences (list)
-             - y_0: label of the raw image (int)
+             - y_clean: label of the raw image (int)
               - score_0: score of the raw image (float)
                 
     """
@@ -32,8 +32,8 @@ def MC_simulation_from_raw(raw_name,model,N=10,batch_size=5,c_1=1.15,c_2=1150):
     image_tensor=torch.from_numpy(img_rgb/255.).to(torch.float32).permute(2,0,1).unsqueeze(0)
     image_tensor=torch.nn.functional.interpolate(image_tensor, size=224, mode='bilinear').cuda()
     logits= model(image_tensor).detach().cpu() 
-    y_0 = torch.argmax(logits)
-    score_0 = t_u.score_function(model=model,X=image_tensor,y_0=y_0)
+    y_clean = torch.argmax(logits)
+    score_0 = t_u.score_function(model=model,X=image_tensor,y_clean=y_clean)
     d = img.size
     input_shape=img.shape # (H,W)
     noise_scale=np.sqrt(np.clip(1.15*img-1150,a_min=0,a_max=None))
@@ -57,7 +57,7 @@ def MC_simulation_from_raw(raw_name,model,N=10,batch_size=5,c_1=1.15,c_2=1150):
             img_rgb_diffs.append(np.linalg.norm(new_img_rgb-img_rgb))
             del new_img_rgb
             new_tensor=torch.nn.functional.interpolate(new_tensor, size=224, mode='bilinear').cuda()
-            score = t_u.score_function(model=model,X=new_tensor,y_0=y_0)
+            score = t_u.score_function(model=model,X=new_tensor,y_clean=y_clean)
             scores.append(score.item())
             tensor_diffs.append(torch.norm(new_tensor-image_tensor))
             del new_tensor
@@ -74,11 +74,11 @@ def MC_simulation_from_raw(raw_name,model,N=10,batch_size=5,c_1=1.15,c_2=1150):
         img_rgb_diffs.append(np.linalg.norm(new_img_rgb-img_rgb))
         del new_img_rgb
         new_tensor=torch.nn.functional.interpolate(new_tensor, size=224, mode='bilinear').cuda()
-        score = t_u.score_function(model=model,X=new_tensor,y_0=y_0)
+        score = t_u.score_function(model=model,X=new_tensor,y_clean=y_clean)
         scores.append(score.detach().cpu().numpy())
         tensor_diffs.append(torch.norm(new_tensor-image_tensor))
         del new_tensor   
-    return scores,img_norm_diffs,img_rgb_diffs,y_0,score_0
+    return scores,img_norm_diffs,img_rgb_diffs,y_clean,score_0
 
 
 

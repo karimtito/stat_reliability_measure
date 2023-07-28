@@ -13,10 +13,11 @@ import torch
 import json
 from dev.utils import float_to_file_float
 
+
 class Config:
 
     def __init__(self,config_dict={}):
-        
+        self.config_name='default'
         if len(config_dict)> 0:
             self.__dict__.update(config_dict)
         config_path=f'{self.config_name}.json'
@@ -32,6 +33,11 @@ class Config:
                 continue
             if isinstance(vars(self)[key],dict):
                 continue
+            if isinstance(vars(self)[key],torch.Tensor):
+                continue
+            if len(vars(self)[key])>10:
+                continue
+
             elif type(vars(self)[key]) in [float,np.float32,np.float64]:
                 str_+=f" {key}={float_to_file_float(vars(self)[key])},"
             else:
@@ -129,10 +135,6 @@ class ExpConfig(Config):
             self.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
             self.cores_number=os.cpu_count()
     
-    
-
-        
-
 class Exp1config(ExpConfig):
     default_dict={'config_name':'Experiment 2',
                 'log_dir':ROOT_DIR+"logs/exp_2_mnist",
@@ -303,7 +305,7 @@ class Exp2Config(ExpConfig):
                 exp_log_path= log_path_prop.replace('9','1')
                 k=1
                 index_level+=1
-            log_path_prop = exp_log_path + '_'+str(k) 
+            log_path_prop = exp_log_path+'_'+str(k) 
             if index_level >5:
                 raise RuntimeError("Error the log naming system has failed")
             k+=1 
@@ -333,8 +335,14 @@ class Exp2Config(ExpConfig):
                 download=self.download,dataset=self.dataset, force_train=self.force_train,
                 )
         else:
-            self.model_arch = self.model_name
-            self.model_shape
+            if (not hasattr(self,"model_name")) or self.model_name=='':
+                self.model_name = self.dataset + "_model"
+            if (not hasattr(self,"model_arch")) or self.model_arch=='':
+                
+                self.model_arch = 'custom'
+        
+            
+        
         self.num_classes=t_u.datasets_num_c[self.dataset.lower()]
         self.x_mean=t_u.datasets_means[self.dataset]
         self.x_std=t_u.datasets_stds[self.dataset]
@@ -363,31 +371,42 @@ class Exp2Config(ExpConfig):
             self.gen= lambda N: torch.randn(size=(N,self.d),device=torch.device(self.device))
         else:
             self.gen = lambda N: (2*torch.rand(size=(N,self.d), device=torch.device(self.device) )-1)
-        self.x_0=self.X[0]
-        self.y_0=self.y[0]
-        self.low=torch.max(self.x_0-self.epsilon, torch.tensor([self.x_min]).to(self.device))
-        self.high=torch.min(self.x_0+self.epsilon, torch.tensor([self.x_max]).to(self.device))
+        self.x_clean=self.X[0]
+        self.y_clean=self.y[0]
+        self.low=torch.max(self.x_clean-self.epsilon, torch.tensor([self.x_min]).to(self.device))
+        self.high=torch.min(self.x_clean+self.epsilon, torch.tensor([self.x_max]).to(self.device))
         if self.mask_opt:
             try:
                 if self.mask_cond is not None:
-                    idx = self.mask_cond(self.x_0)
-                    self.low[idx]=self.x_0[idx]
-                    self.high[idx]=self.x_0[idx]
+                    idx = self.mask_cond(self.x_clean)
+                    self.low[idx]=self.x_clean[idx]
+                    self.high[idx]=self.x_clean[idx]
             except AttributeError:
                 pass
             try:
                 if self.mask_idx is not None:
-                    self.low[self.mask_idx]=self.x_0[self.mask_idx]
-                    self.high[self.mask_idx]=self.x_0[self.mask_idx]
+                    self.low[self.mask_idx]=self.x_clean[self.mask_idx]
+                    self.high[self.mask_idx]=self.x_clean[self.mask_idx]
             except AttributeError:
                 pass
         return 
     
     def score(self,x):
             y = self.model(x)
-            y_diff = torch.cat((y[:,:self.y_0], y[:,(self.y_0+1):]),dim=1) - y[:,self.y_0].unsqueeze(-1)
+            y_diff = torch.cat((y[:,:self.y_clean], y[:,(self.y_clean+1):]),dim=1) - y[:,self.y_clean].unsqueeze(-1)
             y_diff, _ = y_diff.max(dim=1)
             return y_diff #.max(dim=1)
+    
+    def h(self,X):
+        return t_u.h_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
+                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,noise_scale=self.noise_scale)
+
+    def V(self,X):
+        return t_u.V_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
+                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,noise_scale=self.noise_scale)   
+    def gradV(self,X):
+        return t_u.gradV_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
+                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,noise_scale=self.noise_scale)
       
     
 class SamplerConfig(Config):

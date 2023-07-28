@@ -10,7 +10,7 @@ import stat_reliability_measure.dev.utils as utils
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, str2list
 from stat_reliability_measure.dev.utils import get_sel_df, simple_vars, range_vars, range_dict_to_lists
 import stat_reliability_measure.dev.mls.amls_uniform as amls_mls
-from stat_reliability_measure.dev.amls.amls_utils import MLS_SMC_Config
+from dev.amls.amls_config import MLS_SMC_Config
 import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
 from config import Exp2Config
 from itertools import product as cartesian_product
@@ -96,7 +96,7 @@ def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_nam
    
     if not os.path.exists(aggr_res_path):
         print(f'aggregate results csv file not found \n it will be build at {aggr_res_path}')
-        cols=['method_name','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
+        cols=['method_name','gaussian_latent','N','ratio','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
         'std_est','freq underest','g_target']
         cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
         cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist','datetime']
@@ -109,7 +109,7 @@ def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_nam
     
     for l in range(len(exp_config.X)):
         with torch.no_grad():
-            x_0,y_0 = exp_config.X[l], exp_config.y[l]
+            x_clean,y_clean = exp_config.X[l], exp_config.y[l]
         for idx in range(len(exp_config.epsilon_range)):
             
             
@@ -119,17 +119,17 @@ def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_nam
             if exp_config.lirpa_bounds:
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
                 # Step 2: define perturbation. Here we use a Linf perturbation on input image.
-                p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=exp_config.epsilon,
+                p_l,p_u=get_lirpa_bounds(x_clean=x_clean,y_clean=y_clean,model=model,epsilon=exp_config.epsilon,
                 num_classes=exp_config.num_classes,noise_dist=exp_config.noise_dist,a=exp_config.a,device=exp_config.device)
                 exp_config.p_l,exp_config.p_u=p_l.item(),p_u.item()
             if exp_config.lirpa_cert:
                 from dev.lirpa_utils import get_lirpa_cert
-                exp_config.lirpa_safe,exp_config.time_lirpa_safe=get_lirpa_cert(x_0=x_0,y_0=y_0,
+                exp_config.lirpa_safe,exp_config.time_lirpa_safe=get_lirpa_cert(x_clean=x_clean,y_clean=y_clean,
                                 epsilon = exp_config.epsilon, num_classes=exp_config.num_classes                                                
                                 ,model=model, device=exp_config.device)
             def prop(x):
                 y = model(x)
-                y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)
+                y_diff = torch.cat((y[:,:y_clean], y[:,(y_clean+1):]),dim=1) - y[:,y_clean].unsqueeze(-1)
                 y_diff, _ = y_diff.max(dim=1)
                 return y_diff #.max(dim=1)
                 
@@ -147,7 +147,7 @@ def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_nam
                     if os.path.exists(exp_config.aggr_res_path):
                         aggr_res_df = pd.read_csv(exp_config.aggr_res_path)
                         if 'exp_id' in aggr_res_df.columns:
-                            last_exp_id = aggr_res_df['exp_id'].max()
+                            last_exp_id = int(aggr_res_df['exp_id'].max())
                         else:
                             last_exp_id = -1
                     else:
@@ -169,9 +169,7 @@ def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_nam
                                 except KeyError:
                                     if exp_config.verbose>=5:
                                         print(f"No similar experiment found for {method_config.method_name} run {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+str(method_params).replace('{','').replace('}','').replace("'",''))
-                                    exp_config.exp_id = last_exp_id+1
-                    else:
-                        exp_config.exp_id = last_exp_id+1
+                    exp_config.exp_id = last_exp_id+1
                 loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
                 log_name=method_name+'_e_'+float_to_file_float(exp_config.epsilon_range[idx])+f'_n_{exp_config.n_rep}'+'_N_'+str(method_config.N)+'_T_'+str(method_config.T)+'_s_'+str(method_config.s)+'_K_'+str(method_config.K)+'_r_'+float_to_file_float(method_config.ratio)+'_'+loc_time
                
@@ -203,18 +201,18 @@ def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_nam
 
                 for i in tqdm(range(exp_config.n_rep)):
                     t=time()
-                    lg_p,nb_calls,max_val,x,levels,dict_out=amls_mls.multilevel_uniform(prop=prop,
-                    count_particles=method_config.N,count_mh_steps=method_config.T,x_min=exp_config.x_min,
+                    p_est,dict_out=amls_mls.multilevel_uniform(
+                        score=exp_config.score,
+                  N=method_config.N,T=method_config.T,x_min=exp_config.x_min,
                     x_max=exp_config.x_max,
-                    x_sample=x_0,sigma=exp_config.epsilon,rho=method_config.ratio,CUDA=use_cuda,debug=(exp_config.verbose>=1))
-
+                    x_clean=x_clean,epsilon=exp_config.epsilon,ratio=method_config.ratio,CUDA=use_cuda,
+                    verbose=exp_config.verbose
+                    )
 
                     t=time()-t
                     # we don't need adversarial examples and highest score
-                    del x
-                    del max_val
-                    log_ests.append(lg_p)
-                    est=np.exp(lg_p)
+                    log_est=np.log(p_est) if p_est>0 else -250.0
+                    log_ests.append(log_est) 
                     if exp_config.verbose>1:
                         print(f"Est:{est}")
                    
@@ -233,8 +231,8 @@ def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_nam
                     if method_config.track_finish:
                         finish_flags.append(levels[-1]>=0)
                     times.append(t)
-                    ests.append(est)
-                    calls.append(nb_calls)
+                    ests.append(p_est)
+                    calls.append(dict_out['nb_calls'])
     
                 times=np.array(times)
                 ests = np.array(ests)
@@ -277,22 +275,27 @@ def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_nam
                 
 
                 std_log_est=log_ests.std()
+                log10_ests=log_ests/np.log(10)
+                std_log10_est=log10_ests.std()
+                mean_log10_est=log10_ests.mean()
                 mean_log_est=log_ests.mean()
                 lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
-                lg_est_path=os.path.join(log_path,'lg_ests.txt')
+                lg10_q_1,lg10_med_est,lg10_q_3=np.quantile(a=log10_ests,q=[0.25,0.5,0.75])
+                lg_est_path=os.path.join(log_path,'log10_ests.txt')
+                
                 if log_txt_:
                     np.savetxt(fname=times_path,X=times)
                     np.savetxt(fname=est_path,X=ests)
-                    np.savetxt(fname=lg_est_path,X=ests)
+                    np.savetxt(fname=lg_est_path,X=log_ests/np.log(10))
                 if log_hist_:
-                    plt.hist(times, bins=10)
+                    plt.hist(times, bins=exp_config.n_rep//5)
                     plt.savefig(os.path.join(log_path,'times_hist.png'))
                     plt.close()
-                    plt.hist(ests,bins=10)
+                    plt.hist(ests,bins=exp_config.n_rep//5)
                     plt.savefig(os.path.join(log_path,'ests_hist.png'))
                     plt.close()
-                    plt.hist(log_ests,bins=10)
-                    plt.savefig(os.path.join(log_path,'log_ests_hist.png'))
+                    plt.hist(log_ests/np.log(10),bins=exp_config.n_rep//5)
+                    plt.savefig(os.path.join(log_path,'log10_ests_hist.png'))
                     plt.close()
                 #with open(os.path.join(log_path,'results.txt'),'w'):
                 result={"image_idx":l,'mean_calls':calls.mean(),'std_calls':calls.std()
@@ -303,6 +306,8 @@ def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_nam
                 'q_1':q_1,'q_3':q_3,'med_est':med_est,"lg_est_path":lg_est_path,
                 "mean_log_est":mean_log_est,"std_log_est":std_log_est,
                 "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
+                "mean_log10_est":mean_log10_est,"std_log10_est":std_log10_est,
+                "lg10_q_1":lg10_q_1,"lg10_q_3":lg10_q_3,"lg10_med_est":lg10_med_est,
                 "log_path":log_path,"log_name":log_name}
                 result.update(simple_vars(method_config))
                 result.update(simple_vars(exp_config))

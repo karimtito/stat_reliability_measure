@@ -34,8 +34,8 @@ def compute_V_grad_tf2(model, input_, target_class, L=0,v_max =1e5):
     with tf.GradientTape() as tape:
         tape.watch(input_)
         y= model(input_) 
-        y_0 =target_class
-        log_diff = tf.concat((y[:,:y_0], y[:,(y_0+1):]),axis=1)-tf.expand_dims(y[:,y_0],-1)
+        y_clean =target_class
+        log_diff = tf.concat((y[:,:y_clean], y[:,(y_clean+1):]),axis=1)-tf.expand_dims(y[:,y_clean],-1)
         score = tf.reduce_max(log_diff, axis =1)    
         v = tf.clip_by_value(L-score,clip_value_min=0,clip_value_max=v_max)
     grad=tape.gradient(v,input_)
@@ -53,9 +53,9 @@ def compute_V_tf(model, input_, target_class):
 
 def compute_V_tf2(model, input_, target_class,L=0,v_max=1e5):
     y= model(input_) 
-    y_0 =target_class
+    y_clean =target_class
 
-    log_diff = tf.concat((y[:,:y_0], y[:,(y_0+1):]),axis=1)-tf.expand_dims(y[:,y_0],-1)
+    log_diff = tf.concat((y[:,:y_clean], y[:,(y_clean+1):]),axis=1)-tf.expand_dims(y[:,y_clean],-1)
     score = tf.reduce_max(log_diff, axis =1)
     return tf.clip_by_value(L-score,clip_value_min=0,clip_value_max=v_max)
 
