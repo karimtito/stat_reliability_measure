@@ -271,7 +271,7 @@ with torch.no_grad():
     y_pred= torch.argmax(logits,-1)
     correct_idx=y_pred==y
 
-    x_0,y_0 = X[correct_idx][l], y[correct_idx][l]
+    x_clean,y_clean = X[correct_idx][l], y[correct_idx][l]
     X_correct, label_correct= X[correct_idx], y[correct_idx]
 
 
@@ -287,7 +287,7 @@ if config.lirpa_bounds:
     from auto_LiRPA.perturbations import *
     import auto_LiRPA.operators
     with torch.no_grad():
-        image=x_0.view(1,1,28,28)
+        image=x_clean.view(1,1,28,28)
     bounded_model=BoundedModule(model,global_input=torch.zeros_like(input=image),bound_opts={"conv_mode": "patches"})
             
 
@@ -301,16 +301,16 @@ for i in range(len(config.epsilons)):
     if config.lirpa_bounds:
         from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
         # Step 2: define perturbation. Here we use a Linf perturbation on input image.
-        p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=config.epsilon,
+        p_l,p_u=get_lirpa_bounds(x_clean=x_clean,y_clean=y_clean,model=model,epsilon=config.epsilon,
         num_classes=num_classes,noise_dist=config.noise_dis,a=config.a,device=config.device)
             
             
     def h(x):
 
         x=x.reshape(x.shape[:1] +input_shape)
-        x=torch.clamp(input=x_0+x, min=x_min,max=x_max)
+        x=torch.clamp(input=x_clean+x, min=x_min,max=x_max)
         y = model(x)
-        y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)
+        y_diff = torch.cat((y[:,:y_clean], y[:,(y_clean+1):]),dim=1) - y[:,y_clean].unsqueeze(-1)
         y_diff, _ = y_diff.max(dim=1)
         return y_diff #.max(dim=1)
     
@@ -320,7 +320,7 @@ for i in range(len(config.epsilons)):
         gen=lambda N: epsilon*(2*torch.rand(size=(N,dim), device=device )-1)
     normal_gen=lambda N: torch.randn(size=(N,dim),requires_grad=True).to(device)
     
-    x_0.requires_grad=True
+    x_clean.requires_grad=True
     
     for N in config.N_range: 
         for N_b in config.N_b_range:

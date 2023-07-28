@@ -382,7 +382,7 @@ clip_max=1
 
 
 for l in inp_indices:
-    x_0,y_0 = X_correct[l],tf.cast(y_correct[l],dtype=tf.int32) 
+    x_clean,y_clean = X_correct[l],tf.cast(y_correct[l],dtype=tf.int32) 
 
    
     for idx in range(len(config.epsilons)):
@@ -393,14 +393,14 @@ for l in inp_indices:
         if config.lirpa_bounds:
             from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
             # Step 2: define perturbation. Here we use a Linf perturbation on input image.
-            p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
+            p_l,p_u=get_lirpa_bounds(x_clean=x_clean,y_clean=y_clean,model=model,epsilon=epsilon,
             num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)
             p_l,p_u=p_l.item(),p_u.item()
         lirpa_safe=None
         if config.lirpa_cert:
             assert config.noise_dist.lower()=='uniform',"Formal certification only makes sense for uniform distributions"
             from stat_reliability_measure.dev.lirpa_utils import get_lirpa_cert
-            lirpa_safe=get_lirpa_cert(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
+            lirpa_safe=get_lirpa_cert(x_clean=x_clean,y_clean=y_clean,model=model,epsilon=epsilon,
             num_classes=num_classes,device=config.device)
 
         
@@ -410,14 +410,14 @@ for l in inp_indices:
         else:
             gen= lambda N: (2*tf.random.uniform(shape=(N,d))-1)
             
-        low=tf.maximum(x_0-epsilon, tf.constant([float(x_min)]))
-        low_ep = ep.maximum(ep.astensor(x_0-epsilon), x_min)
-        high_ep = ep.minimum(ep.astensor(x_0+epsilon), x_max)
-        high=tf.minimum(x_0+epsilon, tf.constant([float(x_max)]))  
+        low=tf.maximum(x_clean-epsilon, tf.constant([float(x_min)]))
+        low_ep = ep.maximum(ep.astensor(x_clean-epsilon), x_min)
+        high_ep = ep.minimum(ep.astensor(x_clean+epsilon), x_max)
+        high=tf.minimum(x_clean+epsilon, tf.constant([float(x_max)]))  
         model_shape=dic_in_shape_tf['mnist']
-        V_ep = lambda X: e_u.V_ep(X, model=model,low=ep.astensor(low), high = ep.astensor(high),target_class=y_0, input_shape = model_shape,gaussian_latent=config.gaussian_latent)
+        V_ep = lambda X: e_u.V_ep(X, model=model,low=ep.astensor(low), high = ep.astensor(high),target_class=y_clean, input_shape = model_shape,gaussian_latent=config.gaussian_latent)
     
-        gradV_ep = lambda X: e_u.gradV_ep(X,model=model,input_shape=model_shape, low=ep.astensor(low), high = ep.astensor(high), target_class= y_0,  gaussian_latent=config.gaussian_latent)
+        gradV_ep = lambda X: e_u.gradV_ep(X,model=model,input_shape=model_shape, low=ep.astensor(low), high = ep.astensor(high), target_class= y_clean,  gaussian_latent=config.gaussian_latent)
         assert tf.math.reduce_all(low_ep.raw==low), "/!\ lower bounds are not the same"
         assert tf.math.reduce_all(high_ep.raw==high), "/!\ higher bounds are not the same"
 

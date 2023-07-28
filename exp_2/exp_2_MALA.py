@@ -58,10 +58,10 @@ def main():
     for l in range(exp_config.input_start,exp_config.input_stop):
         print(exp_config.nb_inputs)
         with torch.no_grad():
-            x_0,y_0 = exp_config.X[l], exp_config.y[l]
-        x_0.requires_grad=True
-        exp_config.x_0=x_0
-        exp_config.y_0=y_0
+            x_clean,y_clean = exp_config.X[l], exp_config.y[l]
+        x_clean.requires_grad=True
+        exp_config.x_clean=x_clean
+        exp_config.y_clean=y_clean
         for idx in range(len(exp_config.epsilon_range)):
             
             
@@ -73,14 +73,14 @@ def main():
             if exp_config.lirpa_bounds:
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
                 # Step 2: define perturbation. Here we use a Linf perturbation on input image.
-                p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=exp_config.model,epsilon=exp_config.epsilon,
+                p_l,p_u=get_lirpa_bounds(x_clean=x_clean,y_clean=y_clean,model=exp_config.model,epsilon=exp_config.epsilon,
                 num_classes=exp_config.num_classes,noise_dist=exp_config.noise_dist,a=method_config.a,device=exp_config.device)
                 p_l,p_u=p_l.item(),p_u.item()
             lirpa_safe=None
             if exp_config.lirpa_cert:
                 assert exp_config.noise_dist.lower()=='uniform',"Formal certification only makes sense for uniform distributions"
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_cert
-                lirpa_safe=get_lirpa_cert(x_0=x_0,y_0=y_0,model=exp_config.model,epsilon=exp_config.epsilon,
+                lirpa_safe=get_lirpa_cert(x_clean=x_clean,y_clean=y_clean,model=exp_config.model,epsilon=exp_config.epsilon,
                 num_classes=exp_config.num_classes,device=exp_config.device)
             lists_cart= cartesian_product(*method_param_lists)
             for method_params in lists_cart:

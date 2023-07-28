@@ -304,9 +304,9 @@ def main():
     for l in inp_indices:
         with torch.no_grad():
         
-            x_0,y_0 = X_correct[l], label_correct[l]
+            x_clean,y_clean = X_correct[l], label_correct[l]
 
-        x_0.requires_grad=True
+        x_clean.requires_grad=True
         for idx in range(len(config.epsilons)):
             
             
@@ -316,22 +316,22 @@ def main():
             if config.lirpa_bounds:
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
                 # Step 2: define perturbation. Here we use a Linf perturbation on input image.
-                p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
+                p_l,p_u=get_lirpa_bounds(x_clean=x_clean,y_clean=y_clean,model=model,epsilon=epsilon,
                 num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)
                 p_l,p_u=p_l.item(),p_u.item()
             lirpa_safe=None
             if config.lirpa_cert:
                 assert config.noise_dist.lower()=='uniform',"Formal certification only makes sense for uniform distributions"
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_cert
-                lirpa_safe=get_lirpa_cert(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
+                lirpa_safe=get_lirpa_cert(x_clean=x_clean,y_clean=y_clean,model=model,epsilon=epsilon,
                 num_classes=num_classes,device=config.device)
                 lirpa_safe=lirpa_safe.item()
                 if config.verbose>=2:
                     print(f"lirpa safe:{lirpa_safe}")
-            low=torch.max(x_0-epsilon, torch.tensor([x_min]).cuda())
-            high=torch.min(x_0+epsilon, torch.tensor([x_max]).cuda())  
-            V = lambda X: t_u.V_pyt(X,x_0=x_0,model=model,low=low,high=high,target_class=y_0,gaussian_latent=config.gaussian_latent)
-            grad_V = lambda X: t_u.gradV_pyt(X,x_0=x_0,model=model,low=low,high=high, target_class=y_0,gaussian_latent=config.gaussian_latent)
+            low=torch.max(x_clean-epsilon, torch.tensor([x_min]).cuda())
+            high=torch.min(x_clean+epsilon, torch.tensor([x_max]).cuda())  
+            V = lambda X: t_u.V_pyt(X,x_clean=x_clean,model=model,low=low,high=high,target_class=y_clean,gaussian_latent=config.gaussian_latent)
+            grad_V = lambda X: t_u.gradV_pyt(X,x_clean=x_clean,model=model,low=low,high=high, target_class=y_clean,gaussian_latent=config.gaussian_latent)
             
 
 

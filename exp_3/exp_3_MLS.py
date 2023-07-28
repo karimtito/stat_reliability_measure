@@ -321,9 +321,9 @@ nb_exps= np.prod(lenghts)
 
 for l in inp_indices:
     with torch.no_grad():
-        x_0,y_0 = X_correct[l], label_correct[l]
-    input_shape=x_0.shape
-    x_0.requires_grad=True
+        x_clean,y_clean = X_correct[l], label_correct[l]
+    input_shape=x_clean.shape
+    x_clean.requires_grad=True
     for idx in range(len(config.epsilons)):
         
         
@@ -333,12 +333,12 @@ for l in inp_indices:
         if config.lirpa_bounds:
             from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
             # Step 2: define perturbation. Here we use a Linf perturbation on input image.
-            p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
+            p_l,p_u=get_lirpa_bounds(x_clean=x_clean,y_clean=y_clean,model=model,epsilon=epsilon,
             num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)
             p_l,p_u=p_l.item(),p_u.item()
         def prop(x):
             y = model(x)
-            y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)
+            y_diff = torch.cat((y[:,:y_clean], y[:,(y_clean+1):]),dim=1) - y[:,y_clean].unsqueeze(-1)
             y_diff, _ = y_diff.max(dim=1)
             return y_diff #.max(dim=1)
             
@@ -371,7 +371,7 @@ for l in inp_indices:
                             t=time()
                             lg_p,nb_calls,max_val,x,levels,dic=amls_mls.multilevel_uniform(prop=prop,
                             count_particles=N,count_mh_steps=T,x_min=x_min,x_max=x_max,
-                            x_sample=x_0,sigma=epsilon,rho=ratio,CUDA=True,debug=(config.verbose>=1))
+                            x_sample=x_clean,sigma=epsilon,rho=ratio,CUDA=True,debug=(config.verbose>=1))
                             t=time()-t
                             log_ests.append(lg_p)
                             # we don't need adversarial examples and highest score

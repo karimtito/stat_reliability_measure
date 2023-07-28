@@ -319,9 +319,9 @@ nb_exps= np.prod(lenghts)
 for l in inp_indices:
     with torch.no_grad():
     
-        x_0,y_0 = X_correct[l], label_correct[l]
-    input_shape=x_0.shape
-    x_0.requires_grad=True
+        x_clean,y_clean = X_correct[l], label_correct[l]
+    input_shape=x_clean.shape
+    x_clean.requires_grad=True
     for idx in range(len(config.epsilons)):
         
         
@@ -331,7 +331,7 @@ for l in inp_indices:
         if config.lirpa_bounds:
             from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
             # Step 2: define perturbation. Here we use a Linf perturbation on input image.
-            p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
+            p_l,p_u=get_lirpa_bounds(x_clean=x_clean,y_clean=y_clean,model=model,epsilon=epsilon,
             num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)
             p_l,p_u=p_l.item(),p_u.item()
             
@@ -342,8 +342,8 @@ for l in inp_indices:
         else:
             amls_gen= lambda N: torch.rand(size=(N,d), device=device )
         normal_kernel =  lambda x,s : (x + s*torch.randn(size = x.shape,device=config.device))/np.sqrt(1+s**2) #normal law kernel, appliable to vectors 
-        low=torch.max(x_0-epsilon, torch.tensor([x_min]).cuda())
-        high=torch.min(x_0+epsilon, torch.tensor([x_max]).cuda())            
+        low=torch.max(x_clean-epsilon, torch.tensor([x_min]).cuda())
+        high=torch.min(x_clean+epsilon, torch.tensor([x_max]).cuda())            
         def h(x,gaussian_latent=config.gaussian_latent,low=low,high=high):
             x_m=x.reshape((x.shape[0],)+input_shape)
             if gaussian_latent:
@@ -353,7 +353,7 @@ for l in inp_indices:
                 x_m=low+(high-low)*x_m
                 
                 y = model(x_m)
-                y_diff = torch.cat((y[:,:y_0], y[:,(y_0+1):]),dim=1) - y[:,y_0].unsqueeze(-1)
+                y_diff = torch.cat((y[:,:y_clean], y[:,(y_clean+1):]),dim=1) - y[:,y_clean].unsqueeze(-1)
                 y_diff, _ = y_diff.max(dim=1)
             return y_diff #.max(dim=1)
         h_batch_pyt= lambda x: h(x).reshape((x.shape[0],1))

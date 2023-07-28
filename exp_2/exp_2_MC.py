@@ -316,18 +316,18 @@ def main():
 
     for l in inp_indices:
         with torch.no_grad():
-            x_0,y_0 = X_correct[l], label_correct[l]
+            x_clean,y_clean = X_correct[l], label_correct[l]
         if config.print_img:
-            plt.imshow(x_0.detach().cpu().numpy().reshape((28,28)), cmap='gray')
-            plt.title("Pred: {}".format(y_0.argmax()))
+            plt.imshow(x_clean.detach().cpu().numpy().reshape((28,28)), cmap='gray')
+            plt.title("Pred: {}".format(y_clean.argmax()))
             plt.show()
 
-        input_shape=x_0.shape
-        #x_0.requires_grad=True
+        input_shape=x_clean.shape
+        #x_clean.requires_grad=True
         for idx in range(len(config.epsilons)):
             epsilon = config.epsilons[idx]
-            low=torch.max(x_0-epsilon, torch.tensor([x_min]).cuda())
-            high=torch.min(x_0+epsilon, torch.tensor([x_max]).cuda())
+            low=torch.max(x_clean-epsilon, torch.tensor([x_min]).cuda())
+            high=torch.min(x_clean+epsilon, torch.tensor([x_max]).cuda())
             if config.noise_dist=='gaussian' or config.gaussian_latent:  
                 gen = lambda N: torch.randn(size=(N,d),device=config.device)
             else:
@@ -338,7 +338,7 @@ def main():
             if config.lirpa_bounds:
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
                 # Step 2: define perturbation. Here we use a Linf perturbation on input image.
-                p_l,p_u=get_lirpa_bounds(x_0=x_0,y_0=y_0,model=model,epsilon=epsilon,
+                p_l,p_u=get_lirpa_bounds(x_clean=x_clean,y_clean=y_clean,model=model,epsilon=epsilon,
                 num_classes=num_classes,noise_dist=config.noise_dist,a=config.a,device=config.device)
                 p_l,p_u=p_l.item(),p_u.item()
             if config.noise_dist=='gaussian':
@@ -347,7 +347,7 @@ def main():
             else:
                 gaussian_prior = False
                 gaussian_latent = config.gaussian_latent
-            score = lambda X: -t_u.V_pyt(X,x_0=x_0,model=model,low=low,high=high,target_class=y_0,
+            score = lambda X: -t_u.V_pyt(X,x_clean=x_clean,model=model,low=low,high=high,target_class=y_clean,
             gaussian_latent=gaussian_latent,
             gaussian_prior=gaussian_prior)
             for N in config.N_range: 
