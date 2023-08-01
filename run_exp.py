@@ -29,8 +29,8 @@ method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,'rw_s
                     'hmc':SamplerSMC,'smc':SamplerSMC,'amls_batch':amls_pyt.ImportanceSplittingPytBatch}
 
 def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_dist='uniform',dataset_name = 'dataset',
-                 model_name='model',
-                 verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None,mask_cond=None,
+                 model_name='model', 
+                 verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None,mask_cond=None,p_ref=None,
                  log_hist_=True, aggr_res_path='',batch_opt=False,
                  log_txt_=True,exp_config=None,method_config=None,**kwargs):
     """ Running reliability experiments on neural network model with supervised data (X,y)
@@ -154,9 +154,7 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
                 vars(method_config).update(method_params)
                 method_keys= list(simple_vars(method_config).keys())
                 method_vals= list(simple_vars(method_config).values())
-                clean_method_args_str = str(method_params).replace('{','').replace('}','').replace("'",'').replace('(',"").replace(')',"")
-                print(f"method_keys:{method_keys}")
-                print(f"method_vals:{method_vals}")
+                clean_method_args_str = str(method_params).replace('{','').replace('}','').replace("'",'').replace('(',"").replace(')',"").replace(',',':')
                 aggr_res_path=os.path.join(exp_config.log_dir,'aggr_res.csv')
                 if exp_config.update_aggr_res and os.path.exists(exp_config.aggr_res_path):
                     aggr_res_df = pd.read_csv(exp_config.aggr_res_path)
@@ -205,7 +203,7 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
                
                 log_path=os.path.join(exp_config.exp_log_path,log_name)
                 
-                print(f"Starting {method_name} estimation {i_exp}/{nb_exps}")
+                print(f"Starting {method_config.method_name} simulation {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+clean_method_args_str)
                                 
              
                 if exp_config.verbose>0:
@@ -302,6 +300,11 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
                 print(f"mean calls:{calls.mean()}")
                 print(f"std. re.:{std_rel}")
                 print(f"std. rel. adj.:{std_rel_adj}")
+                if p_ref is not None:
+                    rel_error = np.abs(ests-p_ref)/p_ref
+                    print(f"mean rel. error:{rel_error.mean()}")
+                    print(f"std rel. error:{rel_error.std()}")
+                    print(f"stat performance (per 1k calls):{rel_error.std()*(mean_calls/1000)}")
                 
                 if track_finish:
                     finish_flags=np.array(finish_flags)
@@ -354,6 +357,9 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
                 "mean_log_est":mean_log_est,"std_log_est":std_log_est,
                 "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
                 "log_path":log_path,"log_name":log_name}
+                if p_ref is not None:
+                    result.update({"rel_error":rel_error.mean(),"std_rel_error":rel_error.std(),
+                                   "p_ref":p_ref})
                 result.update(simple_vars(method_config))
                 result.update(simple_vars(exp_config))
                 
