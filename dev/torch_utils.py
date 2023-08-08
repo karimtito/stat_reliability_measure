@@ -485,14 +485,14 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
                          
     return data_loader
 
-def plot_tensor(x):
+def plot_tensor(x,cmap='gray'):
     if 'cuda' in str(x.device):
         x=x.cpu()
     if len(x.shape)==4:
         x=x.squeeze(0)
     if len(x.shape)==3:
         x=x.permute(1,2,0)
-    plt.imshow(x)
+    plt.imshow(x,cmap=cmap)
     plt.show()
 
 def get_correct_x_y(data_loader,device,model):
@@ -1360,6 +1360,23 @@ def idx_zero(tensor):
 def idx_negative(tensor):
     """ returns idx where tensor is negative"""
     return (tensor<0)
+
+class NormalCDFLayer(torch.nn.Module):
+    def __init__(self,device='cpu',mu=0,sigma=1,offset = 0.,epsilon = 0.1,x_min=0., x_max=1.):
+        super(NormalCDFLayer, self).__init__()
+        self.device=device
+        self.norm = torch.distributions.Normal(0, 1)
+        self.mu = mu
+        self.sigma = sigma
+        self.offset = offset
+        self.epsilon = epsilon
+        
+    def forward(self,x):
+        return torch.clip(self.offset+self.epsilon*(2*self.norm.cdf(x)-1),min=x_min,max=x_max)
+    def inverse(self,x):
+        return self.norm.icdf(((x-self.offset)/self.epsilon+1.)/2.)
+    def string(self):
+        return f"NormalCDFLayer(mu={self.mu},sigma={self.sigma})"
 
 
 
