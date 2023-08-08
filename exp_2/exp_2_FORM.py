@@ -13,18 +13,18 @@ import torch
 from stat_reliability_measure.home import ROOT_DIR
 from datetime import datetime
 from pathlib import Path
-from stat_reliability_measure.dev.utils import float_to_file_float,str2bool,str2intList,str2floatList,print_config
+from stat_reliability_measure.dev.utils import float_to_file_float,str2bool,str2intList,str2floatList
 import stat_reliability_measure.dev.torch_utils as t_u 
 
 from stat_reliability_measure.dev.form.form_pyt import find_zero_gd_pyt 
-from stat_reliability_measure.exp_2.exp_config import exp_config,parser
+
 method_name="FORM"
 
 
 class config:
     epsilon=1e-15
 
-
+    n_rep=1
     optim_steps=10
     opt_steps_list = []
     verbose=0
@@ -69,7 +69,7 @@ class config:
     model_arch=None  
     epsilons = [0.15]
     save_config=False 
-    print_config=True
+   
     eps_max=0.3
     eps_min=0.2
     eps_num=5
@@ -124,7 +124,7 @@ parser.add_argument('--optim_steps',type=float, default=config.optim_steps)
 parser.add_argument('--opt_steps_list',type=str2floatList,default=config.opt_steps_list)
 parser.add_argument('--tqdm_opt',type=bool,default=config.tqdm_opt)
 parser.add_argument('--save_config', type=bool, default=config.save_config)
-parser.add_argument('--print_config',type=bool , default=config.print_config)
+
 parser.add_argument('--update_aggr_res', type=bool,default=config.update_aggr_res)
 
 parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
@@ -145,11 +145,6 @@ args=parser.parse_args()
 for k,v in vars(args).items():
     if hasattr(config,k):
         setattr(config, k, v)
-    elif hasattr(exp_config,k):
-        setattr(exp_config, k, v)
-    else:
-        raise ValueError(f"unknown config parameter {k}")
-
 #gradient descent in 1 dimension to find zero of a function f
 def find_zero_gd_pyt(f, grad_f, x0, obj='min', step_size=1e-2, max_iter=100, tol=1e-3,random_init=False):
     x = x0
@@ -246,8 +241,7 @@ def main():
     os.mkdir(exp_log_path)
     exp_res = []
     config.json=vars(args)
-    if config.print_config:
-        print_config(config)
+
     #if config.save_config:
     #     with open(file=os.path.join(),mode='w') as f:
     #         f.write(config.json)
@@ -286,13 +280,12 @@ def main():
         attack=fb.attacks.LinfPGD()
         #un-normalize data before performing attack
         _, advs, success = attack(fmodel, X_correct[config.input_start:config.input_stop], 
-        label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
+        label_correct[config.isnput_start:config.input_stop], epsilons=config.epsilons)
 
 
-    config_dict=print_config(config)
-    config_path=os.path.join(exp_log_path,'config.json')
-    with open(config_path,'w') as f:
-        f.write(json.dumps(config_dict, indent = 4, cls=utils.CustomEncoder))
+    # config_path=os.path.join(exp_log_path,'config.json')
+    # with open(config_path,'w') as f:
+    #     f.write(json.dumps(config_dict, indent = 4, cls=utils.CustomEncoder))
     inp_indices=np.arange(start=config.input_start,stop=config.input_stop)
     normal_dist=torch.distributions.Normal(loc=0, scale=1.)
     run_nb=0
@@ -344,19 +337,18 @@ def main():
                     log_path=os.path.join(exp_log_path,log_name)
                     os.mkdir(path=log_path)
                     i_run+=1
-                    
-                    
                     print(f"Starting FORM run {i_run}/{nb_runs} on {config.dataset} dataset, with model {model_name} and epsilon= {epsilon},Maxiter={max_iter},step size={step_size}")
-                    
                     times= []
                     rel_error= []
                     ests = [] 
                     calls=[]
+                    zero_d = np.zeros((d,1))
                     if config.track_finish:
+
                         finish_flags=[]
                     for _ in tqdm(range(config.n_rep)):
                         t=time()
-                        approx_zero,f_calls = dp_search_method(f=V, grad_f=grad_V, x0=zero_d, step_size=step_size,
+                        approx_zero,f_calls = dp_search_method(f=V, grad_f=grad_V, x0=x_clean, step_size=step_size,
                                                             tol=config.tol, max_iter=max_iter,random_init=config.random_init,)
                         beta = torch.norm(approx_zero).detach().cpu().numpy()
                         est = stat.norm.cdf(-beta)
