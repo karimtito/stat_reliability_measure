@@ -231,6 +231,7 @@ class Exp2Config(ExpConfig):
                 'export_to_onnx':False,'use_attack':False,'attack':'PGD',
                 'lirpa_bounds':False,'download':True,'train_model_epochs':10,
                 'gaussian_latent':True,'noise_dist':'uniform','x_min':0.,'mask_opt':False,
+                'sigma':1.,
         
                 'x_max':1.,'x_mean':0.,'x_std':1.,'lirpa_cert':False,'robust_model':False,
                 'robust_eps':0.1,'load_batch_size':128,'nb_epochs': 15,'adversarial_every':1,}
