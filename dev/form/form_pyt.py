@@ -1,46 +1,95 @@
 import scipy.stats as stats 
-from stat_reliability_measure.dev.torch_utils import norm_batch_tensor
+from stat_reliability_measure.dev.torch_utils import NormalCDFLayer
 from math import sqrt
 import torch
 
-def FORM_pyt(dp_search_method,X,score,d,**kwargs):
-    """Computes the probability of failure using the First Order Method
+def FORM_pyt(x_clean,y_clean,model,noise_dist='uniform',
+             search_method='Carlini',
+             num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1,
+              sigma=1.,x_min=0.,x_max=1., random_init=False ,**kwargs):
 
+    """Computes the probability of failure using the First Order Method (FORM)
     Args:
-        dp_search_method (_type_): design point search method (eg. HLRF, iHLRF...)
-        X (_type_): _description_
-        y (_type_): _description_
-        model (_type_): _description_
-        d (_type_): _description_
-        max_dist (_type_, optional): _description_. Defaults to None.
-    """
-    if max_dist is None:
-        max_dist = sqrt(d)
-    design_points=dp_search_method(score,X,**kwargs)
-    l2dist= norm_batch_tensor(design_points,d=d)
-    p_fail= stats.norm.cdf(-l2dist)
-    return p_fail
+        x_clean (torch.Tensor): clean input
+        y_clean (torch.Tensor): clean label
+        model (torch.nn.Module): model to attack
+        noise_dist (str): distribution of the noise. Can be 'uniform' or 'gaussian'
+        search_method (str): search method for the most probable point. Can be 'Carlini' or 'gradient_descent'
+        num_iter (int): number of iterations for the search method
+        steps (int): number of steps for the search method
+        stepsize (float): step size for the search method
+        max_dist (float): maximum distance between the clean input and the adversarial example
+        epsilon (float): maximum perturbation for the search method (if uniform)
+        sigma (float): standard deviation of the noise (if Gaussian)
+        x_min (float): minimum value of the input
+        x_max (float): maximum value of the input
+    
+    Returns:
+        p_fail (float): probability of failure
+        dict_out (dict): dictionary containing the parameters of the attack
 
-class method_config:
-    optim_steps=10
-    opt_steps_list = []
-    tol=1e-3
-    max_iter=100
-    max_iter_range=[]
-    random_init=False
+    """
+    device= x_clean.device
+    if max_dist is None:
+        max_dist = sqrt(x_clean.numel())*sigma # maximum distance between the clean input and the adversarial example
+    if search_method.lower() in ('carlini','cw','carlini-wagner','carliniwagner','carlini_wagner','carlini_wagner_l2'):
+        assert (x_clean is not None) and (y_clean is not None), "x_clean and y_clean must be provided for Carlini-Wagner attack"
+        assert (model is not None), "model must be provided for Carlini-Wagner attack"
+        import foolbox as fb
+        attack = fb.L2CarliniWagnerAttack(binary_search_steps=num_iter, 
+                                          stepsize=stepsize,
+                                        
+                                          steps=steps,)
+    elif search_method.lower() in ('brendel','brendel-bethge','brendel_bethge'):
+        import foolbox as fb
+        attack = fb.attacks.L2BrendelBethgeAttack(binary_search_steps=num_iter,
+        lr=stepsize, steps=steps,)
+    else:
+        raise NotImplementedError(f"Search method '{search_method}' is not implemented.")
+        
+    if noise_dist.lower() in ('gaussian','normal'):
+        
+        fmodel=fb.models.PyTorchModel(model, bounds=(x_min, x_max),device=device)
+        _,advs,success= attack(fmodel, x_clean[:1], y[:1], epsilons=[max_dist])
+        assert success.item(), "The attack failed. Try to increase the number of iterations or steps."
+        design_point= advs[0]-x_clean
+        del advs
+    elif noise_dist.lower() in ('uniform','unif'):
+        normal_cdf_layer = NormalCDFLayer(device=device, offset=x_clean,epsilon =epsilon)
+        fake_bounds=(-10.,10.)
+        total_model = torch.nn.Sequential(normal_cdf_layer, model)
+        total_model.eval()
+        fmodel=fb.models.PyTorchModel(total_model, bounds=fake_bounds,
+                device=device, )
+        _,advs,success= attack(fmodel, x_clean[:1], y[:1], epsilons=[max_dist])
+        design_point= advs[0]
+        del advs
+    else:
+        raise NotImplementedError(f"Noise distribution '{noise_dist}' is not implemented.")
+    
+            
+
+
+
+    l2dist= design_point.norm(p=2)
+    p_fail= stats.norm.cdf(-l2dist/sigma)
+    nb_calls= num_iter*steps
+    dict_out={'nb_calls':nb_calls}
+    return p_fail,dict_out
+
 
 #gradient descent in 1 dimension to find zero of a function f
-def find_zero_gd_pyt(f, grad_f, x0, obj='min', step_size=1e-2, max_iter=100, tol=1e-3,random_init=False):
+def find_zero_gd_pyt(f, grad_f, x0, obj='min', stepsize=1e-2, max_iter=100, tol=1e-3,random_init=False):
     x = x0
     
     if random_init:
-        x = x0 + step_size*torch.randn_like(x0)
+        x = x0 + stepsize*torch.randn_like(x0)
     if x.dim() == 1:
         x = x.unsqueeze(0)
     f_calls = 0
     sign= 1 if obj=='max' else -1
     for i in range(max_iter):
-        x = x + sign*step_size * grad_f(x)
+        x = x + sign*stepsize * grad_f(x)
         f_calls += 2 # we count 2 calls for each gradient evaluation (forward and backward)
         if sign*f(x) > -tol:
             f_calls += 1 # we count one more call for the last function evaluation
