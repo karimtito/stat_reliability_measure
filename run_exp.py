@@ -14,6 +14,8 @@ from dev.amls.amls_config import MLS_SMC_Config
 import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
 import stat_reliability_measure.dev.mls.amls_uniform as amls_webb
 from stat_reliability_measure.dev.mls.webb_config import MLS_Webb_Config
+from stat_reliability_measure.dev.form.form_pyt import FORM_pyt as FORM_pyt
+from stat_reliability_measure.dev.form.form_config import FORM_config
 from dev.smc.smc_pyt import SamplerSMC
 from dev.smc.smc_config import SMCSamplerConfig
 from config import Exp2Config
@@ -23,9 +25,10 @@ from itertools import product as cartesian_product
 
 method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,'mls_webb':MLS_Webb_Config,
                     'mala':SMCSamplerConfig,'amls_batch':MLS_SMC_Config,
+                    'form':FORM_config,'rw_smc':SMCSamplerConfig,
                     'hmc':SMCSamplerConfig,'smc':SMCSamplerConfig,}
 method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,'rw_smc':SamplerSMC,
-                  'amls_webb': amls_webb.multilevel_uniform,
+                  'amls_webb': amls_webb.multilevel_uniform,'form':FORM_pyt,'mls_webb':amls_webb.multilevel_uniform,
                     'hmc':SamplerSMC,'smc':SamplerSMC,'amls_batch':amls_pyt.ImportanceSplittingPytBatch}
 
 def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_dist='uniform',dataset_name = 'dataset',
@@ -230,24 +233,11 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
                     iterator = range(exp_config.n_rep)
 
                 exp_required = {'verbose':exp_config.verbose}
-                if hasattr(method_config,'requires_epsilon') and method_config.requires_epsilon:
-                    exp_required['epsilon']=exp_config.epsilon
-                if hasattr(method_config,'requires_model') and method_config.requires_model:
-                    exp_required['model']=exp_config.model
-                if hasattr(method_config,'requires_score') and method_config.requires_score:
-                    exp_required['score']=exp_config.score 
-                if hasattr(method_config,'requires_x_clean') and method_config.requires_x_clean:
-                    exp_required['x_clean']=exp_config.x_clean
-                if hasattr(method_config,'requires_h') and method_config.requires_h:
-                    exp_required['h']=exp_config.h
-                if hasattr(method_config,'requires_V') and method_config.requires_V:
-                    exp_required['V']=exp_config.V
-                if hasattr(method_config,'requires_V') and method_config.requires_V:
-                    exp_required['gradV']=exp_config.gradV
-                if hasattr(method_config,'requires_y_clean') and method_config.requires_y_clean:
-                    exp_required['y_clean']=exp_config.y_clean
-                if hasattr(method_config,'requires_gen') and method_config.requires_gen:
-                    exp_required['gen']=exp_config.gen
+                requires_keys = [k for k in simple_vars(method_config).keys() if 'requires_' in k]
+                for k in requires_keys:
+                    if getattr(method_config,k):
+                        required_key = k.replace('requires_','')
+                        exp_required[required_key]=getattr(exp_config,required_key)
                 #selecting only method configuration variables relevent to the estimation function
                 func_args_vars = {k:simple_vars(method_config)[k] for k in simple_vars(method_config).keys() if ('require' not in k) and ('track' not in k) and ('name' not in k)}
                 args_dict = {**func_args_vars,**exp_required}
@@ -373,6 +363,10 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
 
                 
 
-
-    
-    return results_df, exp_config, method_config, agg_res_df
+    if len(results_df)>0:
+        p_est = results_df['mean_est'].mean()
+    else:
+        p_est = None
+    dict_out = {'results_df':results_df,'agg_res_df':agg_res_df,
+                'method_config':method_config, 'exp_config':exp_config}
+    return p_est, dict_out
