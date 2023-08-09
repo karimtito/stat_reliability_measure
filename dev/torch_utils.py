@@ -332,7 +332,8 @@ def compute_h_pyt(model, input_, target_class,L=0):
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 norm_dist_pyt = torch.distributions.Normal
 
-def h_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None, noise_dist='gaussian',
+def h_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None,
+           noise_dist='gaussian',
           noise_scale=1.0,):
     gaussian_prior=noise_dist=='gaussian' or noise_dist=='normal'
     with torch.no_grad():
@@ -353,7 +354,8 @@ def h_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=Tr
     h = compute_h_pyt(model=model,input_=x_p,target_class=target_class)
     return h
         
-def V_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None, noise_dist='gaussian',
+def V_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None,
+           noise_dist='gaussian',
           noise_scale=1.0,):
     gaussian_prior=noise_dist=='gaussian' or noise_dist=='normal'
     with torch.no_grad():
@@ -1370,9 +1372,10 @@ class NormalCDFLayer(torch.nn.Module):
         self.sigma = sigma
         self.offset = offset
         self.epsilon = epsilon
-        
+        self.x_min = x_min
+        self.x_max = x_max
     def forward(self,x):
-        return torch.clip(self.offset+self.epsilon*(2*self.norm.cdf(x)-1),min=x_min,max=x_max)
+        return torch.clip(self.offset+self.epsilon*(2*self.norm.cdf(x)-1),min=self.x_min,max=self.x_max)
     def inverse(self,x):
         return self.norm.icdf(((x-self.offset)/self.epsilon+1.)/2.)
     def string(self):

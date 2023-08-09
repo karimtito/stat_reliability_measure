@@ -12,9 +12,9 @@ import torch
 import pandas as pd
 import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
-from stat_reliability_measure.dev.utils import get_sel_df, print_config
+from stat_reliability_measure.dev.utils import get_sel_df
 from stat_reliability_measure.home import ROOT_DIR
-from stat_reliability_measure.exp_2.exp_config import exp_config
+from stat_reliability_measure.exp_2.exp_config import Exp2Config
 
 
 
@@ -409,10 +409,10 @@ def main():
         label_correct[config.input_start:config.input_stop], epsilons=config.epsilons)
 
 
-    config_dict=print_config(config)
-    config_path=os.path.join(exp_log_path,'config.json')
-    with open(config_path,'w') as f:
-        f.write(json.dumps(config_dict, indent = 4, cls=utils.CustomEncoder))
+    # config_dict=print_config(config)
+    # config_path=os.path.join(exp_log_path,'config.json')
+    # with open(config_path,'w') as f:
+    #     f.write(json.dumps(config_dict, indent = 4, cls=utils.CustomEncoder))
     inp_indices=np.arange(start=config.input_start,stop=config.input_stop)
     normal_dist=torch.distributions.Normal(loc=0, scale=1.)
     run_nb=0

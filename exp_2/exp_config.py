@@ -1,7 +1,7 @@
 from stat_reliability_measure.home import ROOT_DIR
 from pathlib import Path
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
-from stat_reliability_measure.dev.utils import clean_attr_dict,pars_type,ok_types
+from stat_reliability_measure.dev.utils import clean_attr_dict,valid_pars_type
 import stat_reliability_measure.dev.torch_utils as t_u
 import argparse
 import git

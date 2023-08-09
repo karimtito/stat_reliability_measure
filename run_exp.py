@@ -18,18 +18,26 @@ from stat_reliability_measure.dev.form.form_pyt import FORM_pyt as FORM_pyt
 from stat_reliability_measure.dev.form.form_config import FORM_config
 from dev.smc.smc_pyt import SamplerSMC
 from dev.smc.smc_config import SMCSamplerConfig
+from dev.mc.mc_config import CrudeMC_Config
+from dev.mc.mc_pyt import MC_pf
 from config import Exp2Config
 from itertools import product as cartesian_product
 
 
 
-method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,'mls_webb':MLS_Webb_Config,
+method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,
+                    'mls_webb':MLS_Webb_Config,
                     'mala':SMCSamplerConfig,'amls_batch':MLS_SMC_Config,
+                    'mc':CrudeMC_Config,'crudemc':CrudeMC_Config,'crude_mc':CrudeMC_Config,
                     'form':FORM_config,'rw_smc':SMCSamplerConfig,
                     'hmc':SMCSamplerConfig,'smc':SMCSamplerConfig,}
-method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,'rw_smc':SamplerSMC,
-                  'amls_webb': amls_webb.multilevel_uniform,'form':FORM_pyt,'mls_webb':amls_webb.multilevel_uniform,
-                    'hmc':SamplerSMC,'smc':SamplerSMC,'amls_batch':amls_pyt.ImportanceSplittingPytBatch}
+method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,
+                  'rw_smc':SamplerSMC,
+                  'mc':MC_pf,'crudemc':MC_pf,'crude_mc':MC_pf, 
+                  'amls_webb': amls_webb.multilevel_uniform,'form':FORM_pyt,
+                  'mls_webb':amls_webb.multilevel_uniform,
+                    'hmc':SamplerSMC,'smc':SamplerSMC,
+                    'amls_batch':amls_pyt.ImportanceSplittingPytBatch}
 
 def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_dist='uniform',dataset_name = 'dataset',
                  model_name='model', 
@@ -121,21 +129,14 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
         cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
         cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist','datetime']
         agg_res_df= pd.DataFrame(columns=cols)
-
     else:
         agg_res_df=pd.read_csv(aggr_res_path)
-    use_cuda= "cuda" in exp_config.device
-    
     estimation_func = method_func_dict[method]
-
     for l in range(len(exp_config.X)):
         with torch.no_grad():
             x_clean,y_clean = exp_config.X[l], exp_config.y[l]
         for idx in range(len(exp_config.epsilon_range)):
-            
-            
             exp_config.epsilon = exp_config.epsilon_range[idx]
-           
             pgd_success= (exp_config.attack_success[idx][l]).item() if exp_config.use_attack else None 
             if exp_config.lirpa_bounds:
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds

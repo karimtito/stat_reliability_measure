@@ -1,42 +1,46 @@
-def MC_pf(gen,score,N_mc:int=int(1e4),batch_size:int=int(1e2),track_advs:bool=False):
+import torch
+def MC_pf(gen,h,N:int=int(1e4),batch_size:int=int(1e2),track_advs:bool=False,verbose=0.):
     """ Computes probability of failure 
 
     Args:
-        X (_type_): _description_
-        y (_type_): _description_
-        gen (_type_): _description_
-        score (_type_): _description_
-        N_mc (int, optional): _description_. Defaults to int(1e4).
-        batch_size (int, optional): _description_. Defaults to int(1e2).
-        track_advs (bool, optional): _description_. Defaults to False.
+        X (_type_): vector of clean inputs 
+        y (_type_): vector of labels
+        gen (_type_): random generator
+        h (_type_): score function
+        N (int, optional): number of samples to use. Defaults to int(1e4).
+        batch_size (int, optional): batch size. Defaults to int(1e2).
+        track_advs (bool, optional): Option to track adversarial examples. Defaults to False.
+        verbose (float, optional): Level of verbosity. Defaults to False.
 
     Returns:
         float: probability of failure
     """
     p_f = 0
-    N=0
+    n=0
     x_advs=[]
-    for _ in range(N_mc//batch_size):
+    for _ in range(N//batch_size):
         x_mc = gen(batch_size)
-        score_MC = score(x_mc)
+        h_MC = h(x_mc)
         if track_advs:
-            x_advs.append(x_mc[score_MC>=0])
+            x_advs.append(x_mc[h_MC>=0])
         del x_mc
-        N+= batch_size
-        p_f = ((N-batch_size)/N)*p_f+(batch_size/N)*(score_MC>=0).float().mean()
-        del score_MC
+        n+= batch_size
+        p_f = ((n-batch_size)/n)*p_f+(batch_size/n)*(h_MC>=0).float().mean()
+        del h_MC
         
-    if N_mc%batch_size!=0:
-        rest = N_mc%batch_size
+    if N%batch_size!=0:
+        rest = N%batch_size
         x_mc = gen(rest)
-        score_MC = score(x_mc)
+        h_MC = h(x_mc)
         if track_advs:
-            x_advs.append(x_mc[score_MC>=0])
+            x_advs.append(x_mc[h_MC>=0])
         del x_mc
         N+= rest
-        p_f = ((N-rest)/N)*p_f+(rest/N)*(score_MC>=0).float().mean()
-        del score_MC
-    assert N==N_mc
+        p_f = ((N-rest)/N)*p_f+(rest/N)*(h_MC>=0).float().mean()
+        del h_MC
+    assert N==N
+    dict_out = {'nb_calls':N}
     if track_advs:
-        return p_f, x_advs
-    return p_f
+        dict_out['x_advs']=torch.cat(x_advs,dim=0).to('cpu').numpy()
+    
+    return p_f.cpu(),dict_out

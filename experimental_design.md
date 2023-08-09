@@ -10,8 +10,8 @@ The methods to compare include:
 - [x] Multiple Importance Splitting (MLS)
 - [x] Hamiltonian within Sequential Monte Carlo (H_SMC)
 - [x] Metropolis Adjusted Langevin Algorithm within Sequential Monte Carlo (MALA_SMC)
-- [ ] Hybrid Multiple Importance Splitting (HMLS)
-- [ ] First Order Reliability Method (FORM)
+- [X] First Order Reliability Method (FORM)
+- [ ] Hybrid (Gradient-Informed) Multiple Importance Splitting (HMLS)
 - [ ] Importance Sampling and Cross-Entropy methods (IS/CE)
 - [ ] Line Sampling methods (LS)
 
@@ -20,8 +20,8 @@ The methods to compare include:
 We evaluate each estimation method on 3 test cases:
 
 - [ ] A linear toy model under Gaussian perturbations, see [`exp_1`](./exp_1) 
-- [ ] Models trained on MNIST dataset, see [`exp_2`](./exp_2) 
-- [ ] Models trained on ImageNet dataset, see [`exp_3`](./exp_3) 
+- [ ] Models trained on MNIST dataset under uniform noise perturbations, see [`exp_2`](./exp_2) 
+- [ ] Models trained on ImageNet dataset under uniform 
 
 ## 3. Rare Event Threshold
 

@@ -22,10 +22,10 @@ class FORM_config(Config):
     "stepsize":0.1,
     "stepsize_range":[],
     "random_init":False,
+    "sigma_init":0.1,
     "search_method":'CarliniWagner'}
     def __init__(self,config_dict=default_dict):
         vars(self).update(config_dict)
-        
         super().__init__()
 
     def add_parsargs(self,parser):

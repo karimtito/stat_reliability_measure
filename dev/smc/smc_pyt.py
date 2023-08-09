@@ -9,7 +9,7 @@ from stat_reliability_measure.dev.smc.smc_utils import nextBetaESS,nextBetaSimpE
     
 supported_beta_adapt={'ess':nextBetaESS,'simp_ess':nextBetaSimpESS,'simp':ESSAdaptBetaPyt}
 
-def SamplerSMC(gen,  V, gradV,adapt_func='',min_rate=0.8,alpha =0.1,N=300,T = 1,L=1,n_max=5000, 
+def SamplerSMC(gen, V, gradV,adapt_func='', min_rate=0.8, alpha =0.1, N=300, T = 1, L=1, n_max=5000, 
 max_beta=1e6, verbose=False,device=None,ess_alpha=0.875,
 track_accept=False,track_beta=False,return_log_p=False,gaussian=False,
 adapt_dt=False, track_finish=False, save_X=False,save_v=False,
@@ -248,10 +248,7 @@ dt_min=1e-5,dt_max=1e-2,v_min_opt=True,kappa_opt=False,
             renew_idx=surv_idx[prenew_idx]
         
             X[to_renew] = X[renew_idx]
-   
-     
     finish_flag=(v<=0).float().mean().item() >=min_rate
-    
     if verbose>=1.:
         print(f"finished flag:{finish_flag}")
     P_est = max(g_prod.item(),1e-250)

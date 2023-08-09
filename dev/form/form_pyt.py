@@ -6,7 +6,7 @@ import torch
 def FORM_pyt(x_clean,y_clean,model,noise_dist='uniform',
              search_method='Carlini',
              num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1,
-              sigma=1.,x_min=0.,x_max=1., random_init=False ,**kwargs):
+              sigma=1.,x_min=0.,x_max=1., random_init=False , sigma_init=0.5,**kwargs):
 
     """Computes the probability of failure using the First Order Method (FORM)
     Args:
@@ -36,7 +36,7 @@ def FORM_pyt(x_clean,y_clean,model,noise_dist='uniform',
         assert (x_clean is not None) and (y_clean is not None), "x_clean and y_clean must be provided for Carlini-Wagner attack"
         assert (model is not None), "model must be provided for Carlini-Wagner attack"
         import foolbox as fb
-        attack = fb.L2CarliniWagnerAttack(binary_search_steps=num_iter, 
+        attack = fb.attacks.L2CarliniWagnerAttack(binary_search_steps=num_iter, 
                                           stepsize=stepsize,
                                         
                                           steps=steps,)
@@ -50,7 +50,13 @@ def FORM_pyt(x_clean,y_clean,model,noise_dist='uniform',
     if noise_dist.lower() in ('gaussian','normal'):
         
         fmodel=fb.models.PyTorchModel(model, bounds=(x_min, x_max),device=device)
-        _,advs,success= attack(fmodel, x_clean[:1], y[:1], epsilons=[max_dist])
+        if not random_init:
+            x_0 = x_clean
+        else:
+            print(f"Random init with sigma_init={sigma_init}")
+            x_0 = x_clean + sigma_init*torch.randn_like(x_clean)
+        
+        _,advs,success= attack(fmodel, x_0[:1], y_clean.unsqueeze(0), epsilons=[max_dist])
         assert success.item(), "The attack failed. Try to increase the number of iterations or steps."
         design_point= advs[0]-x_clean
         del advs
@@ -58,10 +64,15 @@ def FORM_pyt(x_clean,y_clean,model,noise_dist='uniform',
         normal_cdf_layer = NormalCDFLayer(device=device, offset=x_clean,epsilon =epsilon)
         fake_bounds=(-10.,10.)
         total_model = torch.nn.Sequential(normal_cdf_layer, model)
+        if not random_init:
+            x_0 = torch.zeros_like(x_clean)
+        else:
+            print(f"Random init with sigma_init={sigma_init}")
+            x_0 = sigma_init*torch.randn_like(x_clean)
         total_model.eval()
         fmodel=fb.models.PyTorchModel(total_model, bounds=fake_bounds,
                 device=device, )
-        _,advs,success= attack(fmodel, x_clean[:1], y[:1], epsilons=[max_dist])
+        _,advs,success= attack(fmodel,x_0[:1] , y_clean.unsqueeze(0), epsilons=[max_dist])
         design_point= advs[0]
         del advs
     else:
@@ -72,7 +83,7 @@ def FORM_pyt(x_clean,y_clean,model,noise_dist='uniform',
 
 
     l2dist= design_point.norm(p=2)
-    p_fail= stats.norm.cdf(-l2dist/sigma)
+    p_fail= stats.norm.cdf(-l2dist.cpu()/sigma)
     nb_calls= num_iter*steps
     dict_out={'nb_calls':nb_calls}
     return p_fail,dict_out

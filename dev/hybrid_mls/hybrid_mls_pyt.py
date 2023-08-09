@@ -229,7 +229,6 @@ exp_rate=1.):
     P_bias = P_est*n*(1-p)/p/N
     CI_est = P_est*np.array([1,1]) + q*np.sqrt(Var_est)*np.array([-1,1])
     Xrare = X[(SX>=tau).reshape(-1),:] if p_last>0 else None
-
     dic_out = {"Var_est":Var_est,"CI_est": CI_est,"N":N,"K":K,"s":s,"decay":decay,"T":T,"Count_V":Count_V,
     "P_bias":P_bias,"n":n,"Xrare":Xrare}
     if track_accept:
@@ -239,7 +238,4 @@ exp_rate=1.):
         dic_out['dt_means']=dt_means
         dic_out['dt_stds']=dt_stds
     dic_out['finish_flag']=finish_flag
-
-
-       
     return P_est,dic_out
