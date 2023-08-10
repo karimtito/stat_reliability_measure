@@ -83,10 +83,7 @@ class SMCSamplerConfig(Config):
         return parser
     
     def update(self):
-        if self.GV_opt:
-            self.requires_score=True
-            self.requires_V=False
-            self.requires_gradV=False
+    
 
         if len(self.ess_alpha_range)==0:
             self.ess_alpha_range= [self.ess_alpha]
@@ -98,8 +95,6 @@ class SMCSamplerConfig(Config):
             self.L_range= [self.L]
         if len(self.alpha_range)==0:
             self.alpha_range= [self.alpha]
-
-        
         if self.GV_opt:
             self.method_name="RW_SMC"
         elif self.L==1:

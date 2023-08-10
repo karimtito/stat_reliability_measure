@@ -29,7 +29,8 @@ method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,
                     'mls_webb':MLS_Webb_Config,
                     'mala':SMCSamplerConfig,'amls_batch':MLS_SMC_Config,
                     'mc':CrudeMC_Config,'crudemc':CrudeMC_Config,'crude_mc':CrudeMC_Config,
-                    'form':FORM_config,'rw_smc':SMCSamplerConfig,'smc_multi':SMCSamplerConfig,
+                    'form':FORM_config,'rw_smc':SMCSamplerConfig,
+                    'smc_multi':SMCSamplerConfig,
                     'hmc':SMCSamplerConfig,'smc':SMCSamplerConfig,}
 method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,
                   'rw_smc':SamplerSMC,
@@ -75,8 +76,6 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
             exp_config.mask_cond=mask_cond
         else:
             exp_config.mask_opt=False
-        
-
     for k,v in kwargs.items():
         if hasattr(method_config,k):
             if hasattr(exp_config,k) and  not ('config' in k):
@@ -91,11 +90,8 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
     if method=='hmc':
         method.L=5
     method_config.update()
-    
-        
     exp_config.update(method_name=method_config.method_name)
     method_config.exp_config=exp_config
-
     param_ranges = [v for k,v in range_vars(method_config).items()]
     print(param_ranges)
     param_lens=np.array([len(l) for l in param_ranges])  
@@ -103,11 +99,9 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
     if verbose>0:
         print(f"Running reliability experiments on architecture {exp_config.model_arch} trained on {exp_config.dataset}.")
         print(f"Testing {exp_config.noise_dist} noise pertubation with epsilon in {exp_config.epsilon_range}")
-
     if exp_config.verbose>0:
         exp_config.print_config()
         method_config.print_config()
-
     exp_config.config_path=os.path.join(exp_config.exp_log_path,'exp_config.json')
     exp_config.to_json()
     method_config.config_path=os.path.join(exp_config.exp_log_path,'method_config.json')
@@ -115,9 +109,7 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
     method_range_dict = range_vars(method_config)
     print(method_range_dict)
     method_param_lists = range_dict_to_lists(range_dict=method_range_dict)
-
     i_exp=0
-    
     if verbose>1.0:
         print(f"Experiment range parameters: {method_param_lists}")
     

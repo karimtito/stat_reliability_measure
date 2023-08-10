@@ -235,7 +235,7 @@ def verlet_kernel2(X, gradV, delta_t, beta,L, grad_V_q=None,
     i_k=ind_L>=k
     if not GV and grad_V_q is None:
         grad_V_q = gradV(q_t[i_k]).detach()
-        grad_calls += 2*i_k.sum().item()
+        grad_calls += i_k.sum().item()
     while (i_k).sum().item()>0:
         #I. Verlet scheme
         #computing half-point momentum
@@ -249,7 +249,7 @@ def verlet_kernel2(X, gradV, delta_t, beta,L, grad_V_q=None,
         #updating momentum again
         if not GV:
             grad_V_q=gradV(q_t[i_k]).detach()
-            grad_calls+=2*i_k.sum().item()
+            grad_calls+=i_k.sum().item()
             p_t.data[i_k] = p_t[i_k] -0.5*beta*kappa[i_k]*delta_t[i_k]*grad_V_q
         p_t.data[i_k] -= 0.5*kappa[i_k]*delta_t[i_k]*q_t.data[i_k]
         #II. Optional smoothing of momentum memory
