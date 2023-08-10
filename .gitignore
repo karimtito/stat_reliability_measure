@@ -217,7 +217,8 @@ csx/
 # Microsoft Azure Emulator
 ecf/
 rcf/
-
+*.ipynb
+test/test_notebooks
 # Windows Store app package directories and files
 AppPackages/
 BundleArtifacts/
