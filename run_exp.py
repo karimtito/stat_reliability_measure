@@ -58,8 +58,6 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
         assert (mask_idx is not None) or (mask_cond is not None), "if using masking option, either 'mask_idx' or 'mask_cond' should be given"
     if method_config is None:
         method_config = method_config_dict[method]()
-    if method in ['amls','amls_batch','amls_webb','mls_webb','smc','hmc','rw_smc']:
-        method_config.noise_dist=noise_dist
     if exp_config is None:
         exp_config=Exp2Config(model=model,X=X,y=y,
         dataset_name=dataset_name,model_name=model_name,epsilon_range=epsilon_range,
