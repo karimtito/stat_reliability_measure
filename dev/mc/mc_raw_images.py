@@ -1,5 +1,5 @@
 import torch
-import dev.torch_utils as t_u
+import stat_reliability_measure.dev.torch_utils as t_u
 import rawpy
 import numpy as np
 from tqdm import tqdm_notebook as tqdm

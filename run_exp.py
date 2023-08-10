@@ -10,16 +10,16 @@ import stat_reliability_measure.dev.utils as utils
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, str2list
 from stat_reliability_measure.dev.utils import get_sel_df, simple_vars, range_vars, range_dict_to_lists
 import stat_reliability_measure.dev.mls.amls_uniform as amls_mls
-from dev.amls.amls_config import MLS_SMC_Config
+from stat_reliability_measure.dev.amls.amls_config import MLS_SMC_Config
 import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
 import stat_reliability_measure.dev.mls.amls_uniform as amls_webb
 from stat_reliability_measure.dev.mls.webb_config import MLS_Webb_Config
 from stat_reliability_measure.dev.form.form_pyt import FORM_pyt as FORM_pyt
 from stat_reliability_measure.dev.form.form_config import FORM_config
-from dev.smc.smc_pyt import SamplerSMC
-from dev.smc.smc_config import SMCSamplerConfig
-from dev.mc.mc_config import CrudeMC_Config
-from dev.mc.mc_pyt import MC_pf
+from stat_reliability_measure.dev.smc.smc_pyt import SamplerSMC, SamplerSmcMulti
+from stat_reliability_measure.dev.smc.smc_config import SMCSamplerConfig
+from stat_reliability_measure.dev.mc.mc_config import CrudeMC_Config
+from stat_reliability_measure.dev.mc.mc_pyt import MC_pf
 from config import Exp2Config
 from itertools import product as cartesian_product
 
@@ -29,21 +29,22 @@ method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,
                     'mls_webb':MLS_Webb_Config,
                     'mala':SMCSamplerConfig,'amls_batch':MLS_SMC_Config,
                     'mc':CrudeMC_Config,'crudemc':CrudeMC_Config,'crude_mc':CrudeMC_Config,
-                    'form':FORM_config,'rw_smc':SMCSamplerConfig,
+                    'form':FORM_config,'rw_smc':SMCSamplerConfig,'smc_multi':SMCSamplerConfig,
                     'hmc':SMCSamplerConfig,'smc':SMCSamplerConfig,}
 method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,
                   'rw_smc':SamplerSMC,
                   'mc':MC_pf,'crudemc':MC_pf,'crude_mc':MC_pf, 
                   'amls_webb': amls_webb.multilevel_uniform,'form':FORM_pyt,
                   'mls_webb':amls_webb.multilevel_uniform,
-                    'hmc':SamplerSMC,'smc':SamplerSMC,
-                    'amls_batch':amls_pyt.ImportanceSplittingPytBatch}
+                    'hmc':SamplerSMC,'smc':SamplerSMC,'smc_multi':SamplerSmcMulti, 
+                    'amls_batch':amls_pyt.ImportanceSplittingPytBatch,
+                    'smc_multi':SamplerSMC}
 
 def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_dist='uniform',dataset_name = 'dataset',
                  model_name='model', 
                  verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None,mask_cond=None,p_ref=None,
                  log_hist_=True, aggr_res_path='',batch_opt=False,
-                 log_txt_=True,exp_config=None,method_config=None,**kwargs):
+                 log_txt_=True,exp_config=None,method_config=None,smc_multi=False,**kwargs):
     """ Running reliability experiments on neural network model with supervised data (X,y)
         values 
     """
@@ -55,9 +56,9 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
     if mask_opt: 
         assert (mask_idx is not None) or (mask_cond is not None), "if using masking option, either 'mask_idx' or 'mask_cond' should be given"
     if method_config is None:
-
         method_config = method_config_dict[method]()
-        
+    if method in ['amls','amls_batch','amls_webb','mls_webb','smc','hmc','rw_smc']:
+        method_config.noise_dist=noise_dist
     if exp_config is None:
         exp_config=Exp2Config(model=model,X=X,y=y,
         dataset_name=dataset_name,model_name=model_name,epsilon_range=epsilon_range,
@@ -85,8 +86,13 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
             setattr(exp_config, k, v)
         else:
             raise ValueError(f"unknown configuration parameter {k}")
+    if method=='rw_smc':
+        method_config.GV_opt=True
+    if method=='hmc':
+        method.L=5
     method_config.update()
     
+        
     exp_config.update(method_name=method_config.method_name)
     method_config.exp_config=exp_config
 
@@ -132,6 +138,7 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
     else:
         agg_res_df=pd.read_csv(aggr_res_path)
     estimation_func = method_func_dict[method]
+    
     for l in range(len(exp_config.X)):
         with torch.no_grad():
             x_clean,y_clean = exp_config.X[l], exp_config.y[l]
@@ -145,12 +152,11 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
                 num_classes=exp_config.num_classes,noise_dist=exp_config.noise_dist,a=exp_config.a,device=exp_config.device)
                 exp_config.p_l,exp_config.p_u=p_l.item(),p_u.item()
             if exp_config.lirpa_cert:
-                from dev.lirpa_utils import get_lirpa_cert
+                from stat_reliability_measure.dev.lirpa_utils import get_lirpa_cert
                 exp_config.lirpa_safe,exp_config.time_lirpa_safe=get_lirpa_cert(x_clean=x_clean,y_clean=y_clean,
                                 epsilon = exp_config.epsilon, num_classes=exp_config.num_classes                                                
                                 ,model=model, device=exp_config.device)
         
-                
             lists_cart= cartesian_product(*method_param_lists)
             for method_params in lists_cart:
                 i_exp+=1

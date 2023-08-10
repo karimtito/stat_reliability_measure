@@ -10,7 +10,7 @@ import stat_reliability_measure.dev.utils as utils
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, str2list
 from stat_reliability_measure.dev.utils import get_sel_df, simple_vars, range_vars, range_dict_to_lists
 import stat_reliability_measure.dev.mls.amls_uniform as amls_mls
-from dev.amls.amls_config import MLS_SMC_Config
+from stat_reliability_measure.dev.amls.amls_config import MLS_SMC_Config
 import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
 from config import Exp2Config
 from itertools import product as cartesian_product
@@ -123,7 +123,7 @@ def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_nam
                 num_classes=exp_config.num_classes,noise_dist=exp_config.noise_dist,a=exp_config.a,device=exp_config.device)
                 exp_config.p_l,exp_config.p_u=p_l.item(),p_u.item()
             if exp_config.lirpa_cert:
-                from dev.lirpa_utils import get_lirpa_cert
+                from stat_reliability_measure.dev.lirpa_utils import get_lirpa_cert
                 exp_config.lirpa_safe,exp_config.time_lirpa_safe=get_lirpa_cert(x_clean=x_clean,y_clean=y_clean,
                                 epsilon = exp_config.epsilon, num_classes=exp_config.num_classes                                                
                                 ,model=model, device=exp_config.device)

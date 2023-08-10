@@ -14,7 +14,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 from stat_reliability_measure.dev.utils import  float_to_file_float,str2bool,str2intList,str2floatList, str2list
 from stat_reliability_measure.dev.utils import get_sel_df, print_config
 import stat_reliability_measure.dev.mls.amls_uniform as amls_mls
-from dev.amls.amls_config import base_config,update_config
+from stat_reliability_measure.dev.amls.amls_config import base_config,update_config
 str2floatList=lambda x: str2list(in_str=x, type_out=float)
 str2intList=lambda x: str2list(in_str=x, type_out=int)
 low_str=lambda x: str(x).lower()

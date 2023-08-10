@@ -11,7 +11,7 @@ from datetime import datetime
 import numpy as np
 import torch
 import json
-from dev.utils import float_to_file_float
+from stat_reliability_measure.dev.utils import float_to_file_float
 
 
 class Config:
@@ -517,11 +517,8 @@ class Exp3Config(ExpConfig):
         if not hasattr(self,"model"):
             if len(self.model_arch)==0:
                 self.model_arch = t_u.datasets_default_arch[self.dataset]
-            self.model, self.model_shape,self.model_name=t_u.get_model(self.model_arch, 
-                robust_model=self.robust_model, robust_eps=self.robust_eps,
-                nb_epochs=self.nb_epochs,model_dir=self.model_dir,data_dir=self.data_dir,
-                test_loader=test_loader,device=self.device,
-                download=self.download,dataset=self.dataset, force_train=self.force_train,
+            self.model, self.model_shape,self.model_name=t_u.get_model_imagenet(self.model_arch, 
+                model_dir=self.model_dir,
                 )
         else:
             if (not hasattr(self,"model_name")) or self.model_name=='':
