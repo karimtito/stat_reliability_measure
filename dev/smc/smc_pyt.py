@@ -106,9 +106,9 @@ dt_min=1e-5,dt_max=1e-2,v_min_opt=True,kappa_opt=False,
             #p=torch.randn_like(X)
             v=V(X)
             Count_v+=N
-            if gradient_use:
-                grad_v=gradV(X)
-                Count_v+=2*N # each call to gradV costs 2 calls to V
+            
+            grad_v=gradV(X)
+            Count_v+=2*N # each call to gradV costs 2 calls to V
 
             
 
@@ -126,6 +126,8 @@ dt_min=1e-5,dt_max=1e-2,v_min_opt=True,kappa_opt=False,
                 v_y=v[to_renew]
                 if gradient_use:
                     grad_v_y=grad_v[to_renew]
+                else:
+                    grad_v_y=None
                 ind_L_y=ind_L[to_renew]
                 dt_y=dt[to_renew]
             else:
@@ -133,6 +135,8 @@ dt_min=1e-5,dt_max=1e-2,v_min_opt=True,kappa_opt=False,
                 v_y=v
                 if gradient_use:
                     grad_v_y=grad_v
+                else:
+                    grad_v_y=None
                 ind_L_y=ind_L
                 dt_y=dt
             if M_opt:
