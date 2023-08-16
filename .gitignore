@@ -9,7 +9,7 @@ logs*
 data
 models
 notebooks
-test
+tests
 # User-specific files
 *.rsuser
 *.suo
