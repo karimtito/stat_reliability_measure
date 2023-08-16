@@ -9,7 +9,7 @@ logs*
 data
 models
 notebooks
-test/test_notebooks/*.ipynb
+test
 # User-specific files
 *.rsuser
 *.suo
