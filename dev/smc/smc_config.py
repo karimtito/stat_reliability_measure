@@ -7,6 +7,7 @@ class SMCSamplerConfig(Config):
         'requires_V':True,
         'requires_gradV':True,
         'requires_gen':True,
+        'gaussian':True,
         'N_range': [],
         'N':100,
         'T_range':[],

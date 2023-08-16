@@ -398,15 +398,14 @@ class Exp2Config(ExpConfig):
     
     def h(self,X):
         return t_u.h_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
-                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,noise_scale=self.noise_scale)
+                ,gaussian_latent=self.gaussian_latent,noise_scale=self.noise_scale)
 
     def V(self,X):
-        return t_u.V_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
-                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,noise_scale=self.noise_scale)   
+        return t_u.V_pyt(X,self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
+                ,gaussian_latent=self.gaussian_latent,)   
     def gradV(self,X):
-        return t_u.gradV_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
-                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,noise_scale=self.noise_scale)
-
+        return t_u.gradV_pyt(X,self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
+                ,gaussian_latent=self.gaussian_latent,)
 
 
 
@@ -586,14 +585,18 @@ class Exp3Config(ExpConfig):
             return y_diff #.max(dim=1)
     
     def h(self,X):
-        return t_u.h_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
-                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,noise_scale=self.noise_scale)
+        return t_u.h_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,
+                         target_class=self.y_clean
+                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,
+                noise_scale=self.noise_scale)
 
     def V(self,X):
-        return t_u.V_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
-                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,noise_scale=self.noise_scale)   
+        return t_u.V_pyt(X,self.x_clean,model=self.model,low=self.low,high=self.high,
+                         target_class=self.y_clean
+                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,
+                noise_scale=self.noise_scale)   
     def gradV(self,X):
-        return t_u.gradV_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
+        return t_u.gradV_pyt(X,self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
                 ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,noise_scale=self.noise_scale)
       
     

@@ -31,6 +31,7 @@ method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,
                     'mc':CrudeMC_Config,'crudemc':CrudeMC_Config,'crude_mc':CrudeMC_Config,
                     'form':FORM_config,'rw_smc':SMCSamplerConfig,
                     'smc_multi':SMCSamplerConfig,
+                    
                     'hmc':SMCSamplerConfig,'smc':SMCSamplerConfig,}
 method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,
                   'rw_smc':SamplerSMC,
@@ -41,11 +42,14 @@ method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,
                     'amls_batch':amls_pyt.ImportanceSplittingPytBatch,
                     'smc_multi':SamplerSMC}
 
-def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_dist='uniform',dataset_name = 'dataset',
+def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], 
+                     noise_dist='uniform',dataset_name = 'dataset',
                  model_name='model', 
-                 verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None,mask_cond=None,p_ref=None,
+                 verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None,
+                 mask_cond=None,p_ref=None,
                  log_hist_=True, aggr_res_path='',batch_opt=False,
-                 log_txt_=True,exp_config=None,method_config=None,smc_multi=False,**kwargs):
+                 log_txt_=True,exp_config=None,method_config=None,
+                 smc_multi=False,**kwargs):
     """ Running reliability experiments on neural network model with supervised data (X,y)
         values 
     """
@@ -235,6 +239,7 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], noise_di
                     if getattr(method_config,k):
                         required_key = k.replace('requires_','')
                         exp_required[required_key]=getattr(exp_config,required_key)
+                
                 #selecting only method configuration variables relevent to the estimation function
                 func_args_vars = {k:simple_vars(method_config)[k] for k in simple_vars(method_config).keys() if ('require' not in k) and ('track' not in k) and ('name' not in k)}
                 args_dict = {**func_args_vars,**exp_required}
