@@ -20,7 +20,7 @@ from stat_reliability_measure.dev.smc.smc_pyt import SamplerSMC, SamplerSmcMulti
 from stat_reliability_measure.dev.smc.smc_config import SMCSamplerConfig
 from stat_reliability_measure.dev.mc.mc_config import CrudeMC_Config
 from stat_reliability_measure.dev.mc.mc_pyt import MC_pf
-from config import Exp2Config
+from stat_reliability_measure.config import Exp2Config
 from itertools import product as cartesian_product
 
 

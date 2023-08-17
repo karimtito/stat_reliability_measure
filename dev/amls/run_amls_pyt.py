@@ -12,7 +12,7 @@ from stat_reliability_measure.dev.utils import get_sel_df, simple_vars, range_va
 import stat_reliability_measure.dev.mls.amls_uniform as amls_mls
 from stat_reliability_measure.dev.amls.amls_config import MLS_SMC_Config
 import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
-from config import Exp2Config
+from stat_reliability_measure.config import Exp2Config
 from itertools import product as cartesian_product
 
 def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_name = 'dataset',

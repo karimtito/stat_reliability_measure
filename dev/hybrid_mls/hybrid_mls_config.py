@@ -84,10 +84,7 @@ class HMLS_Config(Config):
         return parser
     
     def update(self):
-        if self.GV_opt:
-            self.requires_score=True
-            self.requires_V=False
-            self.requires_gradV=False
+      
 
         if len(self.ess_alpha_range)==0:
             self.ess_alpha_range= [self.ess_alpha]

@@ -350,10 +350,12 @@ def h_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=Tr
     h = compute_h_pyt(model=model,input_=x_p,target_class=target_class)
     return h
         
-def V_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None,
+def V_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,
+          reshape=True,input_shape=None,
            noise_dist='gaussian',
           noise_scale=1.0,):
-    gaussian_prior=noise_dist=='gaussian' or noise_dist=='normal'
+    
+    gaussian_prior = noise_dist=='gaussian' or noise_dist=='normal'
     assert not gaussian_prior
     with torch.no_grad():
         if input_shape is None:
@@ -376,7 +378,6 @@ def V_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=Tr
 def gradV_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None, noise_dist='gaussian',
               noise_scale=1.0,):
     gaussian_prior = noise_dist=='gaussian' or noise_dist=='normal'
-    assert not gaussian_prior
     if input_shape is None:
         input_shape=x_clean.shape
     if gaussian_latent and not gaussian_prior:
