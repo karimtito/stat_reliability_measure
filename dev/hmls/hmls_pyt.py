@@ -9,15 +9,17 @@ def score(v,Lambda):
     s = -v/Lambda.reshape(v.shape)
     return s
     
-def HybridMLS(gen,V,gradV,tau,score=score,gibbs_kernel=None,
-N=2000,K=1000,s=1,decay=0.95,T = 30,L=1,n_max = 300, alpha = 0.2,alpha_q=0.95,
+def HybridMLS(gen,V,gradV,tau=0.,score=score,gibbs_kernel=None,
+N=2000,ratio=0.5,s=1,decay=0.95,T = 30,L=1,n_max = 300, alpha = 0.2,
+alpha_q=0.95,
 verbose=1,device=None,track_accept=False,
 adapt_step=True,kappa_opt=False, alpha_p:float=0.1,FT:bool=True,
 only_duplicated:bool=True,adapt_dt=False,
 target_accept=0.574,accept_spread=0.1,dt_decay=0.999,dt_gain=None,
 dt_min=1e-5,dt_max=1e-2,L_min=1,
-track_v=False,track_dt=False,track_H=False
-, GV_opt=False,dt_d=1,skip_mh=False,scale_M=torch.tensor([1.]),gaussian=True, sig_dt=0.015,
+track_dt=False,track_H=False, track_levels=False,
+GV_opt=False,dt_d=1,skip_mh=False,scale_M=torch.tensor([1.]),
+gaussian=True, sig_dt=0.015,
 exp_rate=1.):
     """
       Hybrid Importance splitting estimator using gradient information 
@@ -44,6 +46,8 @@ exp_rate=1.):
            -dic_out.['CI_est']: estimated confidence of interval
            -dic_out.['Xrare']: Examples of the rare event 
     """
+    assert only_duplicated,"Only duplicated is not implemented yet"
+    K = int(N*ratio) # number of survivors
     exp_dist = torch.distributions.Exponential(rate=torch.tensor([exp_rate]))
     if device is None:
         device= "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -59,12 +63,8 @@ exp_rate=1.):
         dt_stds = []
     if track_H:
         H_s=[]
-    if track_v: 
-        v_means=[]
-        v_stds=[]
-    
-    
-    
+    if track_levels: 
+        levels=[]
     # Internals 
     q = -stat.norm.ppf((1-alpha_q)/2) # gaussian quantile
     d =gen(1).shape[-1] # dimension of the random vectors
@@ -94,9 +94,14 @@ exp_rate=1.):
     V_mean = VX.mean()
     if verbose>=1:
         print('Iter = ',n, ' tau_j = ', tau_j.item(), "beta_j",beta_j, "V_mean",V_mean.item(),  " Calls = ", Count_V)
+    if track_levels:
+        levels.append(tau_j.item())
+        
     assert dt_d==1 or dt_d==d,"dt dimension can be 1 (isotropic diff.) or d (anisotropic diff.)"
     dt_scalar =alpha*TimeStepPyt(v_x=VX,grad_v_x=grad_VX)
-    dt= torch.clamp(dt_scalar*torch.ones(size=(N,dt_d),device=device)+sig_dt*torch.randn(size=(N,dt_d),device=device),min=dt_min,max=dt_max)
+    dt= torch.clamp(dt_scalar*torch.ones(size=(N,dt_d),device=device)+sig_dt*torch.randn(size=(N,dt_d),device=device),
+                    min=dt_min,max=dt_max)
+   
     ind_L=torch.randint(low=L_min,high=L,size=(N,)).float() if L_min<L else L*torch.ones(size=(N,))
   
     ## While
@@ -124,6 +129,7 @@ exp_rate=1.):
         Lambda_Z = Lambda_Y[ind]
         ind_L_Z = ind_L_Y[ind]
         dt_Z = dt_Y[ind]
+
         if N-K==1:
             Z=Z.unsqueeze(0)
         SZ=SY[ind]
@@ -141,12 +147,10 @@ exp_rate=1.):
                     alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,L_min=L_min,
                     gaussian_verlet=GV_opt,dt_min=dt_min,skip_mh=skip_mh)
                 if FT:
-                    if only_duplicated:
-                        dt_Z=dict_out['dt']
-                        ind_L_Z=dict_out['ind_L']
-                    else:
-                        dt=dict_out['dt']
-                        ind_L=dict_out['ind_L']
+                
+                    dt_Z=dict_out['dt']
+                    ind_L_Z=dict_out['ind_L']
+                    
                     if verbose>=1.5:
                         print(f"New dt mean:{dt.mean().item()}, dt std:{dt.std().item()}")
                         print(f"New L mean: {ind_L.mean().item()}, L std:{ind_L.std().item()}")
@@ -194,7 +198,9 @@ exp_rate=1.):
         SX[K:N] = SZ
         VX[K:N] = VZ
         grad_VX[K:N] = grad_VZ
+      
         dt[K:N] = dt_Z
+        
         ind_L[K:N] = ind_L_Z
         # step B: Find new threshold
         ind_ = torch.argsort(SX,dim=0,descending=True).squeeze(-1) # sort in descending order
@@ -229,7 +235,7 @@ exp_rate=1.):
     P_bias = P_est*n*(1-p)/p/N
     CI_est = P_est*np.array([1,1]) + q*np.sqrt(Var_est)*np.array([-1,1])
     Xrare = X[(SX>=tau).reshape(-1),:] if p_last>0 else None
-    dic_out = {"Var_est":Var_est,"CI_est": CI_est,"N":N,"K":K,"s":s,"decay":decay,"T":T,"Count_V":Count_V,
+    dic_out = {"Var_est":Var_est,"CI_est": CI_est,"N":N,"K":K,"s":s,"decay":decay,"T":T,"nb_calls":Count_V,
     "P_bias":P_bias,"n":n,"Xrare":Xrare}
     if track_accept:
         # dic_out['accept_rates']=np.array(accept_rate)
@@ -237,5 +243,8 @@ exp_rate=1.):
     if track_dt:
         dic_out['dt_means']=dt_means
         dic_out['dt_stds']=dt_stds
+    if track_levels:
+        dic_out['levels']=np.array(levels)
+    
     dic_out['finish_flag']=finish_flag
     return P_est,dic_out
