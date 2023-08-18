@@ -42,7 +42,7 @@ last_particle=False):
     if track_accept: 
         accept_rates=[]
     ## Init
-    # step A0: generate & compute scores
+    # step A0: generate f& compute scores
     X = gen(N) # generate N samples
     SX = h(X) # compute their scores
     Count_h = N # Number of calls to function h
@@ -179,7 +179,7 @@ def ImportanceSplittingPytBatch(gen,h,kernel=normal_kernel,tau=0.,N=2000,ratio=0
 verbose=1, track_rejection=False, rejection_ctrl = False, reject_thresh=0.9, gain_rate = 1.0001, 
 prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,track_finish = True,
 allow_unifinished=True, last_particle = False,
-track_s=False):
+track_s=False,track_levels=False):
     """
       Importance splitting estimator
       Args:
@@ -228,7 +228,8 @@ track_s=False):
     h_mean = SX.mean()
     if verbose>=1:
         print('Iter = ',n, ' tau_j = ', tau_j.item(), "h_mean",h_mean.item(),  " Calls = ", Count_h)
-    
+    if track_levels:
+        levels=[tau_j.item()]
     rejection_rate=0
     kernel_pass=0
     rejection_rates=[0]
@@ -311,6 +312,8 @@ track_s=False):
         h_mean = SX.mean()
         if verbose>=1:
             print('Iter = ',n, ' tau_j = ', tau_j.item(), "h_mean",h_mean.item(),  " Calls = ", Count_h)
+        if track_levels:
+            levels.append(tau_j.item())
         if verbose>=2.5:
             print(f'Current prob. estim:{(K/N)**(n-1)}')
         if track_rejection:
@@ -341,6 +344,8 @@ track_s=False):
         dic_out['accept_rates_mcmc']=np.array(accept_rates_mcmc)
     if track_s:
         dic_out['dts']=np.array(dt_s)
+    if track_levels:
+        dic_out['levels'] = levels
     dic_out['finish_flag']=finish_flag   
     return P_est,dic_out
 
