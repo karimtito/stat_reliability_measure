@@ -20,6 +20,8 @@ from stat_reliability_measure.dev.smc.smc_pyt import SamplerSMC, SamplerSmcMulti
 from stat_reliability_measure.dev.smc.smc_config import SMCSamplerConfig
 from stat_reliability_measure.dev.mc.mc_config import CrudeMC_Config
 from stat_reliability_measure.dev.mc.mc_pyt import MC_pf
+from stat_reliability_measure.dev.hmls.hmls_config import HMLS_Config
+from stat_reliability_measure.dev.hmls.hmls_pyt import HybridMLS
 from stat_reliability_measure.config import Exp2Config
 from itertools import product as cartesian_product
 
@@ -27,6 +29,7 @@ from itertools import product as cartesian_product
 
 method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,
                     'mls_webb':MLS_Webb_Config,
+                    'hmls':HMLS_Config,
                     'mala':SMCSamplerConfig,'amls_batch':MLS_SMC_Config,
                     'mc':CrudeMC_Config,'crudemc':CrudeMC_Config,'crude_mc':CrudeMC_Config,
                     'form':FORM_config,'rw_smc':SMCSamplerConfig,
@@ -35,6 +38,7 @@ method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,
                     'hmc':SMCSamplerConfig,'smc':SMCSamplerConfig,}
 method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,
                   'rw_smc':SamplerSMC,
+                  'hmls':HybridMLS,
                   'mc':MC_pf,'crudemc':MC_pf,'crude_mc':MC_pf, 
                   'amls_webb': amls_webb.multilevel_uniform,'form':FORM_pyt,
                   'mls_webb':amls_webb.multilevel_uniform,
