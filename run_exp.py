@@ -99,7 +99,7 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
     exp_config.update(method_name=method_config.method_name)
     method_config.exp_config=exp_config
     param_ranges = [v for k,v in range_vars(method_config).items()]
-    print(param_ranges)
+    
     param_lens=np.array([len(l) for l in param_ranges])  
     nb_exps= np.prod(param_lens)*len(exp_config.epsilon_range)*exp_config.nb_inputs
     if verbose>0:
@@ -113,7 +113,7 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
     method_config.config_path=os.path.join(exp_config.exp_log_path,'method_config.json')
     method_config.to_json()
     method_range_dict = range_vars(method_config)
-    print(method_range_dict)
+    print(f"with parameters in {method_range_dict}")
     method_param_lists = range_dict_to_lists(range_dict=method_range_dict)
     i_exp=0
     if verbose>1.0:
