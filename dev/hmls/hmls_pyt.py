@@ -11,7 +11,7 @@ def score(v,Lambda):
     
 def HybridMLS(gen,V,gradV,tau=0.,score=score,gibbs_kernel=None,
 N=2000,ratio=0.5,s=1,decay=0.95,T = 30,L=1,n_max = 300, alpha = 0.2,
-alpha_q=0.95,
+alpha_q=0.95,track_calls=True,
 verbose=1,device=None,track_accept=False,
 adapt_step=True,kappa_opt=False, alpha_p:float=0.1,FT:bool=True,
 only_duplicated:bool=True,adapt_dt=False,
@@ -218,6 +218,8 @@ exp_rate=1.):
         #h_mean = SX.mean()
         if verbose>=1:
             print('Iter = ',n, ' tau_j = ', tau_j.item(), " beta_j = ", beta_j, " V_mean =",V_mean.item(),  " Calls = ", Count_V)
+        if track_levels:
+            levels.append(tau_j.item())
         if verbose>=2.5:
             print(f'Current prob. estim:{(K/N)**(n-1)}')
         

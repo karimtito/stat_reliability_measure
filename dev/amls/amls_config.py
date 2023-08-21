@@ -21,6 +21,8 @@ class MLS_SMC_Config(SamplerConfig):
         'n_max':2000,
         'track_finish':False,
         'track_accept':False,
+        'track_calls':True,
+        'track_levels':False,
         's_range': [], 
         'n_max':2000,
         'last_particle':False}

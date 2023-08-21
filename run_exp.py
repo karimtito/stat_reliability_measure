@@ -228,6 +228,13 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
                     track_finish=True
                 else:
                     track_finish = False
+                if hasattr(method_config,'track_levels') and method_config.track_levels:
+                    track_levels=True
+                    levels_list=[]
+                    max_iter=0
+                else:
+                    track_levels=False
+
                 if exp_config.tqdm_opt:
                     if exp_config.notebook:
                         from tqdm.notebook import tqdm
@@ -245,7 +252,7 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
                         exp_required[required_key]=getattr(exp_config,required_key)
                 
                 #selecting only method configuration variables relevent to the estimation function
-                func_args_vars = {k:simple_vars(method_config)[k] for k in simple_vars(method_config).keys() if ('require' not in k) and ('track' not in k) and ('name' not in k)}
+                func_args_vars = {k:simple_vars(method_config)[k] for k in simple_vars(method_config).keys() if ('require' not in k) and ('name' not in k) and ('calls' not in k)}
                 args_dict = {**func_args_vars,**exp_required}
                 method_config.update()
                 for i in iterator:
@@ -277,7 +284,17 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
                             exp_config.mean_acc_ratio = np.array(dict_out['acc_ratios']).mean()
                     if track_finish:
                         finish_flags.append(dict_out['finish_flag'])
-                    
+                    if track_levels:
+                        new_levels= dict_out['levels']
+                        if len(new_levels)>max_iter:
+                            for i in range(max_iter):
+                                levels_list[i].append(new_levels[i])
+                            for i in range(max_iter,len(new_levels)):
+                                levels_list.append([new_levels[i]])
+                            max_iter=len(new_levels)
+                        
+                        
+
                     del dict_out
     
                 times=np.array(times)
@@ -287,6 +304,10 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
                 calls=np.array(calls)
                 mean_calls=calls.mean()
                 std_est=ests.std()
+                if track_levels:
+                    mean_levels = [np.array(l).mean() for l in levels_list]
+                    std_levels = [np.array(l).std() for l in levels_list]  
+
                 
                 
                 q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
@@ -333,6 +354,13 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
                     np.savetxt(fname=times_path,X=times)
                     np.savetxt(fname=est_path,X=ests)
                     np.savetxt(fname=lg_est_path,X=ests)
+                    if track_levels:
+                        mean_levels_path=os.path.join(log_path,'mean_levels.txt')
+                        std_levels_path=os.path.join(log_path,'std_levels.txt')
+                        exp_config.levels_path=mean_levels_path
+                        np.savetxt(fname=mean_levels_path,X=mean_levels)
+                        np.savetxt(fname=std_levels_path,X=std_levels)
+
                 if log_hist_:
                     plt.hist(times, bins=10)
                     plt.savefig(os.path.join(log_path,'times_hist.png'))
@@ -343,6 +371,12 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
                     plt.hist(log_ests,bins=10)
                     plt.savefig(os.path.join(log_path,'log_ests_hist.png'))
                     plt.close()
+                    if track_levels:
+                        T = len(mean_levels)
+                        plt.errorbar(x=np.arange(T),y=mean_levels,yerr=std_levels)
+                        plt.savefig(os.path.join(log_path,'levels.png'))
+                        exp_config.levels_png=os.path.join(log_path,'levels.png')
+                        plt.close()
                 #with open(os.path.join(log_path,'results.txt'),'w'):
                 result={"image_idx":l,'mean_calls':calls.mean(),'std_calls':calls.std()
                 ,'mean_time':times.mean(),'std_time':times.std()
@@ -353,6 +387,10 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
                 "mean_log_est":mean_log_est,"std_log_est":std_log_est,
                 "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
                 "log_path":log_path,"log_name":log_name}
+                if track_finish:
+                    result.update({"freq_finished":freq_finished,"freq_zero_est":freq_zero_est,
+                    "unfinished_mean_est":unfinished_mean_est,"unfinished_mean_time":unfinished_mean_time})
+                
                 if p_ref is not None:
                     result.update({"rel_error":rel_error.mean(),"std_rel_error":rel_error.std(),
                                    "p_ref":p_ref})

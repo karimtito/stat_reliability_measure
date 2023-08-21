@@ -20,6 +20,7 @@ class HMLS_Config(Config):
         'L_range':[],
         'L':1,
         'GV_opt':False,
+        
 
      }
     
@@ -27,7 +28,7 @@ class HMLS_Config(Config):
     'n_max':10000,
     'track_accept':True,
     'track_calls':True,
-   
+    'track_levels':False    ,
     'adapt_dt':False,
     
     'target_accept':0.574,
@@ -39,11 +40,9 @@ class HMLS_Config(Config):
     'gaussian':True,
     
     'only_duplicated':True,
-    'track_ess':True,
+   
     'track_levels':True,
-    'track_dt':True,
-    'track_v':True,
-    'track_ratios':False,
+
     'kappa_opt':True,
     'adapt_step':True,
     'FT':True,

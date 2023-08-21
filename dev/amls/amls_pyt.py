@@ -8,6 +8,7 @@ from stat_reliability_measure.dev.torch_utils import normal_kernel
 def ImportanceSplittingPyt(gen,h,kernel=normal_kernel,tau=0.,N=2000,ratio=0.5,s=1.,decay=0.95,T = 30,n_max = 5000, alpha = 0.95,
 verbose=1, track_rejection=False, rejection_ctrl = False, reject_thresh=0.9, gain_rate = 1.0001, 
 prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
+track_levels=False,
 last_particle=False):
     """
       PyTorch implementationf of Importance splitting estimator 
