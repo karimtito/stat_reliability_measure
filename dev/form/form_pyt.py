@@ -111,14 +111,14 @@ def find_zero_gd_pyt(f, grad_f, x0, obj='min', stepsize=1e-2, max_iter=100, tol=
 
 def mpp_search(f, grad_f, x_clean,max_iter=100,stop_cond_type='grad_norm',stop_eps=1e-3):
     """ Search algorithm for the Most Probable Point (MPP) 
-        according to 'Probabilistc Engineering Design' source from University of Missouri  """
+        according to the course 'Probabilistc Engineering Design' from University of Missouri  """
     x=x_clean 
     grad_fx = grad_f(x)
     f_calls+=2
     beta=torch.norm(x)
     k= 0
     stop_cond=False
-    while k<max_iter &  ~stop_cond: 
+    while k<max_iter & ~stop_cond: 
         k+=1
         a = grad_fx/torch.norm(grad_fx)
         beta_new = beta + f(x)/torch.norm(grad_fx)
