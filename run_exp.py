@@ -46,7 +46,7 @@ method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,
                     'amls_batch':amls_pyt.ImportanceSplittingPytBatch,
                     'smc_multi':SamplerSMC}
 
-def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[], 
+def run_est(model, X, y, method='amls_webb', epsilon_range=[], 
                      noise_dist='uniform',dataset_name = 'dataset',
                  model_name='model', 
                  verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None,
@@ -136,7 +136,7 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
     else:
         agg_res_df=pd.read_csv(aggr_res_path)
     estimation_func = method_func_dict[method]
-    
+    track_X = hasattr(method_config,'track_X') and method_config.track_X
     for l in range(len(exp_config.X)):
         with torch.no_grad():
             x_clean,y_clean = exp_config.X[l], exp_config.y[l]
@@ -234,7 +234,14 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
                     max_iter=0
                 else:
                     track_levels=False
-
+                if track_X:
+                    X_list=[]
+                if hasattr(method_config,'track_advs') and method_config.track_advs:
+                    track_advs=True
+                    advs_list = []
+                else:
+                    track_advs=False
+                    advs_list=None
                 if exp_config.tqdm_opt:
                     if exp_config.notebook:
                         from tqdm.notebook import tqdm
@@ -292,8 +299,10 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
                             for i in range(max_iter,len(new_levels)):
                                 levels_list.append([new_levels[i]])
                             max_iter=len(new_levels)
-                        
-                        
+                    if track_X:
+                        X_list.append(dict_out['X'])
+                    if track_advs:
+                        advs_list.append(dict_out['advs'])
 
                     del dict_out
     
@@ -390,7 +399,8 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
                 if track_finish:
                     result.update({"freq_finished":freq_finished,"freq_zero_est":freq_zero_est,
                     "unfinished_mean_est":unfinished_mean_est,"unfinished_mean_time":unfinished_mean_time})
-                
+           
+        
                 if p_ref is not None:
                     result.update({"rel_error":rel_error.mean(),"std_rel_error":rel_error.std(),
                                    "p_ref":p_ref})
@@ -413,4 +423,8 @@ def run_stat_rel_exp(model, X, y, method='amls_webb', epsilon_range=[],
         p_est = None
     dict_out = {'results_df':results_df,'agg_res_df':agg_res_df,
                 'method_config':method_config, 'exp_config':exp_config}
+    if track_X: 
+        dict_out['X_list']=X_list
+    if track_advs:
+        dict_out['advs_list']=advs_list
     return p_est, dict_out
