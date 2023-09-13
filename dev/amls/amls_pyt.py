@@ -8,7 +8,7 @@ from stat_reliability_measure.dev.torch_utils import normal_kernel
 def ImportanceSplittingPyt(gen,h,kernel=normal_kernel,tau=0.,N=2000,ratio=0.5,s=1.,decay=0.95,T = 30,n_max = 5000, alpha = 0.95,
 verbose=1, track_rejection=False, rejection_ctrl = False, reject_thresh=0.9, gain_rate = 1.0001, 
 prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
-track_levels=False,
+track_levels=False, track_advs=False,
 last_particle=False):
     """
       PyTorch implementationf of Importance splitting estimator 
@@ -163,11 +163,12 @@ last_particle=False):
 
 
     dic_out = {"Var_est":Var_est,"CI_est": CI_est,"N":N,"K":K,"s":s,"decay":decay,"T":T,"nb_calls":Count_h,
-    "P_bias":P_bias,"n":n,"Xrare":Xrare}
+    "P_bias":P_bias,"n":n,}
     if track_rejection:
         dic_out["rejection_rates"]=np.array(rejection_rates)
-        dic_out["Avg. rejection rate"]=rejection_rate
-    
+        dic_out["Avg. rejection srate"]=rejection_rate
+    if track_advs:
+        dic_out['advs']=Xrare.detach().to('cpu').numpy()
 
        
     return P_est,dic_out
@@ -177,10 +178,10 @@ def s_to_dt(s):
     return s/math.sqrt(1+s**2)
 
 def ImportanceSplittingPytBatch(gen,h,kernel=normal_kernel,tau=0.,N=2000,ratio=0.5,s=1,decay=0.95,T = 30,n_max = 300, alpha = 0.95,
-verbose=1, track_rejection=False, rejection_ctrl = False, reject_thresh=0.9, gain_rate = 1.0001, 
+verbose=1, track_rejection=False, rejection_ctrl = False, reject_thresh=0.9, gain_rate = 1.0001, track_advs:bool=False,
 prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,track_finish = True,
 allow_unifinished=True, last_particle = False,
-track_s=False,track_levels=False):
+track_s=False,track_levels=False, track_X=False):
     """
       Importance splitting estimator
       Args:
@@ -335,8 +336,11 @@ track_s=False,track_levels=False):
     P_bias = P_est*n*(1-p)/p/N
     CI_est = P_est*np.array([1,1]) + q*np.sqrt(Var_est)*np.array([-1,1])
     Xrare = X[(SX>=tau).reshape(-1),:] if p_last>0 else None
+   
     dic_out = {"Var_est":Var_est,"CI_est": CI_est,"N":N,"K":K,"s":s,"decay":decay,"T":T,"nb_calls":Count_h,
     "P_bias":P_bias,"n":n,"Xrare":Xrare}
+    if track_X:
+        dic_out['X']=X
     if track_rejection:
         dic_out["rejection_rates"]=np.array(rejection_rates)
         dic_out["Avg. rejection rate"]=rejection_rate
@@ -347,6 +351,8 @@ track_s=False,track_levels=False):
         dic_out['dts']=np.array(dt_s)
     if track_levels:
         dic_out['levels'] = levels
+    if track_advs:
+        dic_out['advs']=Xrare.detach().to('cpu').numpy()
     dic_out['finish_flag']=finish_flag   
     return P_est,dic_out
 

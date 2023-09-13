@@ -5,7 +5,7 @@ class CrudeMC_Config(SamplerConfig):
         'method_name': "CrudeMC",
         'requires_gen':True,
         'requires_h':True,
-        'N':40,
+        'N':1000,
         'N_range':[],
         'batch_size':100,
         'batch_size_range':[],

@@ -18,6 +18,8 @@ class MLS_Webb_Config(SamplerConfig):
         'ratio':0.1,
         
         'save_x':False,
+        'track_X':False,
+      
         'save_levels':True,
         'track_finish':False,
         'track_accept':False,

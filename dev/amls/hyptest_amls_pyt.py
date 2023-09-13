@@ -4,14 +4,15 @@ import torch
 import math
 from stat_reliability_measure.dev.utils import dichotomic_search
 
-def HypTestImportanceSplittingPyt(gen,kernel,h,tau,N=2000,s=1,decay=0.95
+def HypTestImportanceMLS(gen,kernel,h,tau,N=2000,s=1,decay=0.95
     ,p_c=10**(-5),T = 30,n_max = 5000, alpha_est = 0.95, alpha_test=0.99,
 verbose=1, track_rejection=False, rejection_ctrl = True,  gain_rate = 1.0001, 
 prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
 reject_forget_rate =1, gain_forget_rate=1,check_every=10,accept_ratio=0.9,
+track_levels = False,
 gain_thresh=0.01):
     """
-      PyTorch implementationf of Importance splitting estimator 
+      PyTorch implementationf of Hybrid Importance splitting estimator 
       Args:
          gen: generator of iid samples X_i                            [fun]
          kernel: mixing kernel invariant to f_X                       [fun]
@@ -62,6 +63,8 @@ gain_thresh=0.01):
     rejection_rate=0
     kernel_pass=0
     rejection_rates=[0]
+    if track_levels:
+        levels=[tau_j]
     ## While
     while (n<=m) and (tau_j<tau).item():
         
@@ -130,24 +133,14 @@ gain_thresh=0.01):
                 print('Strength of kernel diminished!')
                 print(f's={s}')
         Count_accept = 0
-
-        
-        
-       
-
-       
         i_dead = torch.argmin(SX,dim = 0) # find the index of the worst sample
         new_tau = SX[i_dead] # set the new threshold
-        
         if (new_tau-tau_j)/tau_j<prog_thresh:
             s = s*gain_rate if not clip_s else np.clip(s*decay,s_min,s_max)
             if verbose>1:
                 print('Strength of kernel increased!')
                 print(f's={s}')
-
         tau_j = new_tau # set the threshold to (K+1)-th
-
-        
         h_mean = SX.mean()
         if verbose>=1:
             print('Iter = ',n, ' tau_j = ', tau_j.item(), "h_mean",h_mean.item(),  " Calls = ", Count_h)
@@ -158,24 +151,8 @@ gain_thresh=0.01):
 
     # step E: Last round
     K_last = (SX>=tau).sum().item() # count the nb of score above the target threshold
-
-    #Estimation
-    P_est = (K_last/N)*((N-1)/N)**n # estimate the probability of failure
-    
-    if tau_j>tau:
-        Var_est = P_est**2*(P_est**(-1/N)-1)    
-        CI_est[0] = P_est*np.exp(-q/np.sqrt(N)*np.sqrt(-np.log(P_est)+(q**2)/4/N) - (q**2)/2/N)
-        CI_est[1] = P_est*np.exp(q/np.sqrt(N)*np.sqrt(-np.log(P_est)+(q**2)/4/N) - (q**2)/2/N)
-        s_out = {'Var_est':Var_est,'CI_est':CI_est,'Iter':n,'Calls':Count_h,'Sample size':N}
-        s_out['Cert']=False    
-        s_out['Xrare'] = X
-    else:
-        s_out = {'Var_est':None, 'CI_est':[0,p_c],'Iter':n,'Calls':Count_h,'Sample size':N}
-        P_est = p_c
-        s_out['Cert']=True 
-        s_out['Xrare']= None
     return P_est, s_out
-
+    
 
 def s_to_dt(s):
     return s/math.sqrt(1+s**2)

@@ -21,7 +21,7 @@ low_str=lambda x: str(x).lower()
 
 
 def run_amls_exp(model, X, y, epsilons=None, dataset_name = None,model_name=None, x_min=0,x_max=None, mask_opt=False,mask_vale=0,
-                 log_hist_=False, agrr_res_path=None, 
+                 log_hist_=False, agrr_res_path=None,
                  log_txt_=False,dict_arg=None,config=None):
     if config is None:
         config = base_config

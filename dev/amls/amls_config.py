@@ -7,22 +7,21 @@ class MLS_SMC_Config(SamplerConfig):
         'method_name': "MLS_SMC",
         'requires_gen':True,
         'requires_h':True,
-
         'N_range':[],
         'N':40,
         'T_range':[],
         'T':1,
         'ratio_range':[],
         'ratio':0.1,
-        
         'clip_s':True,'s_min':8e-3,'s_max':3,
         's':1.,
-    
         'n_max':2000,
         'track_finish':False,
         'track_accept':False,
         'track_calls':True,
         'track_levels':False,
+        'track_advs':False,
+        'track_X':False,
         's_range': [], 
         'n_max':2000,
         'last_particle':False}

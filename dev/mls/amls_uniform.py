@@ -52,6 +52,7 @@ def multilevel_uniform(
     x_min=0, 
     x_max=1,CUDA=True,
     track_accept=False,
+    track_X=False,
     
     save_x=False,
     save_levels=True,
@@ -233,6 +234,8 @@ def multilevel_uniform(
     dict_out['max_val'] = max_val
     if save_x:
         dict_out['x'] = x
+    if track_X:
+        dict_out['X'] = x
     if save_levels:
         dict_out['levels'] = levels
     if track_accept:

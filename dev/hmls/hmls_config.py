@@ -29,6 +29,8 @@ class HMLS_Config(Config):
     'track_accept':True,
     'track_calls':True,
     'track_levels':False    ,
+    'track_X':False,
+    'track_advs':False,
     'adapt_dt':False,
     
     'target_accept':0.574,

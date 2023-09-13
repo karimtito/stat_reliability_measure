@@ -16,8 +16,8 @@ verbose=1,device=None,track_accept=False,
 adapt_step=True,kappa_opt=False, alpha_p:float=0.1,FT:bool=True,
 only_duplicated:bool=True,adapt_dt=False,
 target_accept=0.574,accept_spread=0.1,dt_decay=0.999,dt_gain=None,
-dt_min=1e-5,dt_max=1e-2,L_min=1,
-track_dt=False,track_H=False, track_levels=False,
+dt_min=1e-5,dt_max=1e-2,L_min=1,track_X=False,
+track_dt=False,track_H=False, track_levels=False,track_advs=False,
 GV_opt=False,dt_d=1,skip_mh=False,scale_M=torch.tensor([1.]),
 gaussian=True, sig_dt=0.015,
 exp_rate=1.):
@@ -120,31 +120,38 @@ exp_rate=1.):
         ind_L_Y = ind_L[(ind_[0:K]).to(ind_L.device)]
         dt_Y = dt[ind_[0:K]]
         Lambda_Y = Lambda[ind_[0:K]]
+        if gradient_use:
+            grad_VY = grad_VX[ind_[0:K]] if gradient_use else None
         # step D: refresh samples
         #Z = torch.zeros((N-K,d),device=device)
         #SZ = torch.zeros((N-K,1),device=device)
         
         ind=torch.multinomial(input=torch.ones(size=(K,)),num_samples=N-K,replacement=True).squeeze(-1)
         Z=Y[ind,:] 
+        if N-K==1:
+            Z=Z.unsqueeze(0)
         Lambda_Z = Lambda_Y[ind]
         ind_L_Z = ind_L_Y[ind]
         dt_Z = dt_Y[ind]
 
-        if N-K==1:
-            Z=Z.unsqueeze(0)
+        
+            
         SZ=SY[ind]
         VZ=VY[ind]
         if GV_opt:
             grad_VZ=None
         else:
-            grad_VZ=grad_VX[ind]
+            grad_VZ=grad_VY[ind]
         if gibbs_kernel is None:
             gibbs_kernel = verlet_mcmc if not adapt_step else adapt_verlet_mcmc
         if adapt_step:
-                Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,v_q=VZ,grad_V_q=grad_VZ,ind_L=ind_L_Z,beta=beta_j,gaussian=gaussian,
+                Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,v_q=VZ,
+                    grad_V_q=grad_VZ,
+                ind_L=ind_L_Z,beta=beta_j,gaussian=gaussian,
                     V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_Z,device=device,
                     save_H=track_H,save_func=None,scale_M=scale_M,
-                    alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,L_min=L_min,
+                    alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,
+                    L_min=L_min,
                     gaussian_verlet=GV_opt,dt_min=dt_min,skip_mh=skip_mh)
                 if FT:
                 
@@ -155,14 +162,16 @@ exp_rate=1.):
                         print(f"New dt mean:{dt.mean().item()}, dt std:{dt.std().item()}")
                         print(f"New L mean: {ind_L.mean().item()}, L std:{ind_L.std().item()}")
         else:
-            Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,grad_V_q=grad_VZ,beta=beta_j,gaussian=gaussian,
-                                V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
+            Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,grad_V_q=grad_VZ,beta=beta_j,
+                                gaussian=gaussian,
+                                V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,
+                                device=device,save_H=track_H,save_func=None,
                                 scale_M=scale_M,GV_opt=GV_opt,verbose=verbose)
             if track_H:
                 H_s.extend(list(dic_out['H']))
         if track_accept:
-                accept_rates_mcmc.append(dict_out['acc_rate'])
-                accept_rate=dict_out['acc_rate'] 
+                #accept_rate=dict_out['acc_rate'] 
+                accept_rates_mcmc.append(accept_rate)
                 if verbose>=2.5:
                     print(f"Accept rate: {accept_rate}")
         if adapt_dt:
@@ -177,20 +186,15 @@ exp_rate=1.):
         if track_dt:
             dt_means.append(dt.mean().item())
             dt_stds.append(dt.std().item())
-        
         Count_V+=nb_calls
-            
-           
         Lambda_Z = beta_j*VZ+exp_gen(N-K).squeeze(1)
-        
         SZ = score(VZ,Lambda_Z)
-
-       
         # step A: update set X and the scores
         X[:K,:] = Y # copy paste the old samples of Y into X
-       
         SX[:K] = SY
         VX[:K] = VY
+        if gradient_use:
+            grad_VX[:K] = grad_VY
         dt[:K] = dt_Y
         ind_L[:K] = ind_L_Y
 
@@ -198,20 +202,18 @@ exp_rate=1.):
         SX[K:N] = SZ
         VX[K:N] = VZ
         grad_VX[K:N] = grad_VZ
-      
         dt[K:N] = dt_Z
-        
         ind_L[K:N] = ind_L_Z
         # step B: Find new threshold
         ind_ = torch.argsort(SX,dim=0,descending=True).squeeze(-1) # sort in descending order
         S_sort= SX[ind_]
+        
         # new_tau = S_sort[K]
         # if (new_tau-tau_j)/tau_j<prog_thresh:
         #     s = s*gain_rate if not clip_s else np.clip(s*gain_rate,s_min,s_max)
         #     if verbose>1:
         #         print('Strength of gibbs_kernel increased!')
         #         print(f's={s}')
-
         tau_j = S_sort[K] # set the threshold to (K+1)-th
         beta_j = -1/tau_j.item() if tau_j.item()<0 else np.inf
         V_mean = VX.mean()
@@ -240,13 +242,17 @@ exp_rate=1.):
     dic_out = {"Var_est":Var_est,"CI_est": CI_est,"N":N,"K":K,"s":s,"decay":decay,"T":T,"nb_calls":Count_V,
     "P_bias":P_bias,"n":n,"Xrare":Xrare}
     if track_accept:
-        # dic_out['accept_rates']=np.array(accept_rate)
-        dic_out['accept_rates_mcmc']=np.array(accept_rates_mcmc)
+        #dic_out['acc_ratios']=np.array(accept_rate)
+        dic_out['acc_ratios']=np.array(accept_rates_mcmc)
     if track_dt:
         dic_out['dt_means']=dt_means
         dic_out['dt_stds']=dt_stds
     if track_levels:
         dic_out['levels']=np.array(levels)
-    
+    if track_X:
+        dic_out['X']=X
+    if track_advs:
+        dic_out['advs']=Xrare.detach().cpu().numpy()
     dic_out['finish_flag']=finish_flag
+
     return P_est,dic_out

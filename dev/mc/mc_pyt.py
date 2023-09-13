@@ -1,5 +1,5 @@
 import torch
-def MC_pf(gen,h,N:int=int(1e4),batch_size:int=int(1e2),track_advs:bool=False,verbose=0.):
+def MC_pf(gen,h,N:int=int(1e4),batch_size:int=int(1e2),track_advs:bool=False,verbose=0.,track_X:bool=False):
     """ Computes probability of failure 
 
     Args:
@@ -41,6 +41,7 @@ def MC_pf(gen,h,N:int=int(1e4),batch_size:int=int(1e2),track_advs:bool=False,ver
     assert N==N
     dict_out = {'nb_calls':N}
     if track_advs:
-        dict_out['x_advs']=torch.cat(x_advs,dim=0).to('cpu').numpy()
+        dict_out['advs']=torch.cat(x_advs,dim=0).to('cpu').numpy()
+    
     
     return p_f.cpu(),dict_out
