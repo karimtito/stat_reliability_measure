@@ -13,11 +13,7 @@ from stat_reliability_measure.home import ROOT_DIR
 from datetime import datetime
 from pathlib import Path
 from stat_reliability_measure.dev.utils import float_to_file_float,str2bool,str2intList,str2floatList
-
-
 from stat_reliability_measure.dev.form.form_pyt import find_zero_gd_pyt
-
-
 method_name="FORM"
 class config:
     n_rep=1
@@ -233,10 +229,8 @@ def main():
                 lg_est_path=os.path.join(log_path,'lg_ests.txt')
                 np.savetxt(fname=lg_est_path,X=ests)
             
-                abs_errors=np.abs(ests-p_t)
-                rel_errors=abs_errors/p_t
-                bias=np.mean(ests)-p_t
-
+                
+                
                 times=np.array(times)  
                 ests=np.array(ests)
                 calls=np.array(calls)

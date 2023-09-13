@@ -11,7 +11,7 @@ import torch
 import pandas as pd
 import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float,dichotomic_search,get_sel_df
-from stat_reliability_measure.dev.utils import print_config
+#from stat_reliability_measure.dev.utils import print_config
 from scipy.special import betainc
 from stat_reliability_measure.home import ROOT_DIR
 from pathlib import Path
@@ -118,12 +118,10 @@ parser.add_argument('--n_rep',type=int,default=config.n_rep)
 parser.add_argument('--N',type=int,default=config.N)
 parser.add_argument('--verbose',type=float,default=config.verbose)
 parser.add_argument('--d',type=int,default=config.d)
-
 parser.add_argument('--min_rate',type=float,default=config.min_rate)
 parser.add_argument('--alpha',type=float,default=config.alpha)
 parser.add_argument('--n_max',type=int,default=config.n_max)
 parser.add_argument('--tqdm_opt',type=str2bool,default=config.tqdm_opt)
-
 parser.add_argument('--save_config',type=str2bool, default=config.save_config)
 #parser.add_argument('--update_aggr_res',type=str2bool,default=config.update_aggr_res)
 #parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
@@ -297,10 +295,10 @@ def main():
     if config.dt_gain is None:
         config.dt_gain=1/config.dt_decay
     
-    config_dict=print_config(config)
-    config_path=os.path.join(exp_log_path,'config.json')
-    with open(config_path,'w') as f:
-        f.write(json.dumps(config_dict, indent = 4, cls=utils.CustomEncoder))
+    #config_dict=print_config(config)
+    # config_path=os.path.join(exp_log_path,'config.json')
+    # with open(config_path,'w') as f:
+    #     f.write(json.dumps(config_dict, indent = 4, cls=utils.CustomEncoder))
 
     param_ranges = [config.N_range,config.T_range,config.alpha_range,config.p_range,config.e_range]
     param_lens=np.array([len(l) for l in param_ranges])
@@ -321,16 +319,13 @@ def main():
     L=config.L
     for p_t in config.p_range:
         if config.linear:
-            
             get_c_norm= lambda p:stat.norm.isf(p)
             c=get_c_norm(p_t)
             if config.verbose>=1.:
                 print(f'c:{c}')
             e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
             V = lambda X: torch.clamp(input=c-X[:,0], min=0, max=None)
-            
             gradV= lambda X: -torch.transpose(e_1[:,None]*(X[:,0]<c),dim0=1,dim1=0)
-            
             norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
         else:
             epsilon=1
@@ -340,9 +335,7 @@ def main():
             print(f'c:{c}',f'P_target:{P_target}')
             e_1= torch.Tensor([1]+[0]*(d-1)).to(device)
             V = lambda X: torch.clamp(input=torch.norm(X,p=2,dim=-1)*c-X[:,0], min=0, max=None)
-            
             gradV= lambda X: (c*X/torch.norm(X,p=2,dim=-1)[:,None] -e_1[None,:])*(X[:,0]<c*torch.norm(X,p=2,dim=1))[:,None]
-            
             norm_gen = lambda N: torch.randn(size=(N,d)).to(device)
 
         for ess_t in config.e_range:
@@ -429,7 +422,7 @@ def main():
                             
                             times.append(t1)
                             ests.append(p_est)
-                            calls.append(res_dict['calls'])
+                            calls.append(res_dict['nb_calls'])
                         times=np.array(times)
                         ests = np.array(ests)
                         log_ests=np.log(np.clip(ests,a_min=1e-250,a_max=1))
