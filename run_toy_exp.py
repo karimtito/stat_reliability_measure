@@ -19,6 +19,7 @@ from stat_reliability_measure.dev.form.form_config import FORM_config
 from stat_reliability_measure.dev.smc.smc_pyt import SamplerSMC
 from stat_reliability_measure.dev.smc.smc_pyt import SamplerSmcMulti
 from stat_reliability_measure.dev.smc.smc_config import SMCSamplerConfig
+from stat_reliability_measure.dev.smc.smc_config2 import SMCSamplerConfig2
 from stat_reliability_measure.dev.mc.mc_config import CrudeMC_Config
 from stat_reliability_measure.dev.mc.mc_pyt import MC_pf
 from stat_reliability_measure.dev.hmls.hmls_config import HMLS_Config
@@ -32,7 +33,8 @@ method_config_dict={'amls':MLS_SMC_Config,
                     'mc':CrudeMC_Config,'crudemc':CrudeMC_Config,'crude_mc':CrudeMC_Config,
                     'form':FORM_config,'rw_smc':SMCSamplerConfig,
                     'smc_multi':SMCSamplerConfig,
-                    'hmc':SMCSamplerConfig,'smc':SMCSamplerConfig,}
+                    'hmc':SMCSamplerConfig,'smc':SMCSamplerConfig,
+                    'smc2':SMCSamplerConfig2}
 
 method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,
                   'rw_smc':SamplerSMC,
