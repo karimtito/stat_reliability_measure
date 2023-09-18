@@ -1,7 +1,7 @@
 import torch 
 import math
 import numpy as np
-from stat_reliability_measure.dev.torch_utils import TimeStepPyt, adapt_verlet_mcmc, adapt_verlet_mcmc2, apply_gaussian_kernel,verlet_mcmc
+from stat_reliability_measure.dev.torch_utils2 import TimeStepPyt, adapt_verlet_mcmc, adapt_verlet_mcmc2, apply_gaussian_kernel,verlet_mcmc
 
 
 
