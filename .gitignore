@@ -24,7 +24,7 @@ tests*
 *.userprefs
 
 .vscode
-
+.VSCodeCounter
 # Mono auto generated files
 mono_crash.*
 
