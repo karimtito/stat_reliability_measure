@@ -2,7 +2,7 @@
 
 ## 1. Goal 
 
-The goal is to benchmark different methods of Statistical Reliability Engineering in the context of Neural Networks classifiers.
+The goal is to benchmark different methods of Statistical Reliability Engineering and of Rare Event Simulat in the context of Neural Networks classifiers.
 
 The methods to compare include:
 
@@ -10,8 +10,8 @@ The methods to compare include:
 - [x] Multiple Importance Splitting (MLS)
 - [x] Hamiltonian within Sequential Monte Carlo (H_SMC)
 - [x] Metropolis Adjusted Langevin Algorithm within Sequential Monte Carlo (MALA_SMC)
-- [X] First Order Reliability Method (FORM)
-- [ ] Hybrid (Gradient-Informed) Multiple Importance Splitting (HMLS)
+- [x] First Order Reliability Method (FORM)
+- [x] Hybrid (Gradient-Informed) Multiple Importance Splitting (HMLS)
 - [ ] Importance Sampling and Cross-Entropy methods (IS/CE)
 - [ ] Line Sampling methods (LS)
 
