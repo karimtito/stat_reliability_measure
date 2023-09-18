@@ -13,6 +13,6 @@ class IS_CONFIG(SamplerConfig):
         'batch_size':100,
         'batch_size_range':[],
         'track_advs':False,
-        ''
+        
        }
   
