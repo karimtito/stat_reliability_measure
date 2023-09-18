@@ -14,7 +14,7 @@ import argparse
 from stat_reliability_measure.dev.utils import str2bool,str2floatList,str2intList,float_to_file_float
 from stat_reliability_measure.dev.utils import get_sel_df
 from stat_reliability_measure.home import ROOT_DIR
-from stat_reliability_measure.exp_2.exp_config import Exp2Config
+from stat_reliability_measure.exp_2.exp_config import ExpModelConfig
 
 
 

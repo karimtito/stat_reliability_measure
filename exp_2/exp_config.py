@@ -92,7 +92,7 @@ class ExpConfig(Config):
         str_+=")"
         return str_
     
-class Exp2Config(ExpConfig):
+class ExpModelConfig(ExpConfig):
     config_name='exp_2'
     dataset='mnist'
     log_dir=Path(ROOT_DIR,"logs/exp_2_mnist")

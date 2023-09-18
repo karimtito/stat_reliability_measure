@@ -10,11 +10,11 @@ import torch
 import pandas as pd
 from stat_reliability_measure.dev.utils import float_to_file_float
 from stat_reliability_measure.dev.utils import get_sel_df, simple_vars, range_vars, range_dict_to_lists
-from stat_reliability_measure.config import Exp2Config
+from stat_reliability_measure.config import ExpModelConfig
 from itertools import product as cartesian_product
 def main():
     method_config=smc_pyt.SMCSamplerConfig()
-    exp_config=Exp2Config()
+    exp_config=ExpModelConfig()
     parser= exp_config.get_parser()
     parser = method_config.add_parsargs(parser)
     args=parser.parse_args()
