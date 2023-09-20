@@ -22,7 +22,7 @@ from stat_reliability_measure.dev.mc.mc_config import CrudeMC_Config
 from stat_reliability_measure.dev.mc.mc_pyt import MC_pf
 from stat_reliability_measure.dev.hmls.hmls_config import HMLS_Config
 from stat_reliability_measure.dev.hmls.hmls_pyt import HybridMLS
-from stat_reliability_measure.config import Exp2Config
+from stat_reliability_measure.config import ExpModelConfig
 from itertools import product as cartesian_product
 
 
@@ -67,7 +67,7 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
     if method_config is None:
         method_config = method_config_dict[method]()
     if exp_config is None:
-        exp_config=Exp2Config(model=model,X=X,y=y,
+        exp_config=ExpModelConfig(model=model,X=X,y=y,
         dataset_name=dataset_name,model_name=model_name,epsilon_range=epsilon_range,
         aggr_res_path=aggr_res_path,x_min=x_min,x_max=x_max,mask_opt=mask_opt,
         mask_idx=mask_idx,mask_cond=mask_cond,verbose=verbose)
@@ -139,26 +139,26 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
     track_X = hasattr(method_config,'track_X') and method_config.track_X
     for l in range(len(exp_config.X)):
         with torch.no_grad():
-            x_clean,y_clean = exp_config.X[l], exp_config.y[l]
+            exp_config.x_clean,exp_config.y_clean = exp_config.X[l], exp_config.y[l]
+        exp_config.update()
         for idx in range(len(exp_config.epsilon_range)):
             exp_config.epsilon = exp_config.epsilon_range[idx]
             pgd_success= (exp_config.attack_success[idx][l]).item() if exp_config.use_attack else None 
             if exp_config.lirpa_bounds:
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
                 # Step 2: define perturbation. Here we use a Linf perturbation on input image.
-                p_l,p_u=get_lirpa_bounds(x_clean=x_clean,y_clean=y_clean,model=model,epsilon=exp_config.epsilon,
+                p_l,p_u=get_lirpa_bounds(x_clean=exp_config.x_clean,y_clean=exp_config.y_clean,model=model,epsilon=exp_config.epsilon,
                 num_classes=exp_config.num_classes,noise_dist=exp_config.noise_dist,a=exp_config.a,device=exp_config.device)
                 exp_config.p_l,exp_config.p_u=p_l.item(),p_u.item()
             if exp_config.lirpa_cert:
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_cert
-                exp_config.lirpa_safe,exp_config.time_lirpa_safe=get_lirpa_cert(x_clean=x_clean,y_clean=y_clean,
+                exp_config.lirpa_safe,exp_config.time_lirpa_safe=get_lirpa_cert(x_clean=exp_config.x_clean,y_clean=exp_config.y_clean,
                                 epsilon = exp_config.epsilon, num_classes=exp_config.num_classes                                                
                                 ,model=model, device=exp_config.device)
         
             lists_cart= cartesian_product(*method_param_lists)
             for method_params in lists_cart:
                 i_exp+=1
-                
                 vars(method_config).update(method_params)
                 method_keys= list(simple_vars(method_config).keys())
                 method_vals= list(simple_vars(method_config).values())
@@ -211,11 +211,11 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                
                 log_path=os.path.join(exp_config.exp_log_path,log_name)
                 
-                print(f"Starting {method_config.method_name} simulation {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+clean_method_args_str)
+                print(f"Starting {method_config.method_name} simulation {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},")
                                 
              
                 if exp_config.verbose>0:
-                    print(f"with model: {model_name}, img_idx:{l},eps:{exp_config.epsilon},")
+                    print(f"with model: {model_name}, input_idx:{l},eps:{exp_config.epsilon},")
               
                 times= []
                 rel_error= []

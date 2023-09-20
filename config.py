@@ -13,6 +13,7 @@ import torch
 import json
 from stat_reliability_measure.dev.utils import float_to_file_float
 
+model_dir = ROOT_DIR+'/models/'
 
 class Config:
     def __init__(self,config_dict={}):
@@ -34,9 +35,9 @@ class Config:
                 continue
             if isinstance(vars(self)[key],torch.Tensor):
                 continue
-            if len(vars(self)[key])>10:
-                continue
-
+            if isinstance(vars(self)[key],np.ndarray) or isinstance(vars(self)[key],list):
+                if len(vars(self)[key])>10:
+                    continue
             elif type(vars(self)[key]) in [float,np.float32,np.float64]:
                 str_+=f" {key}={float_to_file_float(vars(self)[key])},"
             else:
@@ -102,18 +103,20 @@ class ExpConfig(Config):
                   'clip_max':1.,'force_train':False,
                   'repeat_exp':False,'data_dir':ROOT_DIR+"/data",
                   'noise_scale':1.,'exp_name':'',
-                  'notebook':False,}
+                  'notebook':False,'device':''}
 
     def __init__(self,config_dict=default_dict):   
         vars(self).update(config_dict)
         super().__init__()
-        
-    def update(self):
         if self.torch_seed==-1:
             """if the torch seed is not set, then it is set to the current time"""
             self.torch_seed=int(time())
         torch.manual_seed(seed=self.torch_seed)
-        if torch.cuda.is_available(): 
+        if len(self.device)==0:
+            self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+            if self.verbose>=5:
+                print(self.device)
+        if 'cuda' in self.device: 
             torch.cuda.manual_seed_all(seed=self.torch_seed)
 
         if self.np_seed==-1:
@@ -133,6 +136,9 @@ class ExpConfig(Config):
             import cpuinfo
             self.cpu_name=cpuinfo.get_cpu_info()[[key for key in cpuinfo.get_cpu_info().keys() if 'brand' in key][0]]
             self.cores_number=os.cpu_count()
+        
+    
+        
 
 score_functions = {'linear':t_u.build_h_lin,'quadratic':t_u.build_h_quad,'cosinus':t_u.build_h_cos,}
 grad_score_functions = {'linear':t_u.build_gradh_lin,'quadratic':t_u.build_gradh_quad,'cosinus':t_u.build_gradh_cos,}
@@ -147,8 +153,8 @@ class ExpToyConfig(ExpConfig):
                 'score_name':'linear'}
     #p_ref_compute = False
     def __init__(self,config_dict=default_dict,p_target_range=[],score_name='',
-                aggr_res_path='',verbose=0.,**kwargs):
-       
+                aggr_res_path='',verbose=0.,method_name='',**kwargs):
+        super().__init__()
         vars(self).update(config_dict)
         if len(score_name)>0:
             self.score_name=score_name
@@ -156,11 +162,6 @@ class ExpToyConfig(ExpConfig):
         self.aggr_res_path=aggr_res_path
         self.verbose=verbose
         vars(self).update(kwargs)
-        super().__init__()
-
-    def update(self, method_name=''):
-        super().update()
-        
         self.method_name = method_name
         self.commit= git.Repo(path=ROOT_DIR).head.commit.hexsha
         if len(self.p_target_range)==0:
@@ -171,10 +172,7 @@ class ExpToyConfig(ExpConfig):
         else:
             self.p_target_range = [float(p) for p in self.p_target_range]
      
-        if len(self.device)==0:
-            self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-            if self.verbose>=5:
-                print(self.device)
+        
 
         if len(self.log_dir)==0:
             self.log_dir=os.path.join(ROOT_DIR+'/logs','toy_exp_'+self.score_name)
@@ -217,54 +215,46 @@ class ExpToyConfig(ExpConfig):
             self.gen = lambda N: (2*torch.rand(size=(N,self.d), device=torch.device(self.device) )-1)
            
         self.normal_dist = torch.distributions.normal.Normal(loc=0.,scale=1.)
+        self.x_clean = torch.zeros(size=(self.dim,),device=torch.device(self.device))
+        self.input_shape = (self.dim,)
+
+    def update(self):
+        """ update the score and V functions """
         self.V,_ = V_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
         self.gradV,_ = gradV_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
         self.h,self.tresh = score_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
         self.grad_h = grad_score_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
-        self.x_clean = torch.zeros(size=(self.dim,),device=torch.device(self.device))
-         
         return 
     
-    def update_scores(self):
-        self.V,_ = V_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
-        self.gradV,_ = gradV_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
-        self.h,self.thresh = score_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
-        self.grad_h = grad_score_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
-        return
     
 
     
-class Exp2Config(ExpConfig):
-    default_dict={'config_name':'Experiment 2','dataset':'mnist',
-                  'data_dir':ROOT_DIR+"/data",
-                'log_dir':ROOT_DIR+"/logs/exp_2_mnist",
+class ExpModelConfig(ExpConfig):
+    default_dict={'config_name':'Experiment 2','dataset':'',
+                  'data_dir':ROOT_DIR+"/data",'model':None,
+                'log_dir':ROOT_DIR+"/logs/exp_2_mnist",'low':None,'high':None,
                 'model_arch':'','model_dir':'','epsilon_range':[],'eps_max':0.3,'eps_min':0.2,
                 'eps_num':5,'epsilon':-1.,'input_start':0,'input_stop':-1,'n_rep':100,'model_path':'',
-                'export_to_onnx':False,'use_attack':False,'attack':'PGD',
-                'lirpa_bounds':False,'download':True,'train_model_epochs':10,
-                'gaussian_latent':True,'noise_dist':'uniform','x_min':0.,'mask_opt':False,
-                'sigma':1.,'x_max':1.,'x_mean':0.,'x_std':1.,'lirpa_cert':False,'robust_model':False,
+                'export_to_onnx':False,'use_attack':False,'attack':'PGD','X':None,'y':None,
+                'lirpa_bounds':False,'download':True,'train_model_epochs':10,'method_name':'',
+                'gaussian_latent':True,'noise_dist':'uniform','x_min':None,'mask_opt':False,
+                'sigma':1.,'x_max':None,'x_mean':None,'x_std':1.,'lirpa_cert':False,'robust_model':False,
                 'robust_eps':0.1,'load_batch_size':128,'nb_epochs': 15,'adversarial_every':1,}
     #p_ref_compute = False
     def __init__(self,config_dict=default_dict,X=None,y=None,model=None,epsilon_range=[],
-                dataset_name='mnist',aggr_res_path='',model_name='',verbose=0.,**kwargs):
-        if X is not None:
-            self.X=X
-        if y is not None:
-            self.y=y
-        if model is not None:
-            self.model=model   
+                dataset_name='mnist',aggr_res_path='',model_name='',verbose=0.,
+                method_name='',x_mean=None,x_std=None,**kwargs):
+        super().__init__()
         vars(self).update(config_dict)
+        self.X = X
+        self.y = y
+        self.model = model
         self.epsilon_range=epsilon_range
         self.dataset=dataset_name
         self.aggr_res_path=aggr_res_path
         self.verbose=verbose
         vars(self).update(kwargs)
-        super().__init__()
-
-    def update(self, method_name=''):
-        super().update()
-        self.method_name = method_name
+        self.normal_dist = torch.distributions.normal.Normal(loc=0.,scale=1.)
         self.commit= git.Repo(path=ROOT_DIR).head.commit.hexsha
         if len(self.model_dir)==0:
             self.model_dir=os.path.join(ROOT_DIR+"/models/",self.dataset)
@@ -282,14 +272,8 @@ class Exp2Config(ExpConfig):
             raise NotImplementedError("Only uniform and Gaussian distributions are implemented.")
         # if not self.allow_multi_gpu:
         #     os.environ["CUDA_VISIBLE_DEVICES"]="0"
-        if len(self.device)==0:
-            self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-            if self.verbose>=5:
-                print(self.device)
-
-
         if len(self.log_dir)==0:
-            self.log_dir=os.path.join(ROOT_DIR+'/logs','exp_2_'+self.dataset)
+            self.log_dir=os.path.join(ROOT_DIR+'/logs','exp_model_'+self.dataset)
         if not os.path.exists(ROOT_DIR+'/logs'):
             os.mkdir(ROOT_DIR+'/logs')  
         if not os.path.exists(self.log_dir):
@@ -334,32 +318,41 @@ class Exp2Config(ExpConfig):
             self.eps_min,self.eps_max=np.min(self.epsilon_range),np.max(self.epsilon_range)
         if self.epsilon==-1.:
             self.epsilon = self.epsilon_range[0]
-        
-        test_loader = t_u.get_loader(train=False,data_dir=self.data_dir,download=self.download
-        ,dataset=self.dataset,batch_size=self.load_batch_size,
-            x_mean=None,x_std=None)
-        if not hasattr(self,"model"):
-            if len(self.model_arch)==0:
-                self.model_arch = t_u.datasets_default_arch[self.dataset]
-            self.model, self.model_shape,self.model_name=t_u.get_model(self.model_arch, robust_model=self.robust_model, robust_eps=self.robust_eps,
-                nb_epochs=self.nb_epochs,model_dir=self.model_dir,data_dir=self.data_dir,test_loader=test_loader,device=self.device,
-                download=self.download,dataset=self.dataset, force_train=self.force_train,
+        standard_dataset = self.dataset in t_u.supported_datasets
+        data_provided = (self.X is not None) and self.y is not None 
+        model_provided = hasattr(self,"model") and self.model is not None
+        assert standard_dataset or (data_provided and model_provided)
+        if standard_dataset:
+            test_loader = t_u.get_loader(train=False,data_dir=self.data_dir,download=self.download
+                ,dataset=self.dataset,batch_size=self.load_batch_size,
+                    x_mean=None,x_std=None)
+            if not model_provided:
+                if len(self.model_arch)==0:
+                    self.model_arch = t_u.datasets_default_arch[self.dataset]
+                self.model, self.model_shape,self.model_name=t_u.get_model(self.model_arch, robust_model=self.robust_model, robust_eps=self.robust_eps,
+                    nb_epochs=self.nb_epochs,model_dir=self.model_dir,data_dir=self.data_dir,test_loader=test_loader,device=self.device,
+                    download=self.download,dataset=self.dataset, force_train=self.force_train,
                 )
-        else:
-            if (not hasattr(self,"model_name")) or self.model_name=='':
-                self.model_name = self.dataset + "_model"
-            if (not hasattr(self,"model_arch")) or self.model_arch=='':
-                self.model_arch = 'custom'
+        
+            if not data_provided:
+                self.X,self.y,self.sample_accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=self.device,model=self.model)
+            else:
+                self.sample_accuracy=t_u.get_model_accuracy(model=self.model,X=self.X,y=self.y)
+            self.num_classes=t_u.datasets_num_c[self.dataset.lower()]
+            self.x_mean=t_u.datasets_means[self.dataset]
+            self.x_std=t_u.datasets_stds[self.dataset]
+                
+            
+                
 
-        self.num_classes=t_u.datasets_num_c[self.dataset.lower()]
-        self.x_mean=t_u.datasets_means[self.dataset]
-        self.x_std=t_u.datasets_stds[self.dataset]
-        if not hasattr(self,"X"):
-            self.X,self.y,self.sample_accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=self.device,model=self.model)
-
         else:
+            
             """compute the accuracy of the model on the sample batch"""
             self.sample_accuracy=t_u.get_model_accuracy(model=self.model,X=self.X[self.input_start:self.input_stop],y=self.y[self.input_start:self.input_stop])
+        if (not hasattr(self,"model_name")) or self.model_name=='':
+                self.model_name = self.dataset + "_model"
+        if (not hasattr(self,"model_arch")) or self.model_arch=='':
+            self.model_arch = 'custom'
         self.d= np.prod(self.X.shape[1:])
         if self.verbose >=1:
             print(f"model accuracy on sample batch:{self.sample_accuracy}")
@@ -382,8 +375,23 @@ class Exp2Config(ExpConfig):
         self.x_clean=self.X[0]
         self.input_shape = self.x_clean.shape
         self.y_clean=self.y[0]
-        self.low=torch.max(self.x_clean-self.epsilon, torch.tensor([self.x_min]).to(self.device))
-        self.high=torch.min(self.x_clean+self.epsilon, torch.tensor([self.x_max]).to(self.device))
+
+    def update(self, method_name=''):
+        """ """
+        if self.x_min is not None:
+            if not isinstance(self.x_min,torch.Tensor):
+                self.x_min = self.x_min*torch.ones_like(self.x_clean)
+            if self.low is None:
+                self.low=torch.maximum(self.x_clean-self.epsilon, self.x_min.view(-1,*self.input_shape).to(self.device))
+        elif self.low is None:
+            self.low=torch.maximum(self.x_clean-self.epsilon, torch.zeros_like(self.x_clean))
+        if self.x_max is not None:
+            if not isinstance(self.x_max,torch.Tensor):
+                self.x_max = self.x_max*torch.ones_like(self.x_clean)
+            if self.high is None:
+                self.high=torch.minimum(self.x_clean+self.epsilon, self.x_max.view(-1,*self.input_shape).to(self.device))
+        elif self.high is None:
+            self.high=self.x_clean+self.epsilon
         if self.mask_opt:
             try:
                 if self.mask_cond is not None:
@@ -398,7 +406,7 @@ class Exp2Config(ExpConfig):
                     self.high[self.mask_idx]=self.x_clean[self.mask_idx]
             except AttributeError:
                 pass
-        self.normal_dist = torch.distributions.normal.Normal(loc=0.,scale=1.)
+        
         return 
     
     def score(self,x):
