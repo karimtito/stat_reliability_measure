@@ -70,6 +70,9 @@ def nextBetaSimpESS(beta_old, v,lambda_0=1,max_beta=1e9,multi_output=False):
     of the ESS critirion 
     v_min_opt and g_target are unused dummy variables for compatibility
     """
+    v_std=v.std().item()
+    if v_std==0:
+        v_std=1e-9
     delta_beta=(lambda_0/v.std().item())
     res=min(beta_old+delta_beta,max_beta)
     return res,None
