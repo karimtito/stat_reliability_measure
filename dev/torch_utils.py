@@ -42,6 +42,8 @@ def projected_langevin_kernel_pyt(X,gradV,delta_t,beta, projection,device=None):
 
     return X_new
 
+
+
 def fgsm(model, X, y, epsilon=0.1):
     """ Construct FGSM adversarial examples on the examples X"""
     delta = torch.zeros_like(X, requires_grad=True)
@@ -420,9 +422,9 @@ def correct_min_max(x_min,x_max,x_mean,x_std):
             x_min=0
         if x_max is None:
             x_max=1
-    
-    x_min=(x_min-x_mean)/x_std
-    x_max=(x_max-x_mean)/x_std
+    if x_mean is not None and x_std is not None:
+        x_min=(x_min-x_mean)/x_std
+        x_max=(x_max-x_mean)/x_std
     return x_min,x_max
 
 supported_datasets=['mnist','cifar10','cifar100','imagenet']
