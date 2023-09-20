@@ -9,14 +9,14 @@ from stat_reliability_measure.dev.smc.smc_utils import nextBetaESS,nextBetaSimpE
     
 supported_beta_adapt={'ess':nextBetaESS,'simp_ess':nextBetaSimpESS,'simp':ESSAdaptBetaPyt}
 
-def SamplerSMC(gen, V, gradV,adapt_func='', min_rate=0.8, alpha =0.1, N=300, T = 1, L=1, n_max=5000, 
+def SamplerSMC(gen, V, gradV,adapt_func='ess', min_rate=0.8, alpha =0.1, N=300, T = 1, L=1, n_max=5000, 
 max_beta=1e6, verbose=False,device=None,ess_alpha=0.875,mh_opt=True,
 track_accept=False,track_beta=False,return_log_p=False,gaussian=True,
 adapt_dt=False, track_finish=False, save_X=False,save_v=False,
 track_calls=True,track_dt=False,track_H=False,track_v_means=False,track_ratios=False,
 track_X=False,track_advs:bool=False,track_iter:bool=False,
-target_accept=0.574,accept_spread=0.1,dt_decay=0.999,dt_gain=None,
-dt_min=1e-5,dt_max=1e-2,v_min_opt=True,kappa_opt=False,
+target_accept=0.574,accept_spread=0.1,dt_decay=0.99,dt_gain=None,
+dt_min=1e-5,dt_max=0.5,v_min_opt=True,kappa_opt=False,
  track_ess=False,M_opt=False,adapt_step=False,alpha_p=0.1,FT=False,sig_dt=0.015,L_min=1,only_duplicated=False,
  GK_opt=False,GV_opt=False,dt_d=1,skip_mh=False,
  lambda_0=1,g_target=0.8,**kwargs):
@@ -162,7 +162,7 @@ dt_min=1e-5,dt_max=1e-2,v_min_opt=True,kappa_opt=False,
                             print(f"New L mean: {ind_L.mean().item()}, L std:{ind_L.std().item()}")
                 else:
                     Y,v_y,grad_v_y,nb_calls,dict_out=verlet_mcmc(q=Y,grad_V_q=grad_v_y,beta=beta,gaussian=gaussian,
-                                        V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
+                                        V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_y,device=device,save_H=track_H,save_func=None,
                                         scale_M=scale_M)
                     if track_H:
                         H_s.extend(list(dict_out['H']))
