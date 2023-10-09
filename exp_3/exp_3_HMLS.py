@@ -85,7 +85,7 @@ class config:
     print_config=True
     update_aggr_res=True
     aggr_res_path=None
-    gaussian_latent=True
+    from_gaussian=True
     project_kernel=True
     allow_multi_gpu=True
     input_start=0
@@ -140,7 +140,7 @@ parser.add_argument('--T',type=int,default=config.T)
 parser.add_argument('--save_config',type=str2bool, default=config.save_config)
 parser.add_argument('--update_aggr_res',type=str2bool,default=config.update_aggr_res)
 parser.add_argument('--aggr_res_path',type=str, default=config.aggr_res_path)
-parser.add_argument('--gaussian_latent',type=str2bool, default=config.gaussian_latent)
+parser.add_argument('--from_gaussian',type=str2bool, default=config.from_gaussian)
 parser.add_argument('--allow_multi_gpu',type=str2bool)
 parser.add_argument('--track_gpu',type=str2bool,default=config.track_gpu)
 parser.add_argument('--track_cpu',type=str2bool,default=config.track_cpu)
@@ -455,7 +455,7 @@ for l in inp_indices:
                         
 
                         #with open(os.path.join(log_path,'results.txt'),'w'):
-                        results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),'image_idx':l,
+                        results={'method':method_name,'from_gaussian':str(config.from_gaussian),'image_idx':l,
                             'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
                         'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std_adj":ests.std()*mean_calls,
                         'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),'est_path':est_path,'times_path':times_path,
@@ -478,7 +478,7 @@ for l in inp_indices:
                         if config.update_aggr_res:
                             if not os.path.exists(aggr_res_path):
                                 print(f'aggregate results csv file not found \n it will be build at {aggr_res_path}')
-                                cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
+                                cols=['method','from_gaussian','N','rho','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
                                 'std_est','freq underest','g_target']
                                 cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
                                 cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist','datetime']

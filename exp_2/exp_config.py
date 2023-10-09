@@ -112,7 +112,7 @@ class ExpModelConfig(ExpConfig):
     lirpa_bounds=False
     download=True
     #train_model_epochs=10
-    gaussian_latent=True
+    from_gaussian=True
     noise_dist='uniform'
     x_min=0.
     x_max=1.

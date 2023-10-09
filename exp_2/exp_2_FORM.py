@@ -85,7 +85,7 @@ class config:
     input_start=0
     input_stop=None
 
-    gaussian_latent=True
+    from_gaussian=True
 
     model_dir=None 
     noise_dist='uniform'
@@ -323,8 +323,8 @@ def main():
                     print(f"lirpa safe:{lirpa_safe}")
             low=torch.max(x_clean-epsilon, torch.tensor([x_min]).cuda())
             high=torch.min(x_clean+epsilon, torch.tensor([x_max]).cuda())  
-            V = lambda X: t_u.V_pyt(X,x_clean=x_clean,model=model,low=low,high=high,target_class=y_clean,gaussian_latent=config.gaussian_latent)
-            grad_V = lambda X: t_u.gradV_pyt(X,x_clean=x_clean,model=model,low=low,high=high, target_class=y_clean,gaussian_latent=config.gaussian_latent)
+            V = lambda X: t_u.V_pyt(X,x_clean=x_clean,model=model,low=low,high=high,target_class=y_clean,from_gaussian=config.from_gaussian)
+            grad_V = lambda X: t_u.gradV_pyt(X,x_clean=x_clean,model=model,low=low,high=high, target_class=y_clean,from_gaussian=config.from_gaussian)
             
 
 

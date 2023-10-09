@@ -136,7 +136,7 @@ class config:
     input_start=0
     input_stop=None
 
-    gaussian_latent=True
+    from_gaussian=True
 
     model_dir=None 
     L_min=1
@@ -203,7 +203,7 @@ parser.add_argument('--model_arch',type=str,default = exp_config.model_arch)
 parser.add_argument('--robust_model',type=str2bool, default=config.robust_model)
 parser.add_argument('--nb_epochs',type=int,default=config.nb_epochs)
 parser.add_argument('--adversarial_every',type=int,default=config.adversarial_every)
-parser.add_argument('--gaussian_latent',type=str2bool,default=config.gaussian_latent)
+parser.add_argument('--from_gaussian',type=str2bool,default=config.from_gaussian)
 parser.add_argument('--eps_max',type=float,default=config.eps_max)
 parser.add_argument('--eps_min',type=float,default=config.eps_min)
 parser.add_argument('--eps_num',type=int,default=config.eps_num)
@@ -422,14 +422,14 @@ def main():
 
             
             
-            if config.gaussian_latent:
+            if config.from_gaussian:
                 gen = lambda N: torch.randn(size=(N,d),device=config.device)
             else:
                 gen= lambda N: (2*torch.rand(size=(N,d), device=device )-1)
             low=torch.max(x_clean-epsilon, torch.tensor([x_min]).cuda())
             high=torch.min(x_clean+epsilon, torch.tensor([x_max]).cuda())  
-            V_ = lambda X: t_u.V_pyt(X,x_clean=x_clean,model=model,low=low,high=high,target_class=y_clean,gaussian_latent=config.gaussian_latent)
-            gradV_ = lambda X: t_u.gradV_pyt(X,x_clean=x_clean,model=model,low=low,high=high, target_class=y_clean,gaussian_latent=config.gaussian_latent)
+            V_ = lambda X: t_u.V_pyt(X,x_clean=x_clean,model=model,low=low,high=high,target_class=y_clean,from_gaussian=config.from_gaussian)
+            gradV_ = lambda X: t_u.gradV_pyt(X,x_clean=x_clean,model=model,low=low,high=high, target_class=y_clean,from_gaussian=config.from_gaussian)
             
             for ratio in config.ratio_range:
                 for T in config.T_range:
