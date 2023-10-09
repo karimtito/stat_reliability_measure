@@ -20,6 +20,8 @@ class MLS_SMC_Config(SamplerConfig):
         'track_accept':False,
         'track_calls':True,
         'track_levels':False,
+        'track_s':False,
+        'track_dt':False,
         'track_advs':False,
         'track_X':False,
         's_range': [], 

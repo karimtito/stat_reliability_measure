@@ -189,10 +189,25 @@ class ExpToyConfig(ExpConfig):
         raw_logs_path=os.path.join(self.log_dir,'raw_logs/'+self.method_name)
         if not os.path.exists(raw_logs_path):
             os.mkdir(raw_logs_path)
+        self.raw_logs_path=raw_logs_path
         self.loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
         
+        
+        self.d= self.dim
+        
+        if self.noise_dist=='gaussian':
+            self.gen= lambda N: torch.randn(size=(N,self.d),device=torch.device(self.device))
+        elif self.noise_dist=='uniform':
+            self.gen = lambda N: (2*torch.rand(size=(N,self.d), device=torch.device(self.device) )-1)
+           
+        self.normal_dist = torch.distributions.normal.Normal(loc=0.,scale=1.)
+        self.x_clean = torch.zeros(size=(self.dim,),device=torch.device(self.device))
+        self.input_shape = (self.dim,)
+
+    def update(self):
+        """ update the score and V functions """
         log_name=self.method_name+'_'+self.loc_time
-        exp_log_path=os.path.join(raw_logs_path,log_name)
+        exp_log_path=os.path.join(self.raw_logs_path,log_name)
         log_path_prop = exp_log_path
         k=1
         index_level=0
@@ -207,22 +222,9 @@ class ExpToyConfig(ExpConfig):
             k+=1 
         self.exp_log_path =  log_path_prop                  
         os.mkdir(path=exp_log_path)
-        self.d= self.dim
-        
-        if self.noise_dist=='gaussian':
-            self.gen= lambda N: torch.randn(size=(N,self.d),device=torch.device(self.device))
-        elif self.noise_dist=='uniform':
-            self.gen = lambda N: (2*torch.rand(size=(N,self.d), device=torch.device(self.device) )-1)
-           
-        self.normal_dist = torch.distributions.normal.Normal(loc=0.,scale=1.)
-        self.x_clean = torch.zeros(size=(self.dim,),device=torch.device(self.device))
-        self.input_shape = (self.dim,)
-
-    def update(self):
-        """ update the score and V functions """
         self.V,_ = V_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
         self.gradV,_ = gradV_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
-        self.h,self.tresh = score_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
+        self.h,self.thresh = score_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
         self.grad_h = grad_score_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
         return 
     
@@ -230,14 +232,14 @@ class ExpToyConfig(ExpConfig):
 
     
 class ExpModelConfig(ExpConfig):
-    default_dict={'config_name':'Experiment 2','dataset':'',
+    default_dict={'config_name':'ModelExperimentConfig','dataset':'',
                   'data_dir':ROOT_DIR+"/data",'model':None,
-                'log_dir':ROOT_DIR+"/logs/exp_2_mnist",'low':None,'high':None,
+                'log_dir':"",'low':None,'high':None,
                 'model_arch':'','model_dir':'','epsilon_range':[],'eps_max':0.3,'eps_min':0.2,
                 'eps_num':5,'epsilon':-1.,'input_start':0,'input_stop':-1,'n_rep':100,'model_path':'',
                 'export_to_onnx':False,'use_attack':False,'attack':'PGD','X':None,'y':None,
                 'lirpa_bounds':False,'download':True,'train_model_epochs':10,'method_name':'',
-                'gaussian_latent':True,'noise_dist':'uniform','x_min':None,'mask_opt':False,
+                'from_gaussian':True,'noise_dist':'uniform','x_min':None,'mask_opt':False,
                 'sigma':1.,'x_max':None,'x_mean':None,'x_std':1.,'lirpa_cert':False,'robust_model':False,
                 'robust_eps':0.1,'load_batch_size':128,'nb_epochs': 15,'adversarial_every':1,}
     #p_ref_compute = False
@@ -285,29 +287,9 @@ class ExpModelConfig(ExpConfig):
         self.raw_logs = os.path.join(self.log_dir,'raw_logs/')
         if not os.path.exists(self.raw_logs):
             os.mkdir(self.raw_logs)
-        raw_logs_path=os.path.join(self.log_dir,'raw_logs/'+self.method_name)
-        if not os.path.exists(raw_logs_path):
-            os.mkdir(raw_logs_path)
-        self.loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
         
-        log_name=self.method_name+'_'+self.loc_time
-        exp_log_path=os.path.join(raw_logs_path,log_name)
-        log_path_prop = exp_log_path
-        k=1
-        index_level=0
-        while os.path.exists(log_path_prop):
-            if k==10: 
-                exp_log_path= log_path_prop.replace('9','1')
-                k=1
-                index_level+=1
-            log_path_prop = exp_log_path+'_'+str(k) 
-            if index_level >5:
-                raise RuntimeError("Error the log naming system has failed")
-            k+=1 
-
-        self.exp_log_path =  log_path_prop                  
         
-        os.mkdir(path=exp_log_path)
+        
         if len(self.epsilon_range)==0:
             log_min,log_max=np.log(self.eps_min),np.log(self.eps_max)
             log_line=np.linspace(start=log_min,stop=log_max,num=self.eps_num)
@@ -368,7 +350,7 @@ class ExpModelConfig(ExpConfig):
             print (f"input indices: {inp_indices}")
         self.nb_inputs=len(inp_indices)
         
-        if self.gaussian_latent:
+        if self.from_gaussian:
             self.gen= lambda N: torch.randn(size=(N,self.d),device=torch.device(self.device))
         else:
             self.gen = lambda N: (2*torch.rand(size=(N,self.d), device=torch.device(self.device) )-1)
@@ -378,6 +360,30 @@ class ExpModelConfig(ExpConfig):
 
     def update(self, method_name=''):
         """ """
+        self.method_name = method_name
+        raw_logs_path=os.path.join(self.log_dir,'raw_logs/'+method_name)
+        if not os.path.exists(raw_logs_path):
+            os.mkdir(raw_logs_path)
+        self.raw_logs_path = raw_logs_path
+        self.loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
+        self.log_name=method_name+'_'+self.loc_time
+        exp_log_path=os.path.join(self.raw_logs_path,self.log_name)
+        log_path_prop = exp_log_path
+        k=1
+        index_level=0
+        while os.path.exists(log_path_prop):
+            if k==10: 
+                exp_log_path= log_path_prop.replace('9','1')
+                k=1
+                index_level+=1
+            log_path_prop = exp_log_path+'_'+str(k) 
+            if index_level >5:
+                raise RuntimeError("Error the log naming system has failed")
+            k+=1 
+
+        self.exp_log_path =  log_path_prop                  
+        
+        os.mkdir(path=self.exp_log_path)
         if self.x_min is not None:
             if not isinstance(self.x_min,torch.Tensor):
                 self.x_min = self.x_min*torch.ones_like(self.x_clean)
@@ -421,15 +427,15 @@ class ExpModelConfig(ExpConfig):
     
     def h(self,X):
         return t_u.h_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
-                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,
+                ,from_gaussian=self.from_gaussian,noise_dist=self.noise_dist,
                 noise_scale=self.noise_scale)
     def V(self,X):
         return t_u.V_pyt(X,self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
-                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,
+                ,from_gaussian=self.from_gaussian,noise_dist=self.noise_dist,
                 noise_scale=self.noise_scale)   
     def gradV(self,X):
         return t_u.gradV_pyt(X,self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
-                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,
+                ,from_gaussian=self.from_gaussian,noise_dist=self.noise_dist,
                 noise_scale=self.noise_scale)
     
 
@@ -443,7 +449,7 @@ class Exp3Config(ExpConfig):
                 'eps_num':5,'epsilon':-1.,'input_start':0,'input_stop':-1,'n_rep':100,'model_path':'',
                 'export_to_onnx':False,'use_attack':False,'attack':'PGD',
                 'lirpa_bounds':False,'download':True,'train_model_epochs':10,
-                'gaussian_latent':True,'noise_dist':'uniform','x_min':0.,'mask_opt':False,
+                'from_gaussian':True,'noise_dist':'uniform','x_min':0.,'mask_opt':False,
                 'sigma':1.,'x_max':1.,'x_mean':0.,'x_std':1.,'lirpa_cert':False,'robust_model':False,
                 'robust_eps':0.1,'load_batch_size':128,'nb_epochs': 15,'adversarial_every':1,}
     #p_ref_compute = False
@@ -580,7 +586,7 @@ class Exp3Config(ExpConfig):
             print (f"input indices: {inp_indices}")
         self.nb_inputs=len(inp_indices)
         
-        if self.gaussian_latent:
+        if self.from_gaussian:
             self.gen= lambda N: torch.randn(size=(N,self.d),device=torch.device(self.device))
         else:
             self.gen = lambda N: (2*torch.rand(size=(N,self.d), device=torch.device(self.device) )-1)
@@ -612,17 +618,17 @@ class Exp3Config(ExpConfig):
     def h(self,X):
         return t_u.h_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,
                          target_class=self.y_clean
-                ,gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,
+                ,from_gaussian=self.from_gaussian,noise_dist=self.noise_dist,
                 noise_scale=self.noise_scale)
     def V(self,X):
         return t_u.V_pyt(X,self.x_clean,model=self.model,low=self.low,high=self.high,
                          target_class=self.y_clean,
-                gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,
+                from_gaussian=self.from_gaussian,noise_dist=self.noise_dist,
                 noise_scale=self.noise_scale)   
     def gradV(self,X):
         return t_u.gradV_pyt(X,self.x_clean,model=self.model,low=self.low,high=self.high,
                              target_class=self.y_clean,
-                gaussian_latent=self.gaussian_latent,noise_dist=self.noise_dist,
+                from_gaussian=self.from_gaussian,noise_dist=self.noise_dist,
                 noise_scale=self.noise_scale)
       
     
