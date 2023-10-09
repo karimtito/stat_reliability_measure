@@ -226,7 +226,7 @@ debug=False,kappa_opt=False,
             else:
                 
                 if adapt_step:
-                    Y,v_y,grad_v_y,nb_calls,dict_out=adapt_verlet_mcmc_ep(q=Y,v_q=v_y,grad_V_q=grad_v_y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
+                    Y,v_y,grad_v_y,nb_calls,dict_out=adapt_verlet_mcmc_ep(q=Y,v_q=v_y,grad_v_q=grad_v_y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
                         V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_y,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
                         alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,L_min=L_min,
                         gaussian_verlet=GV_opt,dt_min=dt_min,skip_mh=skip_mh)
@@ -241,7 +241,7 @@ debug=False,kappa_opt=False,
                             print(f"New dt mean:{dt.mean().item()}, dt std:{ep_std(dt).item()}")
                             print(f"New L mean: {ind_L.mean().item()}, L std:{ep_std(ind_L).item()}")
                 else:
-                    Y,v_y,grad_v_y,nb_calls,dict_out=verlet_mcmc_ep(q=Y,grad_V_q=grad_v_y,beta=beta,gaussian=gaussian,
+                    Y,v_y,grad_v_y,nb_calls,dict_out=verlet_mcmc_ep(q=Y,grad_v_q=grad_v_y,beta=beta,gaussian=gaussian,
                                         V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
                                         scale_M=scale_M)
                     if track_H:
