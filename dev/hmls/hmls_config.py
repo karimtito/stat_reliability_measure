@@ -32,7 +32,7 @@ class HMLS_Config(Config):
     'track_X':False,
     'track_advs':False,
     'adapt_dt':False,
-    
+    'track_dt':False,
     'target_accept':0.574,
     'accept_spread':0.1,
     'dt_decay':0.999,

@@ -19,7 +19,7 @@ target_accept=0.574,accept_spread=0.1,dt_decay=0.999,dt_gain=None,
 dt_min=1e-5,dt_max=1e-2,L_min=1,track_X=False,
 track_dt=False,track_H=False, track_levels=False,track_advs=False,
 GV_opt=False,dt_d=1,skip_mh=False,scale_M=torch.tensor([1.]),
-gaussian=True, sig_dt=0.015,
+gaussian=True, sig_dt=0.015, mult_grad_calls=2.,
 exp_rate=1.):
     """
       Hybrid Importance splitting estimator using gradient information 
@@ -78,9 +78,9 @@ exp_rate=1.):
     Count_V = N # Number of calls to function score
     SX = score(VX,Lambda) # compute their scores
     gradient_use=not (GV_opt)
-    if gradient_use:
-        grad_VX = gradV(X)
-        Count_V += 2*N # Each call to the gradient costs 2 calls to V
+   
+    grad_VX,VX= gradV(X)
+    Count_V += mult_grad_calls*N # Each call to the gradient costs 2 calls to V
     
     
     #step B: find new threshold
@@ -98,7 +98,7 @@ exp_rate=1.):
         levels.append(tau_j.item())
         
     assert dt_d==1 or dt_d==d,"dt dimension can be 1 (isotropic diff.) or d (anisotropic diff.)"
-    dt_scalar =alpha*TimeStepPyt(v_x=VX,grad_v_x=grad_VX)
+    dt_scalar =alpha*TimeStepPyt(v=VX,grad_v=grad_VX)
     dt= torch.clamp(dt_scalar*torch.ones(size=(N,dt_d),device=device)+sig_dt*torch.randn(size=(N,dt_d),device=device),
                     min=dt_min,max=dt_max)
    
@@ -146,7 +146,7 @@ exp_rate=1.):
             gibbs_kernel = verlet_mcmc if not adapt_step else adapt_verlet_mcmc
         if adapt_step:
                 Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,v_q=VZ,
-                    grad_V_q=grad_VZ,
+                    grad_v_q=grad_VZ, 
                 ind_L=ind_L_Z,beta=beta_j,gaussian=gaussian,
                     V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_Z,device=device,
                     save_H=track_H,save_func=None,scale_M=scale_M,
@@ -162,18 +162,23 @@ exp_rate=1.):
                         print(f"New dt mean:{dt.mean().item()}, dt std:{dt.std().item()}")
                         print(f"New L mean: {ind_L.mean().item()}, L std:{ind_L.std().item()}")
         else:
-            Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,grad_V_q=grad_VZ,beta=beta_j,
-                                gaussian=gaussian,
-                                V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,
+            Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,grad_v_q=grad_VZ,beta=beta_j,
+                                gaussian=gaussian,ind_L=ind_L_Z,
+                                V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_Z,
                                 device=device,save_H=track_H,save_func=None,
-                                scale_M=scale_M,GV_opt=GV_opt,verbose=verbose)
+                                scale_M=scale_M,gaussian_verlet=GV_opt,)
             if track_H:
                 H_s.extend(list(dic_out['H']))
+            if adapt_step:
+                dt_Z=dict_out['dt']
+                
         if track_accept:
-                #accept_rate=dict_out['acc_rate'] 
-                accept_rates_mcmc.append(accept_rate)
-                if verbose>=2.5:
-                    print(f"Accept rate: {accept_rate}")
+            accept_rate=dict_out['acc_rate'] 
+            if isinstance(accept_rate,torch.Tensor):
+                accept_rate=accept_rate.item()
+            accept_rates_mcmc.append(accept_rate)
+            if verbose>=2.5:
+                print(f"Accept rate: {accept_rate}")
         if adapt_dt:
             accept_rate=dict_out['acc_rate'] 
             if accept_rate>target_accept+accept_spread:
@@ -201,7 +206,8 @@ exp_rate=1.):
         X[K:N,:] = Z # copy paste the new samples of Z into X
         SX[K:N] = SZ
         VX[K:N] = VZ
-        grad_VX[K:N] = grad_VZ
+        if gradient_use:
+            grad_VX[K:N] = grad_VZ
         dt[K:N] = dt_Z
         ind_L[K:N] = ind_L_Z
         # step B: Find new threshold
@@ -245,7 +251,7 @@ exp_rate=1.):
         #dic_out['acc_ratios']=np.array(accept_rate)
         dic_out['acc_ratios']=np.array(accept_rates_mcmc)
     if track_dt:
-        dic_out['dt_means']=dt_means
+        dic_out['dts']=dt_means
         dic_out['dt_stds']=dt_stds
     if track_levels:
         dic_out['levels']=np.array(levels)

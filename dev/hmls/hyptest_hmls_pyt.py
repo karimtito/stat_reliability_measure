@@ -148,7 +148,7 @@ gaussian=True, sig_dt=0.015,exp_rate=1.):
         if gibbs_kernel is None:
             gibbs_kernel = verlet_mcmc if not adapt_step else adapt_verlet_mcmc
         if adapt_step:
-                Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,v_q=VZ,grad_V_q=grad_VZ,
+                Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,v_q=VZ,grad_v_q=grad_VZ,
                 ind_L=ind_L_Z,beta=beta_j,gaussian=gaussian,
                     V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_Z,
                     device=device,
@@ -163,7 +163,7 @@ gaussian=True, sig_dt=0.015,exp_rate=1.):
                         print(f"New dt mean:{dt.mean().item()}, dt std:{dt.std().item()}")
                         print(f"New L mean: {ind_L.mean().item()}, L std:{ind_L.std().item()}")
         else:
-            Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,grad_V_q=grad_VZ,beta=beta_j,
+            Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,grad_v_q=grad_VZ,beta=beta_j,
                         gaussian=gaussian,V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,
                         delta_t=dt,device=device,save_H=track_H,save_func=None,
                                 scale_M=scale_M,GV_opt=GV_opt,verbose=verbose)
