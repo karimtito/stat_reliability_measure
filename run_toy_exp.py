@@ -86,7 +86,8 @@ def run_toy_exp(method='amls_batch', p_target_range=[], score_name='linear', p_t
     if method=='hmc':
         method.L=5
     method_config.update()
-    exp_config.update(method_name=method_config.method_name)
+    exp_config.method_name = method_config.method_name
+    
     method_config.exp_config=exp_config
     param_ranges = [v for k,v in range_vars(method_config).items()]
     
@@ -98,10 +99,7 @@ def run_toy_exp(method='amls_batch', p_target_range=[], score_name='linear', p_t
     if exp_config.verbose>0:
         exp_config.print_config()
         method_config.print_config()
-    exp_config.config_path=os.path.join(exp_config.exp_log_path,'exp_config.json')
-    exp_config.to_json()
-    method_config.config_path=os.path.join(exp_config.exp_log_path,'method_config.json')
-    method_config.to_json()
+    
     method_range_dict = range_vars(method_config)
     print(f"with parameters in {method_range_dict}")
     method_param_lists = range_dict_to_lists(range_dict=method_range_dict)
@@ -127,10 +125,13 @@ def run_toy_exp(method='amls_batch', p_target_range=[], score_name='linear', p_t
         agg_res_df=pd.read_csv(aggr_res_path)
     estimation_func = method_func_dict[method]
     track_X = hasattr(method_config,'track_X') and method_config.track_X
-
     for p_t in exp_config.p_target_range:
         exp_config.p_target = p_t
-        exp_config.update_scores()
+        exp_config.update()
+        exp_config.config_path=os.path.join(exp_config.exp_log_path,'exp_config.json')
+        exp_config.to_json()
+        method_config.config_path=os.path.join(exp_config.exp_log_path,'method_config.json')
+        method_config.to_json()
         lists_cart= cartesian_product(*method_param_lists)
         for method_params in lists_cart:
             i_exp+=1
@@ -198,7 +199,9 @@ def run_toy_exp(method='amls_batch', p_target_range=[], score_name='linear', p_t
             ests = [] 
             log_ests=[]
             calls=[]
-            
+            track_dt = hasattr(method_config,'track_dt') and method_config.track_dt
+            if track_dt:
+                dts_list=[]
             if hasattr(method_config,'track_finish') and method_config.track_finish:
                 finish_flags=[]
                 track_finish=True
@@ -258,6 +261,21 @@ def run_toy_exp(method='amls_batch', p_target_range=[], score_name='linear', p_t
                 calls.append(nb_calls)
                 if exp_config.verbose>1:
                     print(f"Est:{p_est}")
+                if track_dt:
+                    if not os.path.exists(log_path):
+                        os.mkdir(log_path)
+                    dt_logs=os.path.join(log_path,'dt_logs')
+                    if not os.path.exists(dt_logs):
+                        os.mkdir(path=dt_logs)
+                    dts=dict_out['dts']
+                    if log_txt_:
+                        np.savetxt(fname=os.path.join(dt_logs,f'dts_{i}.txt'),X=dts)
+                    dts_list.append(dts)
+                    if log_hist_:
+                        plt.hist(dts,bins=10)
+                        plt.savefig(os.path.join(dt_logs,f'dts_hist_{i}.png'))
+                        plt.close()
+                    
                 if track_accept:
                     if not os.path.exists(log_path):
                         os.mkdir(log_path)
@@ -265,6 +283,8 @@ def run_toy_exp(method='amls_batch', p_target_range=[], score_name='linear', p_t
                     if not os.path.exists(accept_logs):
                         os.mkdir(path=accept_logs)
                     accept_rates=dict_out['acc_ratios']
+                    if exp_config.verbose>1:
+                        print(accept_rates)
                     np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_{i}.txt')
                     ,X=accept_rates)
                     x_T=np.arange(len(accept_rates))
@@ -287,7 +307,8 @@ def run_toy_exp(method='amls_batch', p_target_range=[], score_name='linear', p_t
                 if track_advs:
                     advs_list.append(dict_out['advs'])
                     
-
+                if track_dt:
+                    dts_list.append(dict_out['dts'])
                 del dict_out
 
             times=np.array(times)
@@ -316,9 +337,10 @@ def run_toy_exp(method='amls_batch', p_target_range=[], score_name='linear', p_t
             print(f"std. rel. adj.:{std_rel_adj}")
             p_ref=p_t
             rel_error = np.abs(ests-p_ref)/p_ref
+            squared_rel_error = (ests-p_ref)**2/(p_ref**2)
             print(f"mean rel. error:{rel_error.mean()}")
             print(f"std rel. error:{rel_error.std()}")
-            print(f"stat performance (per 1k calls):{rel_error.std()*(mean_calls/1000)}")
+            print(f"stat performance (per 1k calls):{squared_rel_error.mean()*(mean_calls/1000)}")
         
             if track_finish:
                 finish_flags=np.array(finish_flags)
@@ -415,4 +437,6 @@ def run_toy_exp(method='amls_batch', p_target_range=[], score_name='linear', p_t
         dict_out['X_list']=X_list
     if track_advs:
         dict_out['advs_list']=advs_list
+    if track_dt:
+        dict_out['dt_list']= dts_list
     return p_est, dict_out

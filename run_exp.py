@@ -128,7 +128,7 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
    
     if not os.path.exists(aggr_res_path):
         print(f'aggregate results csv file not found \n it will be build at {aggr_res_path}')
-        cols=['method_name','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
+        cols=['method_name','from_gaussian','N','rho','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
         'std_est','freq underest','g_target']
         cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
         cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist','datetime']
@@ -137,12 +137,20 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
         agg_res_df=pd.read_csv(aggr_res_path)
     estimation_func = method_func_dict[method]
     track_X = hasattr(method_config,'track_X') and method_config.track_X
-    for l in range(len(exp_config.X)):
+    track_accept = hasattr(method_config,'track_accept') and method_config.track_accept
+    track_beta = hasattr(method_config,'track_beta') and method_config.track_beta
+    track_dt = hasattr(method_config,'track_dt') and method_config.track_dt
+    first_iter=True
+    for l in range(exp_config.input_start, exp_config.input_stop):
         with torch.no_grad():
             exp_config.x_clean,exp_config.y_clean = exp_config.X[l], exp_config.y[l]
-        exp_config.update()
         for idx in range(len(exp_config.epsilon_range)):
-            exp_config.epsilon = exp_config.epsilon_range[idx]
+            if first_iter:
+                first_iter=False
+            else:
+                exp_config.epsilon = exp_config.epsilon_range[idx]
+                exp_config.update(method_name=method_config.method_name)
+            
             pgd_success= (exp_config.attack_success[idx][l]).item() if exp_config.use_attack else None 
             if exp_config.lirpa_bounds:
                 from stat_reliability_measure.dev.lirpa_utils import get_lirpa_bounds
@@ -207,10 +215,12 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                     if not hasattr(exp_config,'exp_id'):
                         exp_config.exp_id=last_exp_id+1
                 loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
-                log_name=method_name+'_e_'+float_to_file_float(exp_config.epsilon_range[idx])+f'_n_{exp_config.n_rep}'+loc_time
-               
-                log_path=os.path.join(exp_config.exp_log_path,log_name)
+                log_name=method_config.method_name+'_e_'+float_to_file_float(exp_config.epsilon_range[idx])+f'_n_{exp_config.n_rep}_datetime_'+loc_time
                 
+                log_path=os.path.join(exp_config.exp_log_path,log_name)
+                if os.path.exists(log_path):
+                    log_path=log_path+'_rand_'+str(np.random.randint(low=1,high=100))
+                os.mkdir(log_path)
                 print(f"Starting {method_config.method_name} simulation {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},")
                                 
              
@@ -250,13 +260,18 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                     iterator = tqdm(range(exp_config.n_rep))
                 else: 
                     iterator = range(exp_config.n_rep)
+                if track_accept:
+                    accept_rates_list = []
+                else:
+                    accept_rates_list=None
+                if track_dt:
+                    dts_list=[]
 
                 exp_required = {'verbose':exp_config.verbose}
                 requires_keys = [k for k in simple_vars(method_config).keys() if 'requires_' in k]
                 for k in requires_keys:
-                    if getattr(method_config,k):
-                        required_key = k.replace('requires_','')
-                        exp_required[required_key]=getattr(exp_config,required_key)
+                    required_key = k.replace('requires_','')
+                    exp_required[required_key]=getattr(exp_config,required_key)
                 
                 #selecting only method configuration variables relevent to the estimation function
                 func_args_vars = {k:simple_vars(method_config)[k] for k in simple_vars(method_config).keys() if ('require' not in k) and ('name' not in k) and ('calls' not in k)}
@@ -289,6 +304,31 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                             plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
                             plt.close()
                             exp_config.mean_acc_ratio = np.array(dict_out['acc_ratios']).mean()
+                    if track_beta:
+                        beta_list=dict_out['betas']
+                        beta_logs=os.path.join(log_path,'beta_logs')
+                        if not os.path.exists(beta_logs):
+                            os.mkdir(path=beta_logs)
+                        if log_txt_:
+                            np.savetxt(fname=os.path.join(beta_logs,f'beta_{i}.txt'),X=beta_list)
+                        if log_hist_:
+                            x_T=np.arange(len(beta_list))
+                            plt.plot(x_T,beta_list)
+                            plt.savefig(os.path.join(beta_logs,f'beta_{i}.png'))
+                            plt.close()
+                    if track_dt:
+                        dt_list=dict_out['dts']
+                        dt_logs=os.path.join(log_path,'dt_logs')
+                        if not os.path.exists(dt_logs):
+                            os.mkdir(path=dt_logs)
+                        if log_txt_:
+                            np.savetxt(fname=os.path.join(dt_logs,f'dt_{i}.txt'),X=dt_list)
+                        if log_hist_:
+                            x_T=np.arange(len(dt_list))
+                            plt.plot(x_T,dt_list)
+                            plt.savefig(os.path.join(dt_logs,f'dt_{i}.png'))
+                            plt.close()
+                        
                     if track_finish:
                         finish_flags.append(dict_out['finish_flag'])
                     if track_levels:
@@ -346,14 +386,13 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                     unfinished_mean_time=unfinish_times.mean()
                 else:
                     unfinished_mean_est,unfinished_mean_time=None,None
-                if os.path.exists(log_path):
-                    log_path=log_path+'_rand_'+str(np.random.randint(low=0,high=9))
-                os.mkdir(log_path)
+                
                 
                 times_path=os.path.join(log_path,'times.txt')
                 
                 est_path=os.path.join(log_path,'ests.txt')
                 
+                    
 
                 std_log_est=log_ests.std()
                 mean_log_est=log_ests.mean()
@@ -400,7 +439,12 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                     result.update({"freq_finished":freq_finished,"freq_zero_est":freq_zero_est,
                     "unfinished_mean_est":unfinished_mean_est,"unfinished_mean_time":unfinished_mean_time})
            
-        
+                if track_accept:
+                    result.update({"mean_acc_ratio":exp_config.mean_acc_ratio})
+                if track_levels:
+                    result.update({"mean_levels":mean_levels,"std_levels":std_levels})
+                if track_beta:
+                    result.update({"beta_path":beta_logs})
                 if p_ref is not None:
                     result.update({"rel_error":rel_error.mean(),"std_rel_error":rel_error.std(),
                                    "p_ref":p_ref})
@@ -427,4 +471,6 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
         dict_out['X_list']=X_list
     if track_advs:
         dict_out['advs_list']=advs_list
+    
+    
     return p_est, dict_out

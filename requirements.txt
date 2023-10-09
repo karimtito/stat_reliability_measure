@@ -6,4 +6,6 @@ matplotlib
 tensorflow
 tensorflow_probability
 torch>=1.8
+torchvision
+timm
 eagerpy
