@@ -243,7 +243,7 @@ def run_amls_exp(model, X, y, epsilons=None, dataset_name = None,model_name=None
                             
 
                             #with open(os.path.join(log_path,'results.txt'),'w'):
-                            results={'method':method_name,'gaussian_latent':str(config.gaussian_latent),
+                            results={'method':method_name,'from_gaussian':str(config.from_gaussian),
                             'image_idx':l,'dataset':config.dataset,
                                 'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
                             'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std_adj":ests.std()*mean_calls,
@@ -265,7 +265,7 @@ def run_amls_exp(model, X, y, epsilons=None, dataset_name = None,model_name=None
                             if config.update_aggr_res:
                                 if not os.path.exists(aggr_res_path):
                                     print(f'aggregate results csv file not found \n it will be build at {aggr_res_path}')
-                                    cols=['method','gaussian_latent','N','rho','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
+                                    cols=['method','from_gaussian','N','rho','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
                                     'std_est','freq underest','g_target']
                                     cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
                                     cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist','datetime']

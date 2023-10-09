@@ -177,10 +177,12 @@ last_particle=False):
 def s_to_dt(s):
     return s/math.sqrt(1+s**2)
 
+
+
 def ImportanceSplittingPytBatch(gen,h,kernel=normal_kernel,tau=0.,N=2000,ratio=0.5,s=1,decay=0.95,T = 30,n_max = 300, alpha = 0.95,
 verbose=1, track_rejection=False, rejection_ctrl = False, reject_thresh=0.9, gain_rate = 1.0001, track_advs:bool=False,
 prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,track_finish = True,
-allow_unifinished=True, last_particle = False,
+allow_unifinished=True, last_particle = False, track_dt=False,
 track_s=False,track_levels=False, track_X=False):
     """
       Importance splitting estimator
@@ -239,7 +241,10 @@ track_s=False,track_levels=False, track_X=False):
         accept_rates=[]
         accept_rates_mcmc=[]
     if track_s:
-        dt_s=[1.]
+        s_list=[1.]
+    if track_dt:
+        dt_s=[s_to_dt(s)]
+
     
     ## While
     while (tau_j<=tau).item():              #loose equality
@@ -276,7 +281,7 @@ track_s=False,track_levels=False, track_X=False):
             SZ=torch.where(accept_flag,input=SW,other=SZ)
             rejection_rate  = (kernel_pass-(N-K))/kernel_pass*rejection_rate+(1./kernel_pass)*(1-accept_flag.float().sum().item())
             if track_accept:
-                l_accept_rates.append(accept_flag.float().mean())
+                l_accept_rates.append(accept_flag.float().mean().item())
                 accept_rates.append(accept_flag.float().mean())
 
 
@@ -323,6 +328,8 @@ track_s=False,track_levels=False, track_X=False):
                 print(f'Rejection rate: {rejection_rate}')
             rejection_rates+=[rejection_rate]
         if track_s:
+            s_list.append(s)
+        if track_dt:
             dt_s.append(s_to_dt(s))
     # step E: Last round
     if (tau_j>=tau).item():
@@ -345,9 +352,11 @@ track_s=False,track_levels=False, track_X=False):
         dic_out["rejection_rates"]=np.array(rejection_rates)
         dic_out["Avg. rejection rate"]=rejection_rate
     if track_accept:
-        dic_out['accept_rates']=np.array(accept_rates)
-        dic_out['accept_rates_mcmc']=np.array(accept_rates_mcmc)
+        #dic_out['accept_rates']=np.array(accept_rates)
+        dic_out['acc_ratios']=np.array(accept_rates_mcmc)
     if track_s:
+        dic_out['s_list']=np.array(s_list)
+    if track_dt:
         dic_out['dts']=np.array(dt_s)
     if track_levels:
         dic_out['levels'] = levels

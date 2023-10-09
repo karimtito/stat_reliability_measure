@@ -96,7 +96,7 @@ def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_nam
    
     if not os.path.exists(aggr_res_path):
         print(f'aggregate results csv file not found \n it will be build at {aggr_res_path}')
-        cols=['method_name','gaussian_latent','N','ratio','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
+        cols=['method_name','from_gaussian','N','ratio','n_rep','T','epsilon','alpha','min_rate','mean_time','std_time','mean_est',
         'std_est','freq underest','g_target']
         cols+=['freq_finished','freq_zero_est','unfinished_mean_est','unfinished_mean_time']
         cols+=['pgd_success','p_l','p_u','gpu_name','cpu_name','np_seed','torch_seed','noise_dist','datetime']
