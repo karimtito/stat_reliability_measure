@@ -17,10 +17,10 @@ def norm_batch_tensor(x,d):
     y = x.reshape(x.shape[:1]+(d,))
     return y.norm(dim=-1)
 
-def TimeStepPyt(v_x,grad_v_x,p=1,p_p=2):
+def TimeStepPyt(v,grad_v,p=1,p_p=2):
     """computes the initial time step for the langevin/hmc kernel"""
-    V_mean= v_x.mean()
-    V_grad_norm_mean = ((torch.norm(grad_v_x,dim = 1,p=p_p)**p).mean())**(1/p)
+    V_mean= v.mean()
+    V_grad_norm_mean = ((torch.norm(grad_v,dim = 1,p=p_p)**p).mean())**(1/p)
     with torch.no_grad():
         result=V_mean/V_grad_norm_mean
     return result
@@ -98,11 +98,17 @@ def epoch(loader, model, opt=None,device='cpu'):
         total_loss += loss.item() * X.shape[0]
     return total_err / len(loader.dataset), total_loss / len(loader.dataset)
 
-def quantize_img(image_tensor, num_bits=8):
+def quantize_img(image_tensor, num_bits=8,x_min=0.,x_max=1.,rescale =True,
+    rebias=True):
     """Quantizes an image tensor with given bit depth."""
-    image_tensor = image_tensor.mul(255).clamp(0, 255).round()
+    image_tensor= (image_tensor-x_min)/(x_max-x_min)
+    image_tensor = image_tensor.mul(num_bits).clamp(0, num_bits).round()
     if num_bits < 8:
         image_tensor = torch.floor_divide(image_tensor, 2**(8 - num_bits))
+    if rescale:
+        image_tensor = image_tensor.div(2**num_bits - 1)
+        if rebias:
+            image_tensor = image_tensor.mul(x_max - x_min).add(x_min)
     return image_tensor
 
 def score_function(X,y_clean,model):
@@ -159,9 +165,9 @@ def langevin_kernel_pyt2(X,gradV,delta_t,beta,device=None,gaussian=True,gauss_si
     return X_new
 
 
-def verlet_kernel1(X, gradV, delta_t, beta,L,grad_V_q=None,
-ind_L=None,p_0=None,lambda_=0, 
-gaussian=True,kappa_opt=False,scale_M=None,GV=False):
+def verlet_kernel(X, gradV, delta_t, beta,L,v_q=None,grad_v_q=None,
+ind_L=None,p_0=None,lambda_=0, kappa_opt=False,
+gaussian=True,scale_M=None,GV=False):
     """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
 
     """
@@ -172,22 +178,18 @@ gaussian=True,kappa_opt=False,scale_M=None,GV=False):
     assert torch.min(ind_L).item()>=1 # all samples are in the first iteration of the Verlet scheme
     q_t = torch.clone(X)
     # if no initial momentum is given we draw it randomly from gaussian distribution
-    if scale_M is None:
-        scale_M=torch.eye(n=1,device=X.device)
-    if p_0 is None:                        
-        p_t=torch.sqrt(scale_M)*torch.randn_like(X).detach()
-
-    else:
-        p_t = p_0
-    grad_q=lambda p,dt:dt*(p.data/scale_M)
     if kappa_opt:
-        kappa= 2. / (1 + (1 - delta_t**2)**(1/2)) #if scale_M is 1 else 2. / (1 + torch.sqrt(1 - delta_t**2*(1/scale_M)))
-       
-    else:
-        kappa=torch.ones_like(q_t)
+        kappa= 2. / (1 + (1 - delta_t**2)**(1/2))
+    #scale_M=torch.eye(n=1,device=X.device)
+    if p_0 is not None:
+        p_t=torch.randn_like(X).detach()
+
+   
     
-    if not GV and grad_V_q is None:
-        grad_V_q=gradV(q_t).detach()
+    grad_q=lambda p,dt:dt*(p.data)
+    
+    if not GV and grad_v_q is None:
+        grad_v_q,v_q=gradV(q_t)
         grad_calls+=X.shape[0]
     k=1
     i_k=ind_L>=k
@@ -196,12 +198,11 @@ gaussian=True,kappa_opt=False,scale_M=None,GV=False):
         #I. Verlet scheme
         #computing half-point momentum
         #p_t.data = p_t-0.5*dt*gradV(X).detach() / norms(gradV(X).detach())
-        
         if not GV:
-            p_t.data[i_k] = p_t[i_k]-0.5*beta*delta_t[i_k]*grad_V_q[i_k]
+            p_t.data[i_k] = p_t[i_k]-0.5*beta*delta_t[i_k]*grad_v_q[i_k]
         
         
-        p_t.data[i_k] = p_t[i_k]- 0.5*delta_t[i_k]*kappa[i_k]*q_t.data[i_k]
+        p_t.data[i_k] = p_t[i_k]- 0.5*delta_t[i_k]*q_t.data[i_k]
         if p_t.isnan().any():
             print("p_t",p_t)
         #updating position
@@ -209,20 +210,20 @@ gaussian=True,kappa_opt=False,scale_M=None,GV=False):
         #assert not q_t.isnan().any(),"Nan values detected in q"
         #updating momentum again
         if not GV:
-            grad_V_q.data[i_k]=gradV(q_t[i_k]).detach()
+            grad_v_q.data[i_k],v_q.data[i_k]=gradV(q_t[i_k])
             grad_calls+=i_k.sum().item()
-            p_t.data[i_k] = p_t[i_k] -0.5*beta*delta_t[i_k]*grad_V_q[i_k]
-        p_t.data[i_k] =p_t[i_k] -0.5*kappa[i_k]*delta_t[i_k]*q_t.data[i_k]
+            p_t.data[i_k] = p_t[i_k] -0.5*beta*delta_t[i_k]*grad_v_q[i_k]
+        p_t.data[i_k] =p_t[i_k] -0.5*delta_t[i_k]*q_t.data[i_k]
         #II. Optional smoothing of momentum memory
         p_t.data[i_k] = torch.exp(-lambda_*delta_t[i_k])*p_t[i_k]
 
         k+=1
         i_k=ind_L>=k
-    return q_t.detach(),p_t,grad_calls,grad_V_q
+    return q_t.detach(),p_t.detach(),grad_calls,grad_v_q,v_q
 
-def verlet_kernel2(X, gradV, delta_t, beta,L, grad_V_q=None,
-    ind_L=None,p_0=None,lambda_=0, gaussian=True,
-    kappa_opt=False,scale_M=None,GV=False):
+def verlet_kernel_kappa_opt(X, gradV, delta_t, beta,L, grad_v_q=None,v_q=None,
+    ind_L=None,p_0=None,lambda_=0, 
+    scale_M=None,GV=False):
     """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
 
     """
@@ -231,44 +232,45 @@ def verlet_kernel2(X, gradV, delta_t, beta,L, grad_V_q=None,
         ind_L=L*torch.ones(size=(X.shape[0],),dtype=torch.int16)
     q_t = torch.clone(X)
     # if no initial momentum is given we draw it randomly from gaussian distribution
-    if scale_M is None:
-        scale_M=torch.Tensor([1])
+   
+    scale_M=torch.Tensor([1])
     if p_0 is None:                        
         p_t=torch.sqrt(scale_M)*torch.randn_like(X) 
 
     else:
         p_t = p_0
-    grad_q=lambda p,dt:dt*(p.data/scale_M)
-    if kappa_opt:
-        kappa= 2. / (1 + (1 - delta_t**2)**(1/2)) if scale_M == 1 else 2. / (1 + torch.sqrt(1 - delta_t**2*(1/scale_M)))
-    else:
-        kappa=1
+    grad_q=lambda p,dt:dt*(p.data)
+    
+    kappa= 2. / (1 + (1 - delta_t**2)**(1/2))
+    
+    
+    if not GV and (grad_v_q is None or v_q is None):
+        grad_v_q, v_q = gradV(q_t)
+        grad_calls += X.shape[0]
     k=1
     i_k=ind_L>=k
-    if not GV and grad_V_q is None:
-        grad_V_q = gradV(q_t[i_k]).detach()
-        grad_calls += i_k.sum().item()
     while (i_k).sum().item()>0:
         #I. Verlet scheme
         #computing half-point momentum
         #p_t.data = p_t-0.5*dt*gradV(X).detach() / norms(gradV(X).detach())
         if not GV:
-            p_t.data[i_k] = p_t[i_k]-0.5*beta*delta_t[i_k]*kappa[i_k]*grad_V_q
+            p_t.data[i_k] = p_t[i_k]-0.5*beta*delta_t[i_k]*kappa[i_k]*grad_v_q
         
         p_t.data[i_k] -= 0.5*delta_t[i_k]*kappa[i_k]*q_t.data[i_k]
         #updating position
+        
         q_t.data[i_k] = (q_t[i_k] + grad_q(p_t[i_k],delta_t[i_k]))
         #updating momentum again
         if not GV:
-            grad_V_q=gradV(q_t[i_k]).detach()
+            grad_v_q,v_q=gradV(q_t[i_k])
             grad_calls+=i_k.sum().item()
-            p_t.data[i_k] = p_t[i_k] -0.5*beta*kappa[i_k]*delta_t[i_k]*grad_V_q
+            p_t.data[i_k] = p_t[i_k] -0.5*beta*kappa[i_k]*delta_t[i_k]*grad_v_q
         p_t.data[i_k] -= 0.5*kappa[i_k]*delta_t[i_k]*q_t.data[i_k]
         #II. Optional smoothing of momentum memory
         p_t.data[i_k] = torch.exp(-lambda_*delta_t[i_k])*p_t[i_k]
         k+=1
         i_k=ind_L>=k
-    return q_t.detach(),p_t,grad_calls,grad_V_q
+    return q_t.detach(),p_t,grad_calls,grad_v_q,v_q
 
 
 
@@ -280,27 +282,7 @@ def multi_unsqueeze(input_,k,dim=-1):
     return input_
 
 
-def compute_V_grad_pyt2(model, input_, target_class):
-    """ Returns potentials and associated gradients for given inputs, model and target classes """
-    if input_.requires_grad!=True:
-        input_.requires_grad=True
-    #input_.retain_grad()
-    
-    logits = model(input_) 
-    val, ind= torch.topk(logits,k=2)
-    v_=val[:,0]-val[:,1]
-    #v_.backward(gradient=torch.ones_like(v_),retain_graph=True)
-    
 
-    a_priori_grad=torch.autograd.grad(outputs=v_,inputs=input_,grad_outputs=torch.ones_like(v_),retain_graph=False)[0]
-    with torch.no_grad():
-        mask=torch.eq(ind[:,0],target_class)
-        v=torch.where(condition=mask, input=v_,other=torch.zeros_like(v_))
-        mask=multi_unsqueeze(mask,k=a_priori_grad.ndim- mask.ndim)
-        grad=torch.where(condition=mask, input=a_priori_grad,other=torch.zeros_like(a_priori_grad))
-
-    input_.requires_grad =False
-    return v,grad
 
 def compute_V_grad_pyt(model, input_, target_class,L=0):
     """ Returns potentials and associated gradients for given inputs, model and target classes """
@@ -310,7 +292,7 @@ def compute_V_grad_pyt(model, input_, target_class,L=0):
     s=score_function(X=input_,y_clean=target_class,model=model)
     v=torch.clamp(L-s,min=0)
     grad=torch.autograd.grad(outputs=v,inputs=input_,grad_outputs=torch.ones_like(v),retain_graph=False)[0]
-    return v,grad
+    return v.detach(),grad.detach()
 
 
 
@@ -340,14 +322,14 @@ def compute_h_pyt(model, input_, target_class,L=0):
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 norm_dist_pyt = torch.distributions.Normal
 
-def h_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None,
+def h_pyt(x_,x_clean,model,target_class,low,high,from_gaussian=True,reshape=True,input_shape=None,
            noise_dist='gaussian',
           noise_scale=1.0,):
     gaussian_prior=noise_dist=='gaussian' or noise_dist=='normal'
     with torch.no_grad():
         if input_shape is None:
             input_shape=x_clean.shape
-        if gaussian_latent and not gaussian_prior:
+        if from_gaussian and not gaussian_prior:
             u=normal_dist.cdf(x_)
         else:
             u=noise_scale*x_+x_clean
@@ -367,17 +349,16 @@ def gaussian_to_image(gaussian_sample,low,high,input_shape=(28,28)):
     image = low+(high-low)*normal_dist.cdf(gaussian_sample).view(-1,*input_shape)
     return image
 
-def V_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,
+def V_pyt(x_,x_clean,model,target_class,low,high,from_gaussian=True,
           reshape=True,input_shape=None,
            noise_dist='gaussian',
           noise_scale=1.0,):
     
     gaussian_prior = noise_dist=='gaussian' or noise_dist=='normal'
-    assert not gaussian_prior
     with torch.no_grad():
         if input_shape is None:
             input_shape=x_clean.shape
-        if gaussian_latent and not gaussian_prior:
+        if from_gaussian and not gaussian_prior:
             u=normal_dist.cdf(x_)
         else:
             u=noise_scale*x_+x_clean
@@ -392,12 +373,12 @@ def V_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,
     v = compute_V_pyt(model=model,input_=x_p,target_class=target_class)
     return v
 
-def gradV_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None, noise_dist='gaussian',
+def gradV_pyt(x_,x_clean,model,target_class,low,high,from_gaussian=True,reshape=True,input_shape=None, noise_dist='gaussian',
               noise_scale=1.0,):
     gaussian_prior = noise_dist=='gaussian' or noise_dist=='normal'
     if input_shape is None:
         input_shape=x_clean.shape
-    if gaussian_latent and not gaussian_prior:
+    if from_gaussian and not gaussian_prior:
         u=normal_dist.cdf(x_)
     else:
         u=x_
@@ -408,13 +389,14 @@ def gradV_pyt(x_,x_clean,model,target_class,low,high,gaussian_latent=True,reshap
     if gaussian_prior:
         x_p=torch.maximum(x_p,low.view(low.size()+(1,1)))
         x_p=torch.minimum(x_p,high.view(high.size()+(1,1)))
-    _,grad_x_p = compute_V_grad_pyt(model=model,input_=x_p,target_class=target_class)
+    v,grad_x_p = compute_V_grad_pyt(model=model,input_=x_p,target_class=target_class)
     grad_u=torch.reshape(grad_x_p,x_.shape) if gaussian_prior else torch.reshape((high-low)*grad_x_p,x_.shape)
-    if gaussian_latent and not gaussian_prior:
-        grad_x=torch.exp(normal_dist.log_prob(x_))*grad_u
-    else:
-        grad_x=grad_u*noise_scale
-    return grad_x
+    with torch.no_grad():
+        if from_gaussian and not gaussian_prior:
+            grad_x=torch.exp(normal_dist.log_prob(x_))*grad_u
+        else:
+            grad_x=grad_u*noise_scale
+    return grad_x.detach(),v.detach()
 
 def correct_min_max(x_min,x_max,x_mean,x_std):
     if x_min is None or x_max is None: 
@@ -545,14 +527,16 @@ def build_gradh_cos(p_target, device, dim=2,verbose=0):
     def gradh(X):
         grad_value=e_1.unsqueeze(0)-q*X/X.norm(dim=1)[:,None]
         return grad_value.detach()
-
+    return gradh,q
 
 def build_V_cos(p_target, device, dim=2,verbose=0):
     """ builds a cosinus potential function with parameters p_target and dim"""
     c = stat.f.isf(p_target, 1, dim-1)
     q = np.sqrt(c/(dim-1+c))
     def V(X):
-        return torch.clamp(-X[:,0] + q*X.norm(dim=1),min=0,max=None)
+        with torch.no_grad():
+            v = torch.clamp(-X[:,0] + q*X.norm(dim=1),min=0,max=None)
+        return v
     return V,q
 
 def build_gradV_cos(p_target, device, dim=2, verbose=0):
@@ -561,9 +545,10 @@ def build_gradV_cos(p_target, device, dim=2, verbose=0):
     q = np.sqrt(c/(dim-1+c))
     e_1 = torch.Tensor([1.]+[0]*(dim-1)).to(device)
     def gradV(X):
+        v = torch.clamp(-X[:,0] + q*X.norm(dim=1),min=0,max=None)
         grad_value=-e_1.unsqueeze(0)+q*X/X.norm(dim=1)[:,None]
-        grad_cond = -X[:,0] + q*X.norm(dim=1)>0
-        return (grad_value*grad_cond[:,None]).detach()
+        grad_cond = v>0
+        return (grad_value*grad_cond[:,None]).detach(),v.detach()
     return gradV,q
 
 def sig(v,r0,a=.1,dv=0.4):
@@ -571,8 +556,7 @@ def sig(v,r0,a=.1,dv=0.4):
     a: min,  b: mav[0], r_0**2: critical value, dv: steepness
     v: input value
     """
-    b=2.-a
-    return a+(b-a)/(1.0+torch.exp( (r0**2-v)/dv )) 
+    return a+2*(1-a)/(1.0+torch.exp( (r0**2-v)/dv )) 
 
 def grad_sig(v,r0,a=.1,dv=0.4):
     b=2.-a
@@ -583,17 +567,17 @@ def sigma(x):
 def grad_sigma(x):
     return torch.exp(-x)/(1+torch.exp(-x))**2
 
-f = lambda v,r0: v[0]**2 + sig(v[0]**2+v[1]**2,r0) * v[1]**2
-def plot_f(f,r0):
+f = lambda v,r0,dim: (v[0]**2 + sig(v[0]**2+v[1]**2,r0) * v[1]**2)/(dim-1)
+def plot_f(f,r0,dim=2):
     l = 1.4*r0
     x = torch.linspace(-l, l,1000)
     y = torch.linspace(-l, l,1000)
     xx, yy = torch.meshgrid(x, y)
-    zz = f([xx,yy],r0)
+    zz = f([xx,yy],r0,dim=dim)
     max_level=zz.max()
     min_level=zz.min()
     contour_levels = list(np.linspace(5,max_level*1.1,15))
-    contour_levels.append(f(torch.Tensor([r0,0.]),r0).numpy())
+    contour_levels.append(f(torch.Tensor([r0,0.]),r0,dim=dim).numpy())
     contour_levels.sort()
     contour_levels = np.array(contour_levels)
     plt.figure(figsize=(6,6))
@@ -602,42 +586,86 @@ def plot_f(f,r0):
     plt.axis('scaled')
     plt.colorbar(contours, shrink=0.8, extend='both')
 
+f_alt = lambda v,r0,dim: (v[0]**2+ sig(v[0]**2+v[1]**2,r0) * v[1]**2)/(dim-1)
+
+def plot_f_alt(f,r0,dim, min_level=1.,axis_mode = 'scaled',thresh_mult=1.5):
+    l = thresh_mult*r0/np.sqrt(dim-1)
+    x_md_norm = torch.linspace(0, l,1000)
+    x_d_norm = torch.linspace(0, l,1000) 
+    xx,yy = torch.meshgrid(x_md_norm,x_d_norm)
+    zz = f([np.sqrt(dim-1)*xx,yy],r0,dim=dim)  
+    max_level=zz.max()
+    contour_levels = list(np.linspace(min_level,max_level*1.,15))
+    contour_levels.append(f_alt(torch.Tensor([0,r0]),r0,dim=dim).numpy())
+    contour_levels.sort()
+    contour_levels = np.array(contour_levels)
+    plt.figure(figsize=(6,6))
+    contours = plt.contour(xx,yy,zz,levels=contour_levels,cmap='viridis')
+    plt.clabel(contours, inline=True, fontsize=7,fmt='%1.1f')
+    plt.xlabel('|X_{-d}|/sqrt(d-1)')
+    plt.ylabel('|X_d|')
+    plt.axis(axis_mode)
+    #plot the critical value level
+    x_critical = np.linspace(0, r0/np.sqrt(dim-1),1000)
+    y_critical = np.sqrt((r0**2-(dim-1)*x_critical**2))
+    plt.plot(x_critical,y_critical,'r--',label='critical value')
+    plt.legend()
+    plt.colorbar(contours, shrink=0.8, extend='both')
+
+
+
+
+
+
+
+
+
 def build_h_quad(p_target, device, dim=2, verbose=0):
     """ builds a sigmoid score function with parameters r0,a,dv"""
-    r0 = np.sqrt(stat.chi2.isf(p_target, 2))
-    h = lambda X: X[:,0]**2 +sig(X.square().sum(1),r0)*X[:,1]**2-r0**2
+    r0 = np.sqrt(stat.chi2.isf(p_target, dim))
+    h = lambda X: X[:,:dim-1].square().sum(1) +sig(X.square().sum(1),r0)*X[:,dim-1]**2-r0**2
     return h,r0
 
 def build_gradh_quad(p_target, device, dim=2, dv=0.4,a=.1, verbose=0):
     """ builds the gradient of a sigmoid score function with parameters r0,a,dv"""
-    r0 = np.sqrt(stat.chi2.isf(p_target, 2))
-    e_1 = torch.Tensor([1.]+[0]*(dim-1)).to(device)
-    e_2 = torch.Tensor([0.]+[1.]+[0]*(dim-2)).to(device)
+    r0 = np.sqrt(stat.chi2.isf(p_target, dim))
     def gradh(X):
-        grad_h = 2*X[:,0].unsqueeze(-1)*e_1.unsqueeze(0)
-        grad_h += 2*a*X[:,1].unsqueeze(-1)*e_2.unsqueeze(0)
-        grad_h += 2*(1-a)*(2/dv)*(X[:,1]**2).unsqueeze(-1)*grad_sigma((X.square().sum(1)-r0**2)/dv)[:,None]*X
-        grad_h += 4*(1-a)*sigma((X.square().sum(1)-r0**2)/dv).unsqueeze(-1)*e_2.unsqueeze(0)
+        X_1,X_d = torch.zeros_like(X), torch.zeros_like(X)
+        X_1[:,:dim-1] = X[:,:dim-1]
+        X_1[:,dim-1] = 0.
+        X_d[:,:dim-1] = 0.
+        X_d[:,dim-1] = X[:,dim-1]
+        grad_h = 2*X_1
+        grad_h += 2*a*X_d
+        grad_h += 2*(1-a)*(2/dv)*(X[:,dim-1]**2).unsqueeze(-1)*grad_sigma((X.square().sum(1)-r0**2)/dv)[:,None]*X
+        grad_h += 4*(1-a)*sigma((X.square().sum(1)-r0**2)/dv).unsqueeze(-1)*X_d
+        del X_1,X_d
         return grad_h.detach()
+    return gradh
 
 def build_V_quad(p_target, device,dim=2 ,verbose=0,a=.1,dv=0.4):
     """ builds a sigmoid potential with parameters r0,a,dv"""
-    r0 = np.sqrt(stat.chi2.isf(p_target, 2))
-    V = lambda X: torch.clip(r0**2-X[:,0]**2-sig(X.square().sum(1),r0)*X[:,1]**2, min=0, max=None)
+    r0 = np.sqrt(stat.chi2.isf(p_target, dim))
+    V = lambda X: torch.clip(r0**2-X[:,:dim-1].square().sum(1)-sig(X.square().sum(1),r0)*X[:,dim-1]**2, min=0)
     return V,r0
 
 def build_gradV_quad(p_target,device, verbose=0,dim=2,a=.1,dv=0.4):
     """ builds the gradient of a sigmoid potential with parameters r0,a,dv"""
-    r0 = np.sqrt(stat.chi2.isf(p_target, 2))
-    e_1 = torch.Tensor([1.]+[0]*(dim-1)).to(device)
-    e_2 = torch.Tensor([0.]+[1.]+[0]*(dim-2)).to(device)
+    r0 = np.sqrt(stat.chi2.isf(p_target, dim))
     def gradV(X):
-        grad_h = 2*X[:,0].unsqueeze(-1)*e_1.unsqueeze(0)
-        grad_h += 2*a*X[:,1].unsqueeze(-1)*e_2.unsqueeze(0)
-        grad_h += 2*(1-a)*(2/dv)*(X[:,1]**2).unsqueeze(-1)*grad_sigma((X.square().sum(1)-r0**2)/dv)[:,None]*X
-        grad_h += 4*(1-a)*sigma((X.square().sum(1)-r0**2)/dv).unsqueeze(-1)*e_2.unsqueeze(0)
+        X_1,X_d = torch.zeros_like(X), torch.zeros_like(X)
+        X_1[:,:dim-1] = X[:,:dim-1]
+        X_1[:,dim-1] = 0.
+        X_d[:,:dim-1] = 0.
+        X_d[:,dim-1] = X[:,dim-1]
+        v = torch.clip(r0**2-X_1.square().sum(1)-sig(X.square().sum(1),r0)*X[:,dim-1]**2, min=0)
+        grad_h = 2*X_1
+        grad_h += 2*a*X_d
+        grad_h += 2*(1-a)*(2/dv)*(X[:,dim-1]**2).unsqueeze(-1)*grad_sigma((X.square().sum(1)-r0**2)/dv)[:,None]*X
+        grad_h += 4*(1-a)*sigma((X.square().sum(1)-r0**2)/dv).unsqueeze(-1)*X_d
+        del X_1,X_d
         grad_v = -grad_h*(X.square().sum(1)>r0**2)[:,None]
-        return grad_v.detach()
+        return grad_v.detach(),v.detach()
     return gradV,r0
 
 def build_h_lin(p_target,device, dim=2, verbose=0):
@@ -653,7 +681,7 @@ def build_gradh_lin(p_target,device, dim=2, verbose=0):
     c = stat.norm.isf(p_target)
     e_1 = torch.Tensor([1.]+[0]*(dim-1)).to(device)
     def gradh(X):
-        return (e_1.unsqueeze(0)*torch.ones_like(X)).detach()
+        return (e_1.unsqueeze(0)*torch.ones_like(X)).detach(),
     return gradh,c
 
 def build_V_lin(p_target, device,dim=2, verbose=0):
@@ -672,7 +700,8 @@ def build_gradV_lin(p_target,device, verbose=0,dim=2,):
     c = stat.norm.isf(p_target)
     e_1 = torch.Tensor([1.]+[0]*(dim-1)).to(device)
     def gradV(X):
-        return (-e_1*(X[:,0]<c)[:,None]).detach()
+        v = torch.clamp(input=c-X[:,0], min=0, max=None)
+        return (-e_1*(v>0)[:,None]).detach(),v.detach()
     return gradV,c
 
 def get_correct_x_y(data_loader,device,model):
@@ -1061,8 +1090,9 @@ def Hamiltonian(X,p,V,beta,scale_M=1,gaussian=True):
     H = U + 0.5*torch.sum((1/scale_M)*p**2,dim=1)
     return H
 
-
-
+def Hmlt(q,p,v_q,beta):
+    u = beta*v_q + 0.5*q.square().sum(dim=1)
+    return u + 0.5*p.square().sum(dim=1)
 
 
 def apply_v_kernel(Y,v_y,v_kernel,T:int,beta,gradV,V,delta_t:float,mh_opt:bool,track_accept:bool,
@@ -1198,9 +1228,10 @@ save_y=False,kappa_opt=True):
 
 
 
-def verlet_mcmc(q,beta:float,gaussian:bool,V,gradV,T:int,delta_t,
-                grad_V_q=None,L:int=1,
-kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussian_verlet=False,ind_L=None):
+def verlet_mcmc(q,v_q,beta:float,gaussian:bool,V,gradV,T:int,delta_t,
+                grad_v_q=None,L:int=1,
+        kappa_opt:bool=True,save_H=False,save_func=None,device='cpu',scale_M=None,
+gaussian_verlet=False,ind_L=None,mult_grad_calls=2.):
     """ Simple implementation of Hamiltonian dynanimcs MCMC 
 
     Args:
@@ -1222,11 +1253,9 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussia
     """
     acc  = 0
     p=torch.randn_like(q)
-    if scale_M is not None:
-        sqrt_M = torch.sqrt(scale_M)
-        p=sqrt_M*torch.randn_like(q)
+    
     (N,d)=q.shape
-    H_old = Hamiltonian(X=q,p=p,beta=beta, gaussian=gaussian,V=V)
+    H_old = Hmlt(q=q,p=p,v_q=v_q,beta=beta)
     nb_calls=N
     if save_H:
         H_ = np.zeros(T+1)
@@ -1235,44 +1264,43 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussia
     if save_func is not None:
         saved=[save_func(q,p)]
     for i  in range(T):
-        q_trial,p_trial,grad_calls,grad_V_q=verlet_kernel1(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
+        q_trial,p_trial,grad_calls,grad_v_q_trial,v_q_trial=verlet_kernel(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M,ind_L=ind_L,GV=gaussian_verlet)
-        nb_calls+=2*grad_calls # we count each gradient call as 2 function calls
-        H_trial= Hamiltonian(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian)
+        nb_calls+=mult_grad_calls*grad_calls # we count each gradient call as 2 function calls
+        H_trial= Hmlt(q=q_trial,p=p_trial,v_q=v_q_trial,beta=beta)
         nb_calls+=N
-        
         alpha=torch.rand(size=(N,),device=device )
         delta_H=torch.clamp(-(H_trial-H_old),max=0)
         accept=torch.exp(delta_H)>alpha
         acc+=accept.sum()
         q=torch.where(accept.unsqueeze(-1),input=q_trial,other=q)
+        v_q=torch.where(accept,input=v_q_trial,other=v_q)
+        if not gaussian_verlet:
+            grad_v_q=torch.where(accept.unsqueeze(-1),input=grad_v_q_trial,other=grad_v_q)
         p = torch.randn_like(q)
-        if scale_M is not None:
-            p = sqrt_M*p
-        H_old= Hamiltonian(X=q, p=p,V=V,beta=beta,gaussian=gaussian)
+        
+        H_old= Hmlt(q=q,p=p,v_q=v_q,beta=beta)
         if save_H:
             H_[i+1] = H_old.mean()
-        nb_calls+=N
-        
 
         if save_func is not None:
             saved.append(save_func(q,p))
     
-    dict_out={'acc_rate':acc/(T*N)}
+    dict_out={'acc_rate':acc.cpu()/(T*N)}
 
     if save_H:
         dict_out['H']=H_
     if save_func is not None:
         dict_out['saved']=saved
-    v_q=V(q)
-    nb_calls+=N
-    return q,v_q,grad_V_q,nb_calls,dict_out
+    
+    return q,v_q,grad_v_q,nb_calls,dict_out
 
 
 def adapt_verlet_mcmc(q,v_q,ind_L,beta:float,gaussian:bool,V,gradV,T:int,delta_t,
-                      grad_V_q=None,L:int=1,
+                      grad_v_q=None,L:int=1,
 kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,alpha_p:float=0.1,prop_d=0.1,FT=False,dt_max=None,dt_min=None,sig_dt=0.015,
-verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False,corrected_kernel=False):
+verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False,corrected_kernel=False,
+grad_calls_mult=2.,save_T=True):
     """ Simple implementation of Hamiltonian dynanimcs MCMC 
 
     Args:
@@ -1293,7 +1321,8 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False,corrected_kernel=False):
     Returns:
         _type_: _description_
     """
-    verlet_mixer=verlet_kernel2 if corrected_kernel else verlet_kernel1
+
+    verlet_mixer=verlet_kernel_kappa_opt if kappa_opt else verlet_kernel
     acc  = 0
     T_max=T
     if scale_M is None:
@@ -1309,63 +1338,43 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False,corrected_kernel=False):
     (N,d)=q.shape
     o_old=q+q**2
     mu_old,sig_old=(o_old).mean(0),(o_old).std(0)
-    H_old= Hamiltonian(X=q, p=p,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
+    H_old= Hmlt(q=q, p=p,v_q=v_q,beta=beta)
     nb_calls=0 #we can reuse the potential value v_q of previous iteration: no new potential computation
     if save_H:
         H_ = np.zeros(T+1)
         H_[0]=H_old.mean()
-
+    if FT:
+        H_0 = H_old
     if save_func is not None:
         saved=[save_func(q,p)]
     prod_correl=torch.ones(size=(d,),device=q.device)
     i=0
     #torch.multinomial(input=)
     while (prod_correl>alpha_p).sum()>=prop_d*d and i<T_max:
-        q_trial,p_trial,grad_calls,grad_V_q_trial=verlet_mixer(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,
-        L=L,kappa_opt=kappa_opt,
-        scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
+        q_trial,p_trial,grad_calls,grad_v_q_trial,v_q_trial=verlet_mixer(X=q,gradV=gradV,grad_v_q=grad_v_q, p_0=p,delta_t=delta_t,beta=beta,
+        L=L, ind_L=ind_L,GV=gaussian_verlet)
         
-        nb_calls+= 2*grad_calls
-        H_trial= Hamiltonian(X=q_trial, p=p_trial,V=V,beta=beta,
-                             gaussian=gaussian,scale_M=scale_M)
+        nb_calls+= grad_calls_mult*grad_calls
+        H_trial= Hmlt(q=q_trial, p=p_trial,v_q=v_q_trial,beta=beta)
         nb_calls+=N # N new potentials are computed 
         delta_H=torch.clamp(-(H_trial-H_old),max=0)
-        if FT:
-            exp_weight=torch.exp(torch.clamp(delta_H,max=0))
-            m_distances= maha_dist(x=q,y=q_trial)/ind_L.float().to(device)
-            lambda_i=m_distances*exp_weight+1e-8*torch.ones_like(m_distances)
-            if lambda_i.isnan().any():
-                print(f"NaN values in lambda_i:")
-                print(lambda_i)
-            elif (lambda_i==0).sum()>0:
-                print(f"zero values in lambda_i")
-                print(f"lambda_i")
-                print(f"exp_weight:{exp_weight}")
-                print(f"m_distances:{m_distances}")
-                if (m_distances==0).sum()>0:
-                    print(f"q_trial:{q_trial}")
-                    print(f"q:{q}")
-                print(f"ind_L:{ind_L}")
-            
-            sel_ind=torch.multinomial(input=lambda_i,num_samples=N,replacement=True,)
-            
-            delta_t = torch.clamp(delta_t[sel_ind]+sig_dt*torch.randn_like(delta_t),min=dt_min,max=dt_max,)
-            noise_L=torch.rand(size=(N,),device=ind_L.device)
-            
-            ind_L= torch.clamp(ind_L[sel_ind.to(ind_L.device)]+((noise_L>=(2/3)).float()-(noise_L<=1/3).float())*ones_L,min=L_min,max=L+1e-3)
+        
             
         if skip_mh:
             q=q_trial
-            grad_V_q=grad_V_q_trial
+            v_q=v_q_trial
+            grad_v_q=grad_v_q_trial
             nb_accept=N
         else:
             alpha=torch.rand(size=(N,),device=device)
             accept=torch.exp(delta_H)>alpha
             nb_accept=accept.sum().item()
-            acc+=nb_accept
+            acc+=nb_accept 
             q=torch.where(accept.unsqueeze(-1),input=q_trial,other=q)
-            if grad_V_q is not None and grad_V_q_trial is not None:
-                grad_V_q=torch.where(accept.unsqueeze(-1),input=grad_V_q_trial,other=grad_V_q)
+            v_q = torch.where(accept,input=v_q_trial,other=v_q)
+            if not gaussian_verlet:
+                grad_v_q=torch.where(accept.unsqueeze(-1),input=grad_v_q_trial,other=grad_v_q)
+        
         if nb_accept>0:
             o_new=q+q**2
             mu_new,sig_new=o_new.mean(0),o_new.std(0)
@@ -1374,338 +1383,55 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False,corrected_kernel=False):
             mu_old, sig_old, o_old = mu_new, sig_new, o_new
     
         p = torch.randn_like(q)
-        if scale_M is not None:
-            p = sqrt_M*p
-        H_old= Hamiltonian(X=q, p=p,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
+        H_old= Hmlt(q=q, p=p,v_q=v_q,beta=beta)
+
         #no new potential is computed 
         if save_H:
             H_[i+1] = H_old.mean()
-        
-        
-
         if save_func is not None:
             saved.append(save_func(q,p))
         i+=1
+    
+    if FT:
+        delta_H_final = H_old-H_0
+        exp_weight=torch.exp(torch.clamp(delta_H_final,max=0))
+        m_distances= maha_dist(x=q,y=q_trial)/ind_L.float().to(device)
+        lambda_i=m_distances*exp_weight+1e-8*torch.ones_like(m_distances)
+        if lambda_i.isnan().any():
+            print(f"NaN values in lambda_i:")
+            print(lambda_i)
+        elif (lambda_i==0).sum()>0:
+            print(f"zero values in lambda_i")
+            print(f"lambda_i")
+            print(f"exp_weight:{exp_weight}")
+            print(f"m_distances:{m_distances}")
+            if (m_distances==0).sum()>0:
+                print(f"q_trial:{q_trial}")
+                print(f"q:{q}")
+            print(f"ind_L:{ind_L}")
+        
+        sel_ind=torch.multinomial(input=lambda_i,num_samples=N,replacement=True,)
+        
+        delta_t = torch.clamp(delta_t[sel_ind]+sig_dt*torch.randn_like(delta_t),min=dt_min,max=dt_max,)
+        noise_L=torch.rand(size=(N,),device=ind_L.device)
+        
+        ind_L= torch.clamp(ind_L[sel_ind.to(ind_L.device)]+((noise_L>=(2/3)).float()-(noise_L<=1/3).float())*ones_L,min=L_min,max=L+1e-3)
+
     if verbose:
         print(f"T_final={i}")
     dict_out={'acc_rate':acc/(i*N)}
-
+    if FT:
+        dict_out['dt'] = delta_t
+        dict_out['ind_L'] = ind_L
     if save_H:
         dict_out['H']=H_
     if save_func is not None:
         dict_out['saved']=saved
-    if FT:
-        dict_out['dt']=delta_t
-        dict_out['ind_L']=ind_L
-    v_q=V(q)
-    #no new potential computation 
     
-    return q,v_q,grad_V_q,nb_calls,dict_out
-
-
-def Hamiltonian2(X,p,beta,v_x=None,V=None,scale_M=1,gaussian=True):
-    if v_x is None:
-        assert V is not None, "either v_x or V must be provided"
-        with torch.no_grad():
-            U = beta*V(X) +0.5*torch.sum(X**2,dim=1) if gaussian else beta*V(X)
-    else:
-        with torch.no_grad():
-            U = beta*v_x +0.5*torch.sum(X**2,dim=1) if gaussian else beta*v_x
-    H = U + 0.5*torch.sum((1/scale_M)*p**2,dim=1)
-    return H
-
-def verlet_kernel3(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaussian=True,kappa_opt=False,scale_M=None,GV=False):
-    """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
-
-    """
-    if ind_L is None:
-        ind_L=L*torch.ones(size=(X.shape[0],),dtype=torch.int16)
-    q_t = torch.clone(X)
-    # if no initial momentum is given we draw it randomly from gaussian distribution
-    if scale_M is None:
-        scale_M=torch.eye(n=1,device=X.device)
-    if p_0 is None:                        
-        p_t=torch.sqrt(scale_M)*torch.randn_like(X) 
-
-    else:
-        p_t = p_0
-    grad_q=lambda p,dt:dt*(p.data/scale_M)
-    if kappa_opt:
-        kappa= 2. / (1 + (1 - delta_t**2)**(1/2)) #if scale_M is 1 else 2. / (1 + torch.sqrt(1 - delta_t**2*(1/scale_M)))
-       
-    else:
-        kappa=torch.ones_like(q_t)
-    k=1
-    i_k=ind_L>=k
-    while (i_k).sum()>0:
-        #I. Verlet scheme
-        #computing half-point momentum
-        #p_t.data = p_t-0.5*dt*gradV(X).detach() / norms(gradV(X).detach())
         
-        if not GV:
-            p_t.data[i_k] = p_t[i_k]-0.5*beta*delta_t[i_k]*gradV(q_t[i_k]).detach() 
-        
-        
-        p_t.data[i_k] = p_t[i_k]- 0.5*delta_t[i_k]*kappa[i_k]*q_t.data[i_k]
-        if p_t.isnan().any():
-            print("p_t",p_t)
-        #updating position
-        q_t.data[i_k] = (q_t[i_k] + grad_q(p_t[i_k],delta_t[i_k]))
-        assert not q_t.isnan().any(),"Nan values detected in q"
-        #updating momentum again
-        if not GV:
-            p_t.data[i_k] = p_t[i_k] -0.5*beta*delta_t[i_k]*gradV(q_t[i_k]).detach()
-        p_t.data[i_k] =p_t[i_k] -0.5*kappa[i_k]*delta_t[i_k]*q_t.data[i_k]
-        #II. Optional smoothing of momentum memory
-        p_t.data[i_k] = torch.exp(-lambda_*delta_t[i_k])*p_t[i_k]
-        k+=1
-        i_k=ind_L>=k
-    return q_t.detach(),p_t
-
-
-def adapt_verlet_mcmc3(q,v_q,ind_L,beta:float,gaussian:bool,V,gradV,T:int,delta_t,L:int=1,
-kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,alpha_p:float=0.1,prop_d=0.1,FT=False,dt_max=None,dt_min=None,sig_dt=0.015,
-verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
-    """ Simple implementation of Hamiltonian dynanimcs MCMC 
-
-    Args:
-        q (_type_): _description_
-        p (_type_): _description_
-        beta (_type_): _description_
-        gaussian (_type_): _description_
-        V (_type_): _description_
-        gradV (_type_): _description_
-        T (_type_): _description_
-        delta_t (_type_): _description_
-        kappa_opt (bool, optional): _description_. Defaults to True.
-        save_H (bool, optional): _description_. Defaults to True.
-        save_Q (bool, optional): _description_. Defaults to True.
-        save_func (_type_, optional): _description_. Defaults to None.
-        alpha_p 
-
-    Returns:
-        _type_: _description_
-    """
-    acc  = 0
-    T_max=T
-    if scale_M is None:
-        scale_M=1
-        sqrt_M=1
-    else:
-        sqrt_M = torch.sqrt(scale_M) 
-    p=sqrt_M*torch.randn_like(q)
-    if FT:
-        
-        maha_dist = lambda x,y: ((1/scale_M)*(x-y)**2).sum(1)
-        ones_L=torch.ones_like(ind_L)
-    (N,d)=q.shape
-    o_old=q+q**2
-    mu_old,sig_old=(o_old).mean(0),(o_old).std(0)
-    H_old= Hamiltonian(X=q, p=p,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
-    nb_calls=0 #we can reuse the potential value v_q of previous iteration: no new potential computation
-    if save_H:
-        H_ = np.zeros(T+1)
-        H_[0]=H_old.mean()
-
-    if save_func is not None:
-        saved=[save_func(q,p)]
-    prod_correl=torch.ones(size=(d,),device=q.device)
-    i=0
-    #torch.multinomial(input=)
-    while (prod_correl>alpha_p).sum()>=prop_d*d and i<T_max:
-        q_trial,p_trial=verlet_kernel3(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
-        scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
-        
-        nb_calls+=4*ind_L.sum().item()-N # for each particle each vertlet integration step requires two oracle calls (gradients)
-        H_trial= Hamiltonian(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
-        nb_calls+=N # N new potentials are computed 
-        delta_H=torch.clamp(-(H_trial-H_old),max=0)
-        if FT:
-            exp_weight=torch.exp(torch.clamp(delta_H,max=0))
-            m_distances= maha_dist(x=q,y=q_trial)/ind_L.float().to(device)
-            lambda_i=m_distances*exp_weight+1e-8*torch.ones_like(m_distances)
-            if lambda_i.isnan().any():
-                print(f"NaN values in lambda_i:")
-                print(lambda_i)
-            elif (lambda_i==0).sum()>0:
-                print(f"zero values in lambda_i")
-                print(f"lambda_i")
-                print(f"exp_weight:{exp_weight}")
-                print(f"m_distances:{m_distances}")
-                if (m_distances==0).sum()>0:
-                    print(f"q_trial:{q_trial}")
-                    print(f"q:{q}")
-                print(f"ind_L:{ind_L}")
-            
-            sel_ind=torch.multinomial(input=lambda_i,num_samples=N,replacement=True,)
-            
-            delta_t = torch.clamp(delta_t[sel_ind]+sig_dt*torch.randn_like(delta_t),min=dt_min,max=dt_max,)
-            noise_L=torch.rand(size=(N,),device=ind_L.device)
-            
-            ind_L= torch.clamp(ind_L[sel_ind]+((noise_L>=(2/3)).float()-(noise_L<=1/3).float())*ones_L,min=L_min,max=L+1e-3)
-            
-        if skip_mh:
-            q=q_trial
-            nb_accept=N
-        else:
-            alpha=torch.rand(size=(N,),device=device)
-            accept=torch.exp(delta_H)>alpha
-            nb_accept=accept.sum().item()
-            acc+=nb_accept
-            q=torch.where(accept.unsqueeze(-1),input=q_trial,other=q)
-        if nb_accept>0:
-            o_new=q+q**2
-            mu_new,sig_new=o_new.mean(0),o_new.std(0)
-            correl=((o_new-mu_new)*(o_old-mu_old)).mean(0)/(sig_old*sig_new)
-            prod_correl*=correl
     
-        p = torch.randn_like(q)
-        if scale_M is not None:
-            p = sqrt_M*p
-        H_old= Hamiltonian(X=q, p=p,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
-        #no new potential is computed 
-        if save_H:
-            H_[i+1] = H_old.mean()
-        
-        
+    return q,v_q,grad_v_q,nb_calls,dict_out
 
-        if save_func is not None:
-            saved.append(save_func(q,p))
-        i+=1
-    if verbose:
-        print(f"T_final={i}")
-    dict_out={'acc_rate':acc/(i*N)}
-
-    if save_H:
-        dict_out['H']=H_
-    if save_func is not None:
-        dict_out['saved']=saved
-    if FT:
-        dict_out['dt']=delta_t
-        dict_out['ind_L']=ind_L
-    v_q=V(q)
-    #no new potential computation 
-    
-    return q,v_q,nb_calls,dict_out
-
-
-def adapt_verlet_mcmc2(q,v_q,ind_L,beta:float,gaussian:bool,V,gradV,T:int,delta_t,grad_V_q=None,L:int=1,
-kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,alpha_p:float=0.1,prop_d=0.1,FT=False,dt_max=None,dt_min=None,sig_dt=0.015,
-verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
-    """ Simple implementation of Hamiltonian dynanimcs MCMC 
-
-    Args:
-        q (_type_): _description_
-        p (_type_): _description_
-        beta (_type_): _description_
-        gaussian (_type_): _description_
-        V (_type_): _description_
-        gradV (_type_): _description_
-        T (_type_): _description_
-        delta_t (_type_): _description_
-        kappa_opt (bool, optional): _description_. Defaults to True.
-        save_H (bool, optional): _description_. Defaults to True.
-        save_Q (bool, optional): _description_. Defaults to True.
-        save_func (_type_, optional): _description_. Defaults to None.
-        alpha_p 
-
-    Returns:
-        _type_: _description_
-    """
-    acc  = 0
-    T_max=T
-    if scale_M is None:
-        scale_M=1
-        sqrt_M=1
-    else:
-        sqrt_M = torch.sqrt(scale_M) 
-    p=sqrt_M*torch.randn_like(q)
-    if FT:
-        
-        maha_dist = lambda x,y: ((1/scale_M)*(x-y)**2).sum(1)
-        ones_L=torch.ones_like(ind_L)
-    (N,d)=q.shape
-    o_old=q+q**2
-    mu_old,sig_old=(o_old).mean(0),(o_old).std(0)
-    
-    U = beta*v_q +0.5*torch.sum(q**2,dim=1)
-    H_old=U+ torch.sum((1/scale_M)*p**2,dim=1)
-    nb_calls=0 #we reuse the potential value v_q of previous iteration
-    if save_H:
-        H_ = np.zeros(T+1)
-        H_[0]=H_old.mean()
-
-    if save_func is not None:
-        saved=[save_func(q,p)]
-    prod_correl=torch.ones(size=(d,),device=q.device)
-    i=0
-    while (prod_correl>alpha_p).sum()>=prop_d*d and i<T_max:
-        q_trial,p_trial,grad_calls,grad_V_q=verlet_kernel1(X=q,gradV=gradV,grad_V_q=grad_V_q, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
-        scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
-        
-        nb_calls+=2*grad_calls #counting each call to the gradient as 2 calls to the potential
-        v_trial=V(q_trial)
-        nb_calls+=N             # we compute the potential of the new particle                        
-        H_trial= Hamiltonian2(X=q_trial, p=p_trial,v_x=v_trial,beta=beta,gaussian=gaussian,scale_M=scale_M)
-
-        delta_H=torch.clamp(-(H_trial-H_old),max=0)          
-        if FT:
-            exp_weight=torch.exp(torch.clamp(delta_H,max=0))
-            m_distances= maha_dist(x=q,y=q_trial)/ind_L.float().to(device)
-            lambda_i=m_distances*exp_weight+1e-8*torch.ones_like(m_distances)
-            if lambda_i.isnan().any():
-                print(f"NaN values in lambda_i:")
-                print(lambda_i)
-            elif (lambda_i==0).sum()>0:
-                print(f"zero values in lambda_i")
-                print(f"lambda_i")
-                print(f"exp_weight:{exp_weight}")
-                print(f"m_distances:{m_distances}")
-                if (m_distances==0).sum()>0:
-                    print(f"q_trial:{q_trial}")
-                    print(f"q:{q}")
-                print(f"ind_L:{ind_L}")
-            
-            sel_ind=torch.multinomial(input=lambda_i,num_samples=N,replacement=True,)
-            delta_t = torch.clamp(delta_t[sel_ind]+sig_dt*torch.randn_like(delta_t),min=dt_min,max=dt_max,)
-            noise_L=torch.rand(size=(N,),device=ind_L.device)
-            ind_L= torch.clamp(ind_L[sel_ind]+((noise_L>=(2/3)).float()-(noise_L<=1/3).float())*ones_L,min=L_min,max=L+1e-3)
-        alpha=torch.rand(size=(N,),device=device)
-        accept=torch.exp(delta_H)>alpha
-        nb_accept=accept.sum().item()
-        acc+=nb_accept
-        if skip_mh:
-            q=q_trial
-            v_q=v_trial
-            nb_accept=N
-        else:
-            q=torch.where(accept.unsqueeze(-1),input=q_trial,other=q)
-            v_q=torch.where(accept,input=v_trial,other=v_q)
-        if nb_accept>0:
-            o_new=q+q**2
-            mu_new,sig_new=o_new.mean(0),o_new.std(0)
-            correl=((o_new-mu_new)*(o_old-mu_old)).mean(0)/(sig_old*sig_new)
-            prod_correl*=correl
-        p = torch.randn_like(q)
-        if scale_M is not None:
-            p = sqrt_M*p
-        H_old= Hamiltonian2(X=q, p=p,V=V,beta=beta,gaussian=gaussian,scale_M=scale_M)
-        if save_H:
-            H_[i+1] = H_old.mean()
-        if save_func is not None:
-            saved.append(save_func(q,p))
-        i+=1
-    if verbose:
-        print(f"T_final={i}")
-    dict_out={'acc_rate':acc/(i*N),'T_final':i}
-    if save_H:
-        dict_out['H']=H_
-    if save_func is not None:
-        dict_out['saved']=saved
-    if FT:
-        dict_out['dt']=delta_t
-        dict_out['ind_L']=ind_L
-    return q,v_q,grad_V_q,nb_calls,dict_out
 
 def get_imagenet_dict():
     json_path = Path(ROOT_DIR) / "data/ImageNet/imagenet-simple-labels.json"

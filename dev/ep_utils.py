@@ -101,7 +101,7 @@ def hamiltonian_ep(X,p,V,beta,scale_M=1,gaussian=True):
     H = U + 0.5*((1/scale_M)*p**2).sum(axis=1)
     return H
 
-def verlet_mcmc_ep(q,beta:float,gaussian:bool,V,gradV,T:int,delta_t, grad_V_q=None,L:int=1,
+def verlet_mcmc_ep(q,beta:float,gaussian:bool,V,gradV,T:int,delta_t, grad_v_q=None,L:int=1,
 kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussian_verlet=False,ind_L=None):
     """ Simple EagerPy implementation of hamiltonian_ep MCMC 
 
@@ -137,7 +137,7 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussia
     if save_func is not None:
         saved=[save_func(q,p)]
     for i  in range(T):
-        q_trial,p_trial,grad_calls,grad_V_q=verlet_kernel_ep(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=0,L=L,kappa_opt=kappa_opt,
+        q_trial,p_trial,grad_calls,grad_v_q=verlet_kernel_ep(X=q,gradV=gradV, p_0=p,delta_t=delta_t,beta=0,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M,ind_L=ind_L,GV=gaussian_verlet)
         nb_calls+=grad_calls
         H_trial= hamiltonian_ep(X=q_trial, p=p_trial,V=V,beta=beta,gaussian=gaussian)
@@ -167,10 +167,10 @@ kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,gaussia
         dict_out['saved']=saved
     v_q=V(q)
     nb_calls+=N
-    return q,v_q,grad_V_q,nb_calls,dict_out
+    return q,v_q,grad_v_q,nb_calls,dict_out
 
 def adapt_verlet_mcmc_ep(q,v_q,ind_L, beta:float,gaussian:bool,V,gradV,T:int,delta_t:float,
-        grad_V_q=None,L:int=1,kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,alpha_p:float=0.1,
+        grad_v_q=None,L:int=1,kappa_opt:bool=True,save_H=True,save_func=None,device='cpu',scale_M=None,alpha_p:float=0.1,
 prop_d=0.1,FT=False,dt_max=None,dt_min=None,sig_dt=0.015,
 verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     """ Simple implementation of hamiltonian_ep dynanimcs MCMC 
@@ -221,7 +221,7 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     i=0
  
     while (prod_correl>alpha_p).sum().item()>=prop_d*d and i<T_max:
-        q_trial,p_trial,grad_calls,grad_V_q=verlet_kernel_ep(X=q,gradV=gradV,grad_V_q=grad_V_q, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
+        q_trial,p_trial,grad_calls,grad_v_q=verlet_kernel_ep(X=q,gradV=gradV,grad_v_q=grad_v_q, p_0=p,delta_t=delta_t,beta=beta,L=L,kappa_opt=kappa_opt,
         scale_M=scale_M, ind_L=ind_L,GV=gaussian_verlet)
         
         nb_calls+=2*grad_calls # counting gradient calls as 2 potential calls
@@ -297,9 +297,9 @@ verbose=0,L_min=1,gaussian_verlet=False,skip_mh=False):
     v_q= V(q)
     #no new potential computation (already done in the computation of H_new)
     
-    return q,v_q,grad_V_q,nb_calls,dict_out
+    return q,v_q,grad_v_q,nb_calls,dict_out
 
-def verlet_kernel_ep(X, gradV, delta_t, beta,L,grad_V_q=None,
+def verlet_kernel_ep(X, gradV, delta_t, beta,L,grad_v_q=None,
     ind_L=None,p_0=None,lambda_=0, gaussian=True,kappa_opt=False,scale_M=None,GV=False):
     """ HMC (L>1) / Underdamped-Langevin (L=1) kernel with Verlet integration (a.k.a. Leapfrog scheme)
 
@@ -324,8 +324,8 @@ def verlet_kernel_ep(X, gradV, delta_t, beta,L,grad_V_q=None,
         kappa=q_t.ones_like()
     k=1
     i_k=(ind_L>=k)
-    if not GV and grad_V_q is None:
-        grad_V_q = gradV(q_t)
+    if not GV and grad_v_q is None:
+        grad_v_q = gradV(q_t)
         grad_calls+=2*nb_particles
     while (i_k).sum()>0:
         #I. Verlet scheme
@@ -334,7 +334,7 @@ def verlet_kernel_ep(X, gradV, delta_t, beta,L,grad_V_q=None,
         i_k_ep = (p_t.from_numpy(i_k)).reshape((-1,1))
         if not GV:
             #TODO /!\ find a way to compute gradient only for p_t[i_k] as in PyTorch implementation
-            p_t = i_k_ep.where(p_t-0.5*beta*delta_t*grad_V_q,p_t)
+            p_t = i_k_ep.where(p_t-0.5*beta*delta_t*grad_v_q,p_t)
         
         p_t =  i_k_ep.where(p_t- 0.5*delta_t*kappa*q_t,p_t)
         if p_t.isnan().any():
@@ -344,16 +344,16 @@ def verlet_kernel_ep(X, gradV, delta_t, beta,L,grad_V_q=None,
         assert not q_t.isnan().any(),"Nan values detected in q"
         #updating momentum again
         if not GV:
-            grad_V_q = gradV(q_t)
+            grad_v_q = gradV(q_t)
             grad_calls+=2*nb_particles
-            p_t = i_k_ep.where(p_t-0.5*beta*delta_t*grad_V_q,p_t)
+            p_t = i_k_ep.where(p_t-0.5*beta*delta_t*grad_v_q,p_t)
         p_t = i_k_ep.where(p_t- 0.5*delta_t*kappa*q_t,p_t)
         #II. Optional smoothing of momentum memory
         p_t = i_k_ep.where(ep.exp(-lambda_*delta_t)*p_t,p_t)
         del i_k_ep
         k+=1
         i_k=ind_L>=k
-    return q_t,p_t, grad_calls, grad_V_q
+    return q_t,p_t, grad_calls, grad_v_q
 
 norm_dist_dic = {ep.TensorFlowTensor: norm_dist_tf,ep.PyTorchTensor: norm_dist_pyt}
 compute_grad_dic = {ep.TensorFlowTensor: compute_V_grad_tf2, ep.PyTorchTensor: compute_V_grad_pyt }
@@ -361,8 +361,8 @@ compute_V_dic = {ep.TensorFlowTensor: compute_V_tf2, ep.PyTorchTensor: compute_V
 compute_h_dic = {ep.TensorFlowTensor: compute_h_tf, ep.PyTorchTensor: compute_h_pyt }
 
 def gradV_ep(x_:ep.Tensor,model,target_class,input_shape,low:ep.Tensor,high:ep.Tensor
-,gaussian_latent=True,reshape=True,gaussian_prior=False) -> ep.Tensor:
-    if gaussian_latent and not gaussian_prior:
+,from_gaussian=True,reshape=True,gaussian_prior=False) -> ep.Tensor:
+    if from_gaussian and not gaussian_prior:
         norm_dist=norm_dist_dic[type(x_)](loc=0.,scale=1.)
         u=ep.astensor(norm_dist.cdf(x_.raw))
     else:
@@ -377,14 +377,14 @@ def gradV_ep(x_:ep.Tensor,model,target_class,input_shape,low:ep.Tensor,high:ep.T
     _,grad_x_p = compute_grad_dic[type(x_)](model=model,input_=x_p.raw,target_class=target_class)
     grad_x_p = ep.astensor(grad_x_p)
     grad_u=ep.reshape(grad_x_p,x_.shape) if gaussian_prior else ep.reshape((high-low)*grad_x_p,x_.shape)
-    if gaussian_latent and not gaussian_prior:
+    if from_gaussian and not gaussian_prior:
         grad_x=ep.exp(ep.astensor(norm_dist.log_prob(x_.raw)))*grad_u
     else:
         grad_x=grad_u
     return grad_x
 
-def V_ep(x_,model,target_class,input_shape,low,high,gaussian_latent=True,reshape=True,gaussian_prior=False) -> ep.Tensor:
-    if gaussian_latent:
+def V_ep(x_,model,target_class,input_shape,low,high,from_gaussian=True,reshape=True,gaussian_prior=False) -> ep.Tensor:
+    if from_gaussian:
         norm_dist=norm_dist_dic[type(x_)](loc=0.,scale=1.)
         u=apply_native_to_ep(f=norm_dist.cdf, x=x_)
     else:

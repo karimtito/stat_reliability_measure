@@ -313,11 +313,11 @@ def compute_h_pyt(model, input_, target_class):
 
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 
-def V_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None):
+def V_pyt(x_,x_0,model,target_class,low,high,from_gaussian=True,reshape=True,input_shape=None):
     with torch.no_grad():
         if input_shape is None:
             input_shape=x_0.shape
-        if gaussian_latent:
+        if from_gaussian:
             u=normal_dist.cdf(x_)
         else:
             u=x_
@@ -329,11 +329,11 @@ def V_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,i
     v = compute_V_pyt(model=model,input_=x_p,target_class=target_class)
     return v
 
-def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=True,input_shape=None,gaussian_prior=False):
+def gradV_pyt(x_,x_0,model,target_class,low,high,from_gaussian=True,reshape=True,input_shape=None,gaussian_prior=False):
    
     if input_shape is None:
         input_shape=x_0.shape
-    if gaussian_latent and not gaussian_prior:
+    if from_gaussian and not gaussian_prior:
         u=normal_dist.cdf(x_)
     else:
         u=x_
@@ -346,7 +346,7 @@ def gradV_pyt(x_,x_0,model,target_class,low,high,gaussian_latent=True,reshape=Tr
         x_p=torch.min(x_p,high.view(high.size()+(1,1)))
     _,grad_x_p = compute_V_grad_pyt(model=model,input_=x_p,target_class=target_class)
     grad_u=torch.reshape(grad_x_p,x_.shape) if gaussian_prior else torch.reshape((high-low)*grad_x_p,x_.shape)
-    if gaussian_latent and not gaussian_prior:
+    if from_gaussian and not gaussian_prior:
         grad_x=torch.exp(normal_dist.log_prob(x_))*grad_u
     else:
         grad_x=grad_u
