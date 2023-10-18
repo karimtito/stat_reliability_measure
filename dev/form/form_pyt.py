@@ -3,6 +3,60 @@ from stat_reliability_measure.dev.torch_utils import NormalCDFLayer
 from math import sqrt
 import torch
 
+def latent_attack_pyt(x_clean,y_clean,model,noise_dist='uniform',
+                      attack = 'Carlini',num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1,
+                        sigma=1.,x_min=0.,x_max=1., random_init=False , sigma_init=0.5,**kwargs):
+    """ Performs an attack on the latent space of the model."""
+    device= x_clean.device
+    if max_dist is None:
+        max_dist = sqrt(x_clean.numel())*sigma
+    if attack.lower() in ('carlini','cw','carlini-wagner','carliniwagner','carlini_wagner','carlini_wagner_l2'):
+        attack = 'Carlini'
+        assert (x_clean is not None) and (y_clean is not None), "x_clean and y_clean must be provided for Carlini-Wagner attack"
+        assert (model is not None), "model must be provided for Carlini-Wagner attack"
+        import foolbox as fb
+        attack = fb.attacks.L2CarliniWagnerAttack(binary_search_steps=num_iter, 
+                                          stepsize=stepsize,
+                                        
+                                          steps=steps,)
+    elif attack.lower() in ('brendel','brendel-bethge','brendel_bethge'):
+        attack = 'Brendel'
+        import foolbox as fb
+        attack = fb.attacks.L2BrendelBethgeAttack(binary_search_steps=num_iter,
+        lr=stepsize, steps=steps,)
+    else:
+        raise NotImplementedError(f"Search method '{attack}' is not implemented.")
+    if noise_dist.lower() in ('gaussian','normal'):
+        
+        fmodel=fb.models.PyTorchModel(model, bounds=(x_min, x_max),device=device)
+        if not random_init:
+            x_0 = x_clean
+        else:
+            print(f"Random init with sigma_init={sigma_init}")
+            x_0 = x_clean + sigma_init*torch.randn_like(x_clean)
+        
+        _,advs,success= attack(fmodel, x_0[:1], y_clean.unsqueeze(0), epsilons=[max_dist])
+        assert success.item(), "The attack failed. Try to increase the number of iterations or steps."
+        design_point= advs[0]-x_clean
+        del advs
+    elif noise_dist.lower() in ('uniform','unif'):
+        normal_cdf_layer = NormalCDFLayer(device=device, offset=x_clean,epsilon =epsilon)
+        fake_bounds=(-10.,10.)
+        total_model = torch.nn.Sequential(normal_cdf_layer, model)
+        if not random_init:
+            x_0 = torch.zeros_like(x_clean)
+        else:
+            print(f"Random init with sigma_init={sigma_init}")
+            x_0 = sigma_init*torch.randn_like(x_clean)
+        total_model.eval()
+        fmodel=fb.models.PyTorchModel(total_model, bounds=fake_bounds,
+                device=device, )
+        _,advs,success= attack(fmodel,x_0[:1] , y_clean.unsqueeze(0), epsilons=[max_dist])
+        design_point= advs[0]
+        del advs 
+
+    return design_point                
+
 def FORM_pyt(x_clean,y_clean,model,noise_dist='uniform',
              search_method='Carlini',
              num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1,

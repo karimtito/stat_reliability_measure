@@ -120,6 +120,7 @@ exp_rate=1.):
         ind_L_Y = ind_L[(ind_[0:K]).to(ind_L.device)]
         dt_Y = dt[ind_[0:K]]
         Lambda_Y = Lambda[ind_[0:K]]
+        
         if gradient_use:
             grad_VY = grad_VX[ind_[0:K]] if gradient_use else None
         # step D: refresh samples
@@ -160,9 +161,9 @@ exp_rate=1.):
                     
                     if verbose>=1.5:
                         print(f"New dt mean:{dt.mean().item()}, dt std:{dt.std().item()}")
-                        print(f"New L mean: {ind_L.mean().item()}, L std:{ind_L.std().item()}")
+                        print(f"New L mean: {ind_L.mean().item()}, L std:,{ind_L.std().item()}")
         else:
-            Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,grad_v_q=grad_VZ,beta=beta_j,
+            Z,VZ,grad_VZ,nb_calls,dict_out=gibbs_kernel(q=Z,v_q=VZ,grad_v_q=grad_VZ,beta=beta_j,
                                 gaussian=gaussian,ind_L=ind_L_Z,
                                 V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_Z,
                                 device=device,save_H=track_H,save_func=None,

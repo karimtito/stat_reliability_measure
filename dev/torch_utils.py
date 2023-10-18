@@ -188,9 +188,12 @@ gaussian=True,scale_M=None,GV=False):
     
     grad_q=lambda p,dt:dt*(p.data)
     
-    if not GV and grad_v_q is None:
+    if not GV and (grad_v_q is None or v_q is None):
+        
         grad_v_q,v_q=gradV(q_t)
+
         grad_calls+=X.shape[0]
+    
     k=1
     i_k=ind_L>=k
     assert i_k.sum().item() == X.shape[0] # all samples are in the first iteration of the Verlet scheme
@@ -209,6 +212,7 @@ gaussian=True,scale_M=None,GV=False):
         q_t.data[i_k] = (q_t[i_k] + grad_q(p_t[i_k],delta_t[i_k]))
         #assert not q_t.isnan().any(),"Nan values detected in q"
         #updating momentum again
+       
         if not GV:
             grad_v_q.data[i_k],v_q.data[i_k]=gradV(q_t[i_k])
             grad_calls+=i_k.sum().item()
@@ -254,7 +258,7 @@ def verlet_kernel_kappa_opt(X, gradV, delta_t, beta,L, grad_v_q=None,v_q=None,
         #computing half-point momentum
         #p_t.data = p_t-0.5*dt*gradV(X).detach() / norms(gradV(X).detach())
         if not GV:
-            p_t.data[i_k] = p_t[i_k]-0.5*beta*delta_t[i_k]*kappa[i_k]*grad_v_q
+            p_t.data[i_k] = p_t[i_k]-0.5*beta*delta_t[i_k]*kappa[i_k]*grad_v_q[i_k]
         
         p_t.data[i_k] -= 0.5*delta_t[i_k]*kappa[i_k]*q_t.data[i_k]
         #updating position
@@ -262,9 +266,9 @@ def verlet_kernel_kappa_opt(X, gradV, delta_t, beta,L, grad_v_q=None,v_q=None,
         q_t.data[i_k] = (q_t[i_k] + grad_q(p_t[i_k],delta_t[i_k]))
         #updating momentum again
         if not GV:
-            grad_v_q,v_q=gradV(q_t[i_k])
+            grad_v_q.data[i_k],v_q.data[i_k]=gradV(q_t[i_k])
             grad_calls+=i_k.sum().item()
-            p_t.data[i_k] = p_t[i_k] -0.5*beta*kappa[i_k]*delta_t[i_k]*grad_v_q
+            p_t.data[i_k] = p_t[i_k] -0.5*beta*kappa[i_k]*delta_t[i_k]*grad_v_q[i_k]
         p_t.data[i_k] -= 0.5*kappa[i_k]*delta_t[i_k]*q_t.data[i_k]
         #II. Optional smoothing of momentum memory
         p_t.data[i_k] = torch.exp(-lambda_*delta_t[i_k])*p_t[i_k]
@@ -294,7 +298,14 @@ def compute_V_grad_pyt(model, input_, target_class,L=0):
     grad=torch.autograd.grad(outputs=v,inputs=input_,grad_outputs=torch.ones_like(v),retain_graph=False)[0]
     return v.detach(),grad.detach()
 
-
+def compute_h_grad_pyt(model, input_, target_class,L=0):
+    """ Returns potentials and associated gradients for given inputs, model and target classes """
+    if input_.requires_grad!=True:
+        input_.requires_grad=True
+    #input_.retain_grad()
+    s=score_function(X=input_,y_clean=target_class,model=model)
+    grad=torch.autograd.grad(outputs=s,inputs=input_,grad_outputs=torch.ones_like(s),retain_graph=False)[0]
+    return s.detach(),grad.detach()
 
 def compute_V_pyt2(model, input_, target_class,L=0):
     """Return potentials for given inputs, model and target classes"""
@@ -343,6 +354,31 @@ def h_pyt(x_,x_clean,model,target_class,low,high,from_gaussian=True,reshape=True
             x_p=torch.minimum(x_p,high.view(high.size()+(1,1)))
     h = compute_h_pyt(model=model,input_=x_p,target_class=target_class)
     return h
+
+def gradh_pyt(x_,x_clean,model,target_class,low,high,from_gaussian=True,reshape=True,input_shape=None, noise_dist='gaussian',
+              noise_scale=1.0,):
+    gaussian_prior=noise_dist=='gaussian' or noise_dist=='normal'
+    if input_shape is None:
+        input_shape=x_clean.shape
+    if from_gaussian and not gaussian_prior:
+        u=normal_dist.cdf(x_)
+    else:
+        u=x_
+    if reshape:
+        u=torch.reshape(u,(u.shape[0],)+input_shape)
+    
+    x_p = u if gaussian_prior else low+(high-low)*u 
+    if gaussian_prior:
+        x_p=torch.maximum(x_p,low.view(low.size()+(1,1)))
+        x_p=torch.minimum(x_p,high.view(high.size()+(1,1)))
+    h,grad_x_p = compute_h_grad_pyt(model=model,input_=x_p,target_class=target_class)
+    grad_u=torch.reshape(grad_x_p,x_.shape) if gaussian_prior else torch.reshape((high-low)*grad_x_p,x_.shape)
+    with torch.no_grad():
+        if from_gaussian and not gaussian_prior:
+            grad_x=torch.exp(normal_dist.log_prob(x_))*grad_u
+        else:
+            grad_x=grad_u*noise_scale
+    return grad_x.detach(),h.detach()
 
 normal_dist=torch.distributions.Normal(loc=0, scale=1.)
 def gaussian_to_image(gaussian_sample,low,high,input_shape=(28,28)):
@@ -522,11 +558,13 @@ def build_h_cos(p_target, device, dim=2,verbose=0):
 def build_gradh_cos(p_target, device, dim=2,verbose=0):
     """ builds gradient function of a cosinus score with parameters p_target"""
     c = stat.f.isf(p_target, 1, dim-1)
+    
     q = np.sqrt(c/(dim-1+c))
     e_1 = torch.Tensor([1.]+[0]*(dim-1)).to(device)
     def gradh(X):
+        h_ = X[:,0] - q*X.norm(dim=1)
         grad_value=e_1.unsqueeze(0)-q*X/X.norm(dim=1)[:,None]
-        return grad_value.detach()
+        return grad_value.detach(),h_.detach()
     return gradh,q
 
 def build_V_cos(p_target, device, dim=2,verbose=0):
@@ -630,6 +668,7 @@ def build_gradh_quad(p_target, device, dim=2, dv=0.4,a=.1, verbose=0):
     """ builds the gradient of a sigmoid score function with parameters r0,a,dv"""
     r0 = np.sqrt(stat.chi2.isf(p_target, dim))
     def gradh(X):
+        h_ = X[:,:dim-1].square().sum(1) +sig(X.square().sum(1),r0)*X[:,dim-1]**2-r0**2
         X_1,X_d = torch.zeros_like(X), torch.zeros_like(X)
         X_1[:,:dim-1] = X[:,:dim-1]
         X_1[:,dim-1] = 0.
@@ -640,7 +679,7 @@ def build_gradh_quad(p_target, device, dim=2, dv=0.4,a=.1, verbose=0):
         grad_h += 2*(1-a)*(2/dv)*(X[:,dim-1]**2).unsqueeze(-1)*grad_sigma((X.square().sum(1)-r0**2)/dv)[:,None]*X
         grad_h += 4*(1-a)*sigma((X.square().sum(1)-r0**2)/dv).unsqueeze(-1)*X_d
         del X_1,X_d
-        return grad_h.detach()
+        return grad_h.detach(),h_.detach()
     return gradh
 
 def build_V_quad(p_target, device,dim=2 ,verbose=0,a=.1,dv=0.4):
@@ -681,7 +720,9 @@ def build_gradh_lin(p_target,device, dim=2, verbose=0):
     c = stat.norm.isf(p_target)
     e_1 = torch.Tensor([1.]+[0]*(dim-1)).to(device)
     def gradh(X):
-        return (e_1.unsqueeze(0)*torch.ones_like(X)).detach(),
+        gradh = (e_1.unsqueeze(0)*torch.ones_like(X))
+        h_ = X[:,0]-c
+        return (e_1.unsqueeze(0)*torch.ones_like(X)).detach(),h_.detach()
     return gradh,c
 
 def build_V_lin(p_target, device,dim=2, verbose=0):
@@ -701,8 +742,12 @@ def build_gradV_lin(p_target,device, verbose=0,dim=2,):
     e_1 = torch.Tensor([1.]+[0]*(dim-1)).to(device)
     def gradV(X):
         v = torch.clamp(input=c-X[:,0], min=0, max=None)
-        return (-e_1*(v>0)[:,None]).detach(),v.detach()
+        gradv= (-e_1*(v>0)[:,None])
+        return gradv.detach(),v.detach()
     return gradV,c
+
+
+
 
 def get_correct_x_y(data_loader,device,model):
     for X,y in data_loader:
@@ -1351,7 +1396,8 @@ grad_calls_mult=2.,save_T=True):
     i=0
     #torch.multinomial(input=)
     while (prod_correl>alpha_p).sum()>=prop_d*d and i<T_max:
-        q_trial,p_trial,grad_calls,grad_v_q_trial,v_q_trial=verlet_mixer(X=q,gradV=gradV,grad_v_q=grad_v_q, p_0=p,delta_t=delta_t,beta=beta,
+        q_trial,p_trial,grad_calls,grad_v_q_trial,v_q_trial=verlet_mixer(X=q,v_q=v_q,gradV=gradV,grad_v_q=grad_v_q, 
+        p_0=p,delta_t=delta_t,beta=beta,
         L=L, ind_L=ind_L,GV=gaussian_verlet)
         
         nb_calls+= grad_calls_mult*grad_calls

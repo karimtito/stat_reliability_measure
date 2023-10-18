@@ -12,6 +12,8 @@ from stat_reliability_measure.dev.utils import get_sel_df, simple_vars, range_va
 import stat_reliability_measure.dev.mls.amls_uniform as amls_mls
 from stat_reliability_measure.dev.amls.amls_config import MLS_SMC_Config
 import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
+from stat_reliability_measure.dev.imp_sampling.is_pyt import GaussianIS
+from stat_reliability_measure.dev.imp_sampling.is_config import IS_Config
 import stat_reliability_measure.dev.mls.amls_uniform as amls_webb
 from stat_reliability_measure.dev.mls.webb_config import MLS_Webb_Config
 from stat_reliability_measure.dev.form.form_pyt import FORM_pyt as FORM_pyt
@@ -25,11 +27,10 @@ from stat_reliability_measure.dev.hmls.hmls_pyt import HybridMLS
 from stat_reliability_measure.config import ExpModelConfig
 from itertools import product as cartesian_product
 
-
-
 method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,
                     'mls_webb':MLS_Webb_Config,
-                    'hmls':HMLS_Config,
+                    'hmls':HMLS_Config,'importance_sampling':IS_Config,
+                    'imp_samp':IS_Config,'is':IS_Config,
                     'mala':SMCSamplerConfig,'amls_batch':MLS_SMC_Config,
                     'mc':CrudeMC_Config,'crudemc':CrudeMC_Config,'crude_mc':CrudeMC_Config,
                     'form':FORM_config,'rw_smc':SMCSamplerConfig,
@@ -38,7 +39,8 @@ method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,
                     'hmc':SMCSamplerConfig,'smc':SMCSamplerConfig,}
 method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,
                   'rw_smc':SamplerSMC,
-                  'hmls':HybridMLS,
+                  'hmls':HybridMLS,'importance_sampling':GaussianIS,
+                  'imp_samp':GaussianIS,
                   'mc':MC_pf,'crudemc':MC_pf,'crude_mc':MC_pf, 
                   'amls_webb': amls_webb.multilevel_uniform,'form':FORM_pyt,
                   'mls_webb':amls_webb.multilevel_uniform,
@@ -48,9 +50,9 @@ method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,
 
 def run_est(model, X, y, method='amls_webb', epsilon_range=[], 
                      noise_dist='uniform',dataset_name = 'dataset',
-                 model_name='model', 
+                 model_name='model', plot_errorbar=True,
                  verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None,
-                 mask_cond=None,p_ref=None,
+                 mask_cond=None,p_ref=None, nb_points_errorbar=100,
                  log_hist_=True, aggr_res_path='',batch_opt=False,
                  log_txt_=True,exp_config=None,method_config=None,
                  smc_multi=False,**kwargs):
@@ -65,6 +67,7 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
     if mask_opt: 
         assert (mask_idx is not None) or (mask_cond is not None), "if using masking option, either 'mask_idx' or 'mask_cond' should be given"
     if method_config is None:
+
         method_config = method_config_dict[method]()
     if exp_config is None:
         exp_config=ExpModelConfig(model=model,X=X,y=y,
@@ -140,6 +143,7 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
     track_accept = hasattr(method_config,'track_accept') and method_config.track_accept
     track_beta = hasattr(method_config,'track_beta') and method_config.track_beta
     track_dt = hasattr(method_config,'track_dt') and method_config.track_dt
+    track_advs= hasattr(method_config,'track_advs') and method_config.track_advs
     first_iter=True
     for l in range(exp_config.input_start, exp_config.input_stop):
         with torch.no_grad():
@@ -201,6 +205,8 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
 
                                     if len(same_exp_df)>0:
                                         print(f"Skipping {method_config.method_name} run {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+clean_method_args_str)
+                                        p_est = same_exp_df['mean_est'].iloc[0]
+                                        std_est = same_exp_df['std_est'].iloc[0]
                                         continue
                                 except KeyError:
                                     if exp_config.verbose>=1:
@@ -348,6 +354,21 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
     
                 times=np.array(times)
                 ests = np.array(ests)
+
+                if plot_errorbar:
+                    if nb_points_errorbar>exp_config.n_rep:
+                        nb_points_errorbar=exp_config.n_rep
+                    if nb_points_errorbar>1:
+                        errorbar_idx = np.linspace(start=0,stop=exp_config.n_rep-1,num=nb_points_errorbar,dtype=int)
+                    else:
+                        errorbar_idx=[0]
+                    ests_errorbar = ests[errorbar_idx]
+                    plt.figure(figsize=(21,13))
+
+                    times_errorbar = times[errorbar_idx]
+                    
+
+
                 log_ests=np.array(log_ests)
                 mean_est=ests.mean()
                 calls=np.array(calls)
@@ -395,6 +416,10 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                     
 
                 std_log_est=log_ests.std()
+
+               
+                    
+
                 mean_log_est=log_ests.mean()
                 lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                 lg_est_path=os.path.join(log_path,'lg_ests.txt')
@@ -463,9 +488,8 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
 
     if len(results_df)>0:
         p_est = results_df['mean_est'].mean()
-    else:
-        p_est = None
-    dict_out = {'results_df':results_df,'agg_res_df':agg_res_df,
+        std_est = results_df['std_est'].mean()
+    dict_out = {'results_df':results_df,'agg_res_df':agg_res_df,'std_est':std_est,
                 'method_config':method_config, 'exp_config':exp_config}
     if track_X: 
         dict_out['X_list']=X_list

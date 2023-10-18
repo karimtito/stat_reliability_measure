@@ -3,8 +3,8 @@ from stat_reliability_measure.config import SamplerConfig
 import numpy as np
 import torch
 
-class IS_CONFIG(SamplerConfig):
-    default_dict = { 'config_name': "IS",
+class IS_Config(SamplerConfig):
+    default_dict = { 'config_name': "ISconfig",
         'method_name': "IS",
         'requires_gen':True,
         'requires_h':True,
@@ -13,6 +13,13 @@ class IS_CONFIG(SamplerConfig):
         'batch_size':100,
         'batch_size_range':[],
         'track_advs':False,
+        'alpha_CI':0.05,
+        'sigma_bias':1.,
+        'zero_latent':None,
+        'requires_gradG':False,
+        'requires_model':False,
+        'requires_x_clean':False,
+        
         
        }
   

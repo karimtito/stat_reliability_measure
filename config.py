@@ -82,7 +82,7 @@ class Config:
     
     def print_config(self):
  
-        print(f"{self.config_name} configuration: /n {self}")
+        print(f"{self.config_name} configuration: \n {self}")
 
     def to_json(self,path=None):
         if path is not None:
@@ -226,6 +226,9 @@ class ExpToyConfig(ExpConfig):
         self.gradV,_ = gradV_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
         self.h,self.thresh = score_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
         self.grad_h = grad_score_functions[self.score_name](p_target=self.p_target, device=self.device, dim=self.dim, verbose=self.verbose)
+        self.G = lambda x: -self.h(x)
+        self.gradG = lambda x: -self.grad_h(x)
+        
         return 
     
     
@@ -357,9 +360,20 @@ class ExpModelConfig(ExpConfig):
         self.x_clean=self.X[0]
         self.input_shape = self.x_clean.shape
         self.y_clean=self.y[0]
+        if self.noise_dist in ('gaussian','normal'):
+            self.normal_cdf_layer = torch.nn.Identity()
+        elif self.noise_dist=='uniform':
+            self.normal_cdf_layer = t_u.NormalCDFLayer(offset=self.x_clean, 
+            epsilon=self.epsilon, 
+            x_min=self.x_min,x_max=self.x_max,device=self.device)
 
     def update(self, method_name=''):
         """ """
+        if self.noise_dist=='uniform':
+            self.normal_cdf_layer = t_u.NormalCDFLayer(offset=self.x_clean, 
+            epsilon=self.epsilon, 
+            x_min=self.x_min,x_max=self.x_max,device=self.device)
+        
         self.method_name = method_name
         raw_logs_path=os.path.join(self.log_dir,'raw_logs/'+method_name)
         if not os.path.exists(raw_logs_path):
@@ -429,6 +443,20 @@ class ExpModelConfig(ExpConfig):
         return t_u.h_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
                 ,from_gaussian=self.from_gaussian,noise_dist=self.noise_dist,
                 noise_scale=self.noise_scale)
+    
+    def gradh(self,X):
+        return t_u.gradh_pyt(X,self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
+                ,from_gaussian=self.from_gaussian,noise_dist=self.noise_dist,
+                noise_scale=self.noise_scale)
+    
+    def G(self,X):
+        return -self.h(X)
+    
+    def gradG(self,X):
+        gradh_X, h_X = self.gradh(X)
+        return -gradh_X, -h_X
+                             
+
     def V(self,X):
         return t_u.V_pyt(X,self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
                 ,from_gaussian=self.from_gaussian,noise_dist=self.noise_dist,
