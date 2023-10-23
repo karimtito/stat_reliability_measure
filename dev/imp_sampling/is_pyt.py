@@ -110,7 +110,16 @@ def GaussianIS(x_clean,gen,h,N:int=int(1e4),batch_size:int=int(1e3),track_advs:b
             debug=verbose>=1
             X_mpp,nb_calls_mpp=mpp_search(zero_latent=zero_latent, 
                         grad_f= gradG,stop_cond_type='beta',
-                        max_iter=5,stop_eps=1E-2,debug=debug) 
+                        max_iter=5,stop_eps=1E-2,debug=debug,**kwargs) 
+        elif search_method=='gradient_binary_search':
+            assert gradG is not None, "gradG must be provided for gradient_binary_search"
+            assert G is not None, "G must be provided for gradient_binary_search"
+            X_mpp=gradient_binary_search(zero_latent=zero_latent,gradG=gradG, G=G)
+        elif search_method.lower() in ['carlini','carlini-wagner','cw','carlini_wagner','carlini_wagner_l2']:
+            assert (model is not None), "model must be provided for Carlini-Wagner attack"
+            X_mpp= latent_attack_pyt(x_clean=x_clean,y_clean=None,model=model,noise_dist='uniform',
+                      attack = search_method,num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1,
+                        sigma=1.,x_min=0.,x_max=1., random_init=False , sigma_init=0.5,**kwargs)
     else:
         assert nb_calls_mpp>0, "nb_calls_mpp must be provided if X_mpp is provided" 
     if batch_size>N:
@@ -218,7 +227,7 @@ def latent_attack_pyt(x_clean,y_clean,model,noise_dist='uniform',
     return design_point   
 
 
-def gradient_binary_search(zero_latent,gradG, num_iter=20):
+def gradient_binary_search(zero_latent,gradG, G,num_iter=20):
     """ Binary search algorithm to find the failure point in the direction of the gradient of the limit state function.
 
     Args:

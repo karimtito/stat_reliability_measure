@@ -6,6 +6,7 @@ import torch
 class IS_Config(SamplerConfig):
     default_dict = { 'config_name': "ISconfig",
         'method_name': "IS",
+
         'requires_gen':True,
         'requires_h':True,
         'N':1000,
@@ -16,9 +17,12 @@ class IS_Config(SamplerConfig):
         'alpha_CI':0.05,
         'sigma_bias':1.,
         'zero_latent':None,
-        'requires_gradG':False,
-        'requires_model':False,
-        'requires_x_clean':False,
+        'requires_gradG':True,
+        'requires_G':True,
+        'requires_model':True,
+        'requires_x_clean':True,
+        'search_method':'mpp_search',
+
         
         
        }
