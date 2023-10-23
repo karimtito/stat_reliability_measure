@@ -32,7 +32,7 @@ alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_
        Returns:
          P_est: estimated probability
          s_out: a dictionary containing additional data
-           -s_out['Var_est']: estimated variance
+           -s_out['var_est']: estimated variance
            -s_out['CI_est']: estimated confidence of interval
            -s_out['Xrare']: Examples of the rare event 
            -s_out['result']: Result of the estimation/hypothesis testing process
@@ -53,7 +53,7 @@ alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_
         raise AssertionError(f"Confidence level requires more than n_max={n_max} iterations... increase n_max ?")
     tau_j = -np.inf
     P_est = 0
-    Var_est = 0
+    var_est = 0
     CI_est = np.zeros((2))
     kernel_pass=0
     Count_accept = 0
@@ -125,14 +125,14 @@ alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_
     
     
     if tau_j>tau:
-        Var_est = P_est**2*(P_est**(-1/N)-1)    
+        var_est = P_est**2*(P_est**(-1/N)-1)    
         CI_est[0] = P_est*np.exp(-q/np.sqrt(N)*np.sqrt(-np.log(P_est)+(q**2)/4/N) - (q**2)/2/N)
         CI_est[1] = P_est*np.exp(q/np.sqrt(N)*np.sqrt(-np.log(P_est)+(q**2)/4/N) - (q**2)/2/N)
-        s_out = {'Var_est':Var_est,'CI_est':CI_est,'Iter':k,'Calls':Count_h,'Sample size':N}
+        s_out = {'var_est':var_est,'CI_est':CI_est,'Iter':k,'Calls':Count_h,'Sample size':N}
         s_out['Cert']=False    
         s_out['Xrare'] = X
     else:
-        s_out = {'Var_est':None, 'CI_est':[0,p_c],'Iter':k,'Calls':Count_h,'Sample size':N}
+        s_out = {'var_est':None, 'CI_est':[0,p_c],'Iter':k,'Calls':Count_h,'Sample size':N}
         P_est = p_c
         s_out['Cert']=True 
         s_out['Xrare']= None
@@ -166,7 +166,7 @@ alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_
        Returns:
          P_est: estimated probability
          s_out: a dictionary containing additional data
-           -s_out['Var_est']: estimated variance
+           -s_out['var_est']: estimated variance
            -s_out['CI_est']: estimated confidence of interval
            -s_out['Xrare']: Examples of the rare event 
            -s_out['result']: Result of the estimation/hypothesis testing process
@@ -294,15 +294,15 @@ alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_
     
     if is_done.sum()>0:
         P_est = p**(done_k-1)*is_done+(1-is_done)*p_c
-        Var_est = is_done*P_est**2*(P_est**(-1/N)-1)-(1-is_done)
+        var_est = is_done*P_est**2*(P_est**(-1/N)-1)-(1-is_done)
         CI_est = np.zeros((nb_system,2))
         CI_est[:,0] = is_done*(P_est*np.exp(-q/np.sqrt(N)*np.sqrt(-np.log(P_est)+(q**2)/4/N) - (q**2)/2/N))
         CI_est[:,1] = is_done*(P_est*np.exp(q/np.sqrt(N)*np.sqrt(-np.log(P_est)+(q**2)/4/N) - (q**2)/2/N)) + (1-is_done)*p_c
         cert_ = 1-is_done 
-        s_out ={'Var_est':Var_est,'CI_est':CI_est,'Iter':k,'Calls':Count_h,'Sample size':N,'Cert':cert_}
+        s_out ={'var_est':var_est,'CI_est':CI_est,'Iter':k,'Calls':Count_h,'Sample size':N,'Cert':cert_}
         s_out['Xrare'] = Xrare
     else:
-        s_out = {'Var_est': -np.ones(nb_system), 'CI_est':np.array(nb_system*[0,p_c]),'Iter':k,'Calls':Count_h,'Sample size':N} 
+        s_out = {'var_est': -np.ones(nb_system), 'CI_est':np.array(nb_system*[0,p_c]),'Iter':k,'Calls':Count_h,'Sample size':N} 
         s_out['Cert']= np.array([True]*nb_system)
         s_out['Xrare']= None
         P_est = np.array(nb_system*[p_c])
@@ -331,7 +331,7 @@ prog_thresh=0.01):
       Returns:
          P_est: estimated probability
          s_out: a dictionary containing additional data
-           -s_out['Var_est']: estimated variance
+           -s_out['var_est']: estimated variance
            -s_out.['CI_est']: estimated confidence of interval
            -s_out.['Xrare']: Examples of the rare event 
     """
@@ -428,11 +428,11 @@ prog_thresh=0.01):
     p = K/N
     p_last = K_last/N
     P_est = (p**(n-1))*p_last
-    Var_est = (P_est**2)*((n-1)*(1-p)/p + (1-p_last)/p_last)/N
+    var_est = (P_est**2)*((n-1)*(1-p)/p + (1-p_last)/p_last)/N
     P_bias = P_est*n*(1-p)/p/N
-    CI_est = P_est*np.array([1,1]) + q*np.sqrt(Var_est)*np.array([-1,1])
+    CI_est = P_est*np.array([1,1]) + q*np.sqrt(var_est)*np.array([-1,1])
     Xrare = X[(SX>=tau).reshape(-1),:]
-    s_out = {"Var_est":Var_est,"CI_est": CI_est,"N":N,"K":K,"s":s,"decay":decay,"T":T,"Count_h":Count_h,
+    s_out = {"var_est":var_est,"CI_est": CI_est,"N":N,"K":K,"s":s,"decay":decay,"T":T,"Count_h":Count_h,
     "P_bias":P_bias,"n":n,"Xrare":Xrare}
     if track_rejection:
         s_out["rejection_rates"]=np.array(rejection_rates)

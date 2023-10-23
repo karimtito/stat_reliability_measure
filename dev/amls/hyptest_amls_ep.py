@@ -32,7 +32,7 @@ alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_
        Returns:
          P_est: estimated probability
          s_out: a dictionary containing additional data
-           -s_out['Var_est']: estimated variance
+           -s_out['var_est']: estimated variance
            -s_out['CI_est']: estimated confidence of interval
            -s_out['Xrare']: Examples of the rare event 
            -s_out['result']: Result of the estimation/hypothesis testing process
@@ -53,7 +53,7 @@ alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_
         raise AssertionError(f"Confidence level requires more than n_max={n_max} iterations... increase n_max ?")
     tau_j = -np.inf
     P_est = 0
-    Var_est = 0
+    var_est = 0
     CI_est = np.zeros((2))
     kernel_pass=0
     Count_accept = 0
@@ -125,14 +125,14 @@ alpha_est = 0.95, alpha_test=0.99,verbose=1, gain_thresh=0.01, check_every=3, p_
     
     
     if tau_j>tau:
-        Var_est = P_est**2*(P_est**(-1/N)-1)    
+        var_est = P_est**2*(P_est**(-1/N)-1)    
         CI_est[0] = P_est*np.exp(-q/np.sqrt(N)*np.sqrt(-np.log(P_est)+(q**2)/4/N) - (q**2)/2/N)
         CI_est[1] = P_est*np.exp(q/np.sqrt(N)*np.sqrt(-np.log(P_est)+(q**2)/4/N) - (q**2)/2/N)
-        s_out = {'Var_est':Var_est,'CI_est':CI_est,'Iter':k,'Calls':Count_h,'Sample size':N}
+        s_out = {'var_est':var_est,'CI_est':CI_est,'Iter':k,'Calls':Count_h,'Sample size':N}
         s_out['Cert']=False    
         s_out['Xrare'] = X
     else:
-        s_out = {'Var_est':None, 'CI_est':[0,p_c],'Iter':k,'Calls':Count_h,'Sample size':N}
+        s_out = {'var_est':None, 'CI_est':[0,p_c],'Iter':k,'Calls':Count_h,'Sample size':N}
         P_est = p_c
         s_out['Cert']=True 
         s_out['Xrare']= None

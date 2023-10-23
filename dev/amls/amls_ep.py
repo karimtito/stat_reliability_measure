@@ -25,7 +25,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,track_accept=False):
       Returns:
          P_est: estimated probability
          dic_out: a dictionary containing additional data
-           -dic_out['Var_est']: estimated variance
+           -dic_out['var_est']: estimated variance
            -dic_out.['CI_est']: estimated confidence of interval
            -dic_out.['Xrare']: Examples of the rare event 
     """
@@ -143,13 +143,13 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,track_accept=False):
     p = K/N
     p_last = K_last/N
     P_est = (p**(n-1))*p_last
-    Var_est = (P_est**2)*((n-1)*(1-p)/p + (1-p_last)/p_last)/N
+    var_est = (P_est**2)*((n-1)*(1-p)/p + (1-p_last)/p_last)/N
     P_bias = P_est*n*(1-p)/p/N
-    CI_est = P_est*np.array([1,1]) + q*np.sqrt(Var_est)*np.array([-1,1])
+    CI_est = P_est*np.array([1,1]) + q*np.sqrt(var_est)*np.array([-1,1])
     Xrare = X[(SX>=tau).reshape(-1),:]
 
 
-    dic_out = {"Var_est":Var_est,"CI_est": CI_est,"N":N,"K":K,"s":s,"decay":decay,"T":T,"Count_h":Count_h,
+    dic_out = {"var_est":var_est,"CI_est": CI_est,"N":N,"K":K,"s":s,"decay":decay,"T":T,"Count_h":Count_h,
     "P_bias":P_bias,"n":n,"Xrare":Xrare}
     if track_rejection:
         dic_out["rejection_rates"]=np.array(rejection_rates)
@@ -183,7 +183,7 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
       Returns:
          P_est: estimated probability
          dic_out: a dictionary containing additional data
-           -dic_out['Var_est']: estimated variance
+           -dic_out['var_est']: estimated variance
            -dic_out.['CI_est']: estimated confidence of interval
            -dic_out.['Xrare']: Examples of the rare event 
     """
@@ -304,12 +304,12 @@ prog_thresh=0.01,clip_s=False,s_min=1e-3,s_max=5,device=None,track_accept=False,
     p = K/N
     p_last = K_last/N
     P_est = (p**(n-1))*p_last
-    Var_est = (P_est**2)*((n-1)*(1-p)/p + (1-p_last)/p_last)/N if p_last>0 else 0
+    var_est = (P_est**2)*((n-1)*(1-p)/p + (1-p_last)/p_last)/N if p_last>0 else 0
     P_bias = P_est*n*(1-p)/p/N
-    CI_est = P_est*np.array([1,1]) + q*np.sqrt(Var_est)*np.array([-1,1])
+    CI_est = P_est*np.array([1,1]) + q*np.sqrt(var_est)*np.array([-1,1])
     Xrare = X[(SX>=tau).reshape(-1),:] if p_last>0 else None
 
-    dic_out = {"Var_est":Var_est,"CI_est": CI_est,"N":N,"K":K,"s":s,"decay":decay,"T":T,"Count_h":Count_h,
+    dic_out = {"var_est":var_est,"CI_est": CI_est,"N":N,"K":K,"s":s,"decay":decay,"T":T,"Count_h":Count_h,
     "P_bias":P_bias,"n":n,"Xrare":Xrare}
     if track_rejection:
         dic_out["rejection_rates"]=np.array(rejection_rates)

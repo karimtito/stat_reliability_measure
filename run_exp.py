@@ -25,6 +25,7 @@ from stat_reliability_measure.dev.mc.mc_pyt import MC_pf
 from stat_reliability_measure.dev.hmls.hmls_config import HMLS_Config
 from stat_reliability_measure.dev.hmls.hmls_pyt import HybridMLS
 from stat_reliability_measure.config import ExpModelConfig
+import scipy.stats as stats
 from itertools import product as cartesian_product
 
 method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,
@@ -52,7 +53,8 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                      noise_dist='uniform',dataset_name = 'dataset',
                  model_name='model', plot_errorbar=True,
                  verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None,
-                 mask_cond=None,p_ref=None, nb_points_errorbar=100,
+                 mask_cond=None,p_ref=None, nb_points_errorbar=100, 
+                 alpha_CI=0.05,
                  log_hist_=True, aggr_res_path='',batch_opt=False,
                  log_txt_=True,exp_config=None,method_config=None,
                  smc_multi=False,**kwargs):
@@ -283,6 +285,7 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                 func_args_vars = {k:simple_vars(method_config)[k] for k in simple_vars(method_config).keys() if ('require' not in k) and ('name' not in k) and ('calls' not in k)}
                 args_dict = {**func_args_vars,**exp_required}
                 method_config.update()
+                var_ests=[]
                 for i in iterator:
                     t=time()
                     p_est,dict_out=estimation_func(**args_dict,)
@@ -349,24 +352,19 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                         X_list.append(dict_out['X'])
                     if track_advs:
                         advs_list.append(dict_out['advs'])
+                    if 'var_est' in dict_out.keys():
+                        var_est=dict_out['var_est']
+                        var_ests.append(var_est)
+                    elif 'std_est' in dict_out.keys():
+                        std_est=dict_out['std_est']
+                        var_ests.append(std_est**2)
 
                     del dict_out
     
                 times=np.array(times)
                 ests = np.array(ests)
 
-                if plot_errorbar:
-                    if nb_points_errorbar>exp_config.n_rep:
-                        nb_points_errorbar=exp_config.n_rep
-                    if nb_points_errorbar>1:
-                        errorbar_idx = np.linspace(start=0,stop=exp_config.n_rep-1,num=nb_points_errorbar,dtype=int)
-                    else:
-                        errorbar_idx=[0]
-                    ests_errorbar = ests[errorbar_idx]
-                    plt.figure(figsize=(21,13))
-
-                    times_errorbar = times[errorbar_idx]
-                    
+                
 
 
                 log_ests=np.array(log_ests)
@@ -374,6 +372,48 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                 calls=np.array(calls)
                 mean_calls=calls.mean()
                 std_est=ests.std()
+                if plot_errorbar:
+                    
+                    q_alpha = stats.norm.ppf(1-alpha_CI/2)
+                    if nb_points_errorbar>exp_config.n_rep:
+                        nb_points=exp_config.n_rep
+                    else:
+                        nb_points=nb_points_errorbar
+                    if nb_points_errorbar>1:
+                        errorbar_idx = np.arange(nb_points)
+                    else:
+                        errorbar_idx=[0]
+                
+                    trunc_ests = ests[errorbar_idx]
+                    if len(var_ests)>0:
+                        std_ests= np.sqrt(np.array(var_ests))
+                        trunc_std_ests = std_ests[:nb_points]
+                        plt.figure(figsize=(13,8))
+                        plt.errorbar(x=errorbar_idx,y=trunc_ests,yerr=trunc_std_ests,
+                        fmt='o',errorevery=1,elinewidth=1.,capsize=2,
+                        label = r'Est. Prob. +/- $q_{\alpha/2}\hat{\sigma}$')
+                    else:
+                        plt.figure(figsize=(13,8))
+                        plt.errorbar(x=errorbar_idx,y=trunc_ests,fmt='o',errorevery=1,elinewidth=1.
+                        ,capsize=2, label = r'Est. Prob. +/- $q_{\alpha/2}\hat{\sigma}$')
+                    if p_ref is not None:
+                        plt.plot(np.arange(nb_points),np.ones(nb_points)*p_ref,'r',label='Ref. Prob.')
+                    plt.plot(np.arange(nb_points),np.ones(nb_points)*mean_est,'g',label='Avg. Est.')
+                    CI_low_empi = mean_est-q_alpha*std_est
+                    CI_high_empi = mean_est+q_alpha*std_est
+                    plt.plot(np.arange(nb_points),np.ones(nb_points)*CI_low_empi,'--',color='grey',label=fr'CI low, $\alpha$ = {alpha_CI}')
+                    plt.plot(np.arange(nb_points),np.ones(nb_points)*CI_high_empi,'--',color='k',label=fr'CI high, $\alpha$ = {alpha_CI}')
+                    plt.xlabel('replicate')
+                    plt.ylabel('estimated probability')
+                    plt.legend(loc='upper right')
+                    plt.title(fr'Estimation of failure probability with {method_config.method_name} using $\approx${mean_calls} model calls, $\varepsilon$={exp_config.epsilon}, input idx.={l}, {exp_config.n_rep} reps')
+                    plt.show()
+                    ploterror_path=os.path.join(log_path,'errorbar.png')
+                    plt.savefig(ploterror_path)
+                    plt.close()
+
+                    times_errorbar = times[errorbar_idx]
+                    
                 if track_levels:
                     mean_levels = [np.array(l).mean() for l in levels_list]
                     std_levels = [np.array(l).std() for l in levels_list]  
@@ -459,7 +499,8 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                 'q_1':q_1,'q_3':q_3,'med_est':med_est,"lg_est_path":lg_est_path,
                 "mean_log_est":mean_log_est,"std_log_est":std_log_est,
                 "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
-                "log_path":log_path,"log_name":log_name}
+                "log_path":log_path,"log_name":log_name,
+                'ploterror_path':ploterror_path,}
                 if track_finish:
                     result.update({"freq_finished":freq_finished,"freq_zero_est":freq_zero_est,
                     "unfinished_mean_est":unfinished_mean_est,"unfinished_mean_time":unfinished_mean_time})
@@ -485,12 +526,20 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                     agg_res_df.to_csv(aggr_res_path,index=False)
 
                 
-
+    dict_out={}
     if len(results_df)>0:
         p_est = results_df['mean_est'].mean()
         std_est = results_df['std_est'].mean()
-    dict_out = {'results_df':results_df,'agg_res_df':agg_res_df,'std_est':std_est,
-                'method_config':method_config, 'exp_config':exp_config}
+        q_alpha_CI = stats.norm.ppf(1-alpha_CI/2)
+        dict_out['CI_low'] = p_est-q_alpha_CI*std_est
+        dict_out['CI_high'] = p_est+q_alpha_CI*std_est
+        dict_out['CI'] = np.array([dict_out['CI_low'],dict_out['CI_high']])
+        if plot_errorbar:
+            dict_out['ploterror_path']=ploterror_path
+        
+    dict_out.update({'results_df':results_df,'agg_res_df':agg_res_df,'std_est':std_est,
+                'method_config':method_config, 'exp_config':exp_config})
+    
     if track_X: 
         dict_out['X_list']=X_list
     if track_advs:

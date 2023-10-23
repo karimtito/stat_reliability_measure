@@ -295,6 +295,10 @@ def compute_V_grad_pyt(model, input_, target_class,L=0):
     #input_.retain_grad()
     s=score_function(X=input_,y_clean=target_class,model=model)
     v=torch.clamp(L-s,min=0)
+    # print(f"v={v},input_={input_}")
+    # print(f"v.shape={v.shape},input_.shape={input_.shape}")
+    # print(f"v.requires_grad={v.requires_grad},input_.requires_grad={input_.requires_grad}")
+    # print(f"v.grad={v.grad},input_.grad={input_.grad}")
     grad=torch.autograd.grad(outputs=v,inputs=input_,grad_outputs=torch.ones_like(v),retain_graph=False)[0]
     return v.detach(),grad.detach()
 

@@ -30,7 +30,7 @@ gain_thresh=0.01):
       Returns:
          P_est: estimated probability
          dic_out: a dictionary containing additional data
-           -dic_out['Var_est']: estimated variance
+           -dic_out['var_est']: estimated variance
            -dic_out.['CI_est']: estimated confidence of interval
            -dic_out.['Xrare']: Examples of the rare event 
     """
@@ -53,7 +53,7 @@ gain_thresh=0.01):
         raise AssertionError(f"Confidence level requires more than n_max={n_max} iterations... increase n_max ?")
     ## Init
     P_est = 0
-    Var_est = 0
+    var_est = 0
     check = 0    
     CI_est = np.zeros((2))
     # step A0: generate & compute scores 
