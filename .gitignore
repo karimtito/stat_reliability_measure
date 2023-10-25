@@ -30,7 +30,7 @@ logs2
 mono_crash.*
 
 
-
+.vscode
 
 # Build results
 [Dd]ebug/
