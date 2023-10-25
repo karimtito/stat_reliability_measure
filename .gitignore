@@ -8,6 +8,8 @@
 logs
 data
 models
+logs3
+logs2
 # User-specific files
 *.rsuser
 *.suo
@@ -17,7 +19,9 @@ models
 *.ipynb
 ./data
 ./logs
-
+./logs2
+./models
+./logs3
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
