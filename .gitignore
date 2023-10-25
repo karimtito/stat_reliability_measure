@@ -24,7 +24,7 @@ logs2
 ./logs3
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
-
+.VSCodeCounter
 
 # Mono auto generated files
 mono_crash.*
