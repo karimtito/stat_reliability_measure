@@ -151,7 +151,7 @@ def verlet_kernel1(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaus
 
     """
     if ind_L is None:
-        ind_L=L*torch.ones(size=(X.shape[0],),dtype=torch.int16)
+        ind_L=L*torch.ones(size=(X.shape[0],),dtype=torch.int16).to(X.device)
     q_t = torch.clone(X)
     # if no initial momentum is given we draw it randomly from gaussian distribution
     if scale_M is None:
@@ -199,7 +199,7 @@ def verlet_kernel2(X, gradV, delta_t, beta,L,ind_L=None,p_0=None,lambda_=0, gaus
 
     """
     if ind_L is None:
-        ind_L=L*torch.ones(size=(X.shape[0],),dtype=torch.int16)
+        ind_L=L*torch.ones(size=(X.shape[0],),dtype=torch.int16).to(X.device)
     q_t = torch.clone(X)
     # if no initial momentum is given we draw it randomly from gaussian distribution
     if scale_M is None:

@@ -223,7 +223,7 @@ debug=False,kappa_opt=False,
             dt_scalar =alpha*TimeStepPyt(V,X,gradV)
             
             dt= torch.clamp(dt_scalar*torch.ones(size=(N,dt_d),device=device)+sig_dt*torch.randn(size=(N,dt_d),device=device),min=dt_min,max=dt_max)
-            ind_L=torch.randint(low=L_min,high=L,size=(N,)).float() if L_min<L else L*torch.ones(size=(N,))
+            ind_L=torch.randint(low=L_min,high=L,size=(N,)).float().to(device) if L_min<L else L*torch.ones(size=(N,)).to(device)
             if track_calls:
                 Count_v = 3*N #N calls to V + 2*N calls to grad_V
     
