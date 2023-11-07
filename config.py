@@ -366,6 +366,7 @@ class ExpModelConfig(ExpConfig):
             self.normal_cdf_layer = t_u.NormalCDFLayer(offset=self.x_clean, 
             epsilon=self.epsilon, 
             x_min=self.x_min,x_max=self.x_max,device=self.device)
+        self.build_parser()
 
     def update(self, method_name=''):
         """ """
