@@ -136,7 +136,7 @@ def valid_pars_type(x):
     if t==list:
         # if list, we try to infer the type of the elements
         if len(x)==0:
-            return str2list
+            return str2list,True
         t_0 = type(x[0])
         if t_0 in pars_type_dict.keys():
             return pars_type_dict[t_0],True
