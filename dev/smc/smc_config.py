@@ -80,6 +80,8 @@ class SMCSamplerConfig(Config):
             else:
                 # else the type is the type of the default value
                 ptype,valid = valid_pars_type(vars(self)[key])
+            if key == 'method_name':
+                continue
             if valid:
                 parser.add_argument('--'+key,type=ptype,default=vars(self)[key])
     
