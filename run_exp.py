@@ -274,7 +274,6 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                     accept_rates_list=None
                 if track_dt:
                     dts_list=[]
-
                 exp_required = {'verbose':exp_config.verbose}
                 requires_keys = [k for k in simple_vars(method_config).keys() if 'requires_' in k]
                 for k in requires_keys:
@@ -290,8 +289,6 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                     t=time()
                     p_est,dict_out=estimation_func(**args_dict,)
                     t=time()-t
-                    
-                    
                     nb_calls=dict_out['nb_calls']
                     ests.append(p_est)
                     log_est= np.log(p_est) if p_est>0 else -250.
@@ -360,13 +357,8 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                         var_ests.append(std_est**2)
 
                     del dict_out
-    
                 times=np.array(times)
                 ests = np.array(ests)
-
-                
-
-
                 log_ests=np.array(log_ests)
                 mean_est=ests.mean()
                 calls=np.array(calls)
@@ -418,8 +410,6 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                     mean_levels = [np.array(l).mean() for l in levels_list]
                     std_levels = [np.array(l).std() for l in levels_list]  
 
-                
-                
                 q_1,med_est,q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                 std_rel=std_est/mean_est**2 if mean_est >0 else 0
                 std_rel_adj=std_rel*mean_calls
@@ -432,7 +422,6 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                     print(f"mean rel. error:{rel_error.mean()}")
                     print(f"std rel. error:{rel_error.std()}")
                     print(f"stat performance (per 1k calls):{rel_error.std()*(mean_calls/1000)}")
-                
                 if track_finish:
                     finish_flags=np.array(finish_flags)
                     freq_finished=finish_flags.mean()
@@ -447,19 +436,9 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                     unfinished_mean_time=unfinish_times.mean()
                 else:
                     unfinished_mean_est,unfinished_mean_time=None,None
-                
-                
                 times_path=os.path.join(log_path,'times.txt')
-                
                 est_path=os.path.join(log_path,'ests.txt')
-                
-                    
-
                 std_log_est=log_ests.std()
-
-               
-                    
-
                 mean_log_est=log_ests.mean()
                 lg_q_1,lg_med_est,lg_q_3=np.quantile(a=ests,q=[0.25,0.5,0.75])
                 lg_est_path=os.path.join(log_path,'lg_ests.txt')
@@ -473,7 +452,6 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                         exp_config.levels_path=mean_levels_path
                         np.savetxt(fname=mean_levels_path,X=mean_levels)
                         np.savetxt(fname=std_levels_path,X=std_levels)
-
                 if log_hist_:
                     plt.hist(times, bins=10)
                     plt.savefig(os.path.join(log_path,'times_hist.png'))
