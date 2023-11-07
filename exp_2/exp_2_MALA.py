@@ -1,5 +1,6 @@
 import stat_reliability_measure.dev.torch_utils as t_u
 import stat_reliability_measure.dev.smc.smc_pyt as smc_pyt
+import stat_reliability_measure.dev.smc.smc_config as smc_config
 import numpy as np
 from tqdm import tqdm
 from time import time
@@ -12,15 +13,20 @@ from stat_reliability_measure.dev.utils import float_to_file_float
 from stat_reliability_measure.dev.utils import get_sel_df, simple_vars, range_vars, range_dict_to_lists
 from stat_reliability_measure.config import ExpModelConfig
 from itertools import product as cartesian_product
+
+
 def main():
-    method_config=smc_pyt.SMCSamplerConfig()
-    exp_config=ExpModelConfig()
+    method_config=smc_config.SMCSamplerConfig()
+    exp_config=ExpModelConfig(epsilon_range=[0.18]
+            ,n_rep=10,verbose=1,update_aggr_res=True,repeat_exp=False,)
     parser= exp_config.get_parser()
     parser = method_config.add_parsargs(parser)
     args=parser.parse_args()
     for k,v in vars(args).items():
         if hasattr(method_config,k):
             if hasattr(exp_config,k) and  not ('config' in k):
+                if k == 'method_name':
+                    continue
                 raise ValueError(f"parameter {k} is in both exp_config and method_config")
             setattr(method_config, k, v)
         elif hasattr(exp_config,k):
@@ -148,9 +154,9 @@ def main():
                 print(f"Saving results in {log_path}")
                 for i in iterator:
                     t=time()
-                    p_est,res_dict,=smc_pyt.SamplerSMC(gen=exp_config.gen,V= method_config.V_classif,
-                                    adapt_func = method_config.adapt_func,
-                                    gradV=method_config.gradV_classif,**simple_vars(method_config))
+                    p_est,res_dict,=smc_pyt.SamplerSMC(gen=exp_config.gen,V= exp_config.V,
+                                    
+                                    gradV=exp_config.gradV,**simple_vars(method_config))
                     
                     t1=time()-t
                     if exp_config.verbose>2:
@@ -161,7 +167,7 @@ def main():
                         accept_logs=os.path.join(log_path,'accept_logs')
                         if not os.path.exists(accept_logs):
                             os.mkdir(path=accept_logs)
-                        accept_rates_mcmc=res_dict['accept_rates_mcmc']
+                        accept_rates_mcmc=res_dict['acc_ratios']
                         np.savetxt(fname=os.path.join(accept_logs,f'accept_rates_mcmc_{i}.txt')
                         ,X=accept_rates_mcmc,)
                         x_T=np.arange(len(accept_rates_mcmc))
