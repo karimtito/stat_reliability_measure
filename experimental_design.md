@@ -12,7 +12,7 @@ The methods to compare include:
 - [x] Metropolis Adjusted Langevin Algorithm within Sequential Monte Carlo (MALA_SMC)
 - [x] First Order Reliability Method (FORM)
 - [x] Hybrid (Gradient-Informed) Multiple Importance Splitting (HMLS)
-- [ ] Importance Sampling and Cross-Entropy methods (IS/CE)
+- [x] Importance Sampling  (IS)
 - [ ] Line Sampling methods (LS)
 
 ## 2. Scope of experiments
