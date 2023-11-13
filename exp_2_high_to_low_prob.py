@@ -7,8 +7,8 @@ import pandas as pd
 import os
 from itertools import product
 import argparse
-from stat_reliability_measure.dev.utils import str2list,str2floatList,get_sel_df
-from stat_reliability_measure.dev.utils import float_to_file_float
+from dev.utils import str2list,str2floatList,get_sel_df
+from dev.utils import float_to_file_float
 
 
 
