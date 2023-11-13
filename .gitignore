@@ -8,7 +8,7 @@
 logs*
 data
 models
-notebooks
+
 tests*
 # User-specific files
 *.rsuser
