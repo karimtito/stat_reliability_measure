@@ -449,24 +449,30 @@ def correct_min_max(x_min,x_max,x_mean,x_std):
         x_max=(x_max-x_mean)/x_std
     return x_min,x_max
 
-supported_datasets=['mnist','cifar10','cifar100','imagenet']
+supported_datasets=['mnist','fashion-mnist','cifar10','cifar100','imagenet']
 datasets_in_shape={'mnist':(1,28,28),'cifar10':(3,32,32),'cifar100':(3,32,32),'imagenet':(3,224,224)}
 datasets_dims={'mnist':784,'cifar10':3*1024,'cifar100':3*1024,'imagenet':3*224**2}
 datasets_num_c={'mnist':10,'cifar10':10,'imagenet':1000}
-datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465),'cifar100':[125.3/255.0, 123.0/255.0, 113.9/255.0]}
-datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010),'cifar100':[63.0/255.0, 62.1/255.0, 66.7/255.0]}
+datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465),'cifar100':[125.3/255.0, 123.0/255.0, 113.9/255.0], 
+                'imagenet':(0.485, 0.456, 0.406)}
+
+mean = [0.485, 0.456, 0.406]
+std = [0.229, 0.224, 0.225]
+datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010),'cifar100':[63.0/255.0, 62.1/255.0, 66.7/255.0],
+               'imagenet':(0.229, 0.224, 0.225)}
 datasets_supp_archs={'mnist':{'dnn2':dnn2,'dnn_2':dnn2,'dnn_4':dnn4,'dnn4':dnn4,'cnn_custom':CNN_custom},
                     'cifar10':{'lenet':LeNet,'convnet':ConvNet,'dnn2':dnn2},
                     'cifar100':{'densenet':DenseNet3}}
-datasets_default_arch={'mnist':'dnn2', 'cifar10':'convnet', 'cifar100':'densenet'}
+datasets_default_arch={'mnist':'dnn2', 'cifar10':'convnet', 'cifar100':'densenet','imagenet':'resnet18'}
 defaults_datasets=['mnist','cifar10','cifar100','imagenet']
-def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=None,x_std=None): 
+def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=None,x_std=None,shuffle=False): 
     assert dataset in supported_datasets,f"support datasets are in {supported_datasets}"
     if dataset=='mnist':
         if x_mean is not None and x_std is not None: 
             assert x_std!=0, "Can't normalize with 0 std."
         
             transform_=transforms.Compose([
+
                                 transforms.ToTensor(),
                                 #transforms.Normalize((x_mean,), (x_std,)) we perform normalization at the model level
                             ])
@@ -521,7 +527,7 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
 
         imagenet_dataset = datasets.ImageNet(data_dir, split="val", transform=data_transform)
 
-        data_loader = DataLoader(imagenet_dataset, batch_size =batch_size, shuffle=False)
+        data_loader = DataLoader(imagenet_dataset, batch_size =batch_size, shuffle=shuffle)
                          
     return data_loader
 
@@ -535,17 +541,17 @@ def plot_tensor(x,cmap='gray'):
     plt.imshow(x.detach(),cmap=cmap)
     plt.show()
 
-def plot_k_tensor(X,figsize=(10,10),x_0=None):
-    """plots k tensors representing images"""
+def plot_k_tensor(X,figsize=(10,10),x_0=None,img_size=(28,28)):
+    """plots k tensors representing images in a row of 4 columns"""
 
     k = X.shape[0]
     nrows = k // 4 if k%4==0 else k // 4 +1
     if x_0 is not None:
-        plt.imshow(x_0.view(28,28).detach().cpu().numpy(),cmap='gray')
+        plt.imshow(x_0.view(*img_size).detach().cpu().numpy(),cmap='gray')
     plt.figure(figsize=(figsize[0]*k,figsize[1]))
     for i in range(k):
         plt.subplot(nrows,4,i+1)
-        plt.imshow(X[i].view(28,28).detach().cpu().numpy(),cmap='gray')
+        plt.imshow(X[i].view(*img_size).detach().cpu().numpy(),cmap='gray')
 
 
 def gaussian_to_image(gaussian_sample,normal_layer,image_shape=(28,28)):
@@ -1482,6 +1488,11 @@ grad_calls_mult=2.,save_T=True):
     
     return q,v_q,grad_v_q,nb_calls,dict_out
 
+def get_imagenet_simple_labels():
+    json_path = Path(ROOT_DIR) / "data/ImageNet/imagenet-simple-labels.json"
+    with open(json_path, 'r') as f:
+        imagenet_dict = json.load(f)
+    return imagenet_dict
 
 def get_imagenet_dict():
     json_path = Path(ROOT_DIR) / "data/ImageNet/imagenet-simple-labels.json"
@@ -1497,16 +1508,19 @@ def idx_negative(tensor):
     return (tensor<0)
 
 class NormalCDFLayer(torch.nn.Module):
-    def __init__(self,device='cpu',mu=0,sigma=1,offset = 0.,epsilon = 0.1,x_min=0., x_max=1.):
+    def __init__(self,device='cpu',mu=0.,sigma=1.,x_clean = 0.,epsilon = 0.1,x_min=0., x_max=1., offset=0.,
+                 no_atoms=True):
         super(NormalCDFLayer, self).__init__()
         self.device=device
         self.norm = torch.distributions.Normal(0, 1)
         self.mu = mu
         self.sigma = sigma
-        self.offset = offset
+        self.x_clean = x_clean
         self.epsilon = epsilon
         self.x_min = x_min
         self.x_max = x_max
+        self.offset =offset
+        
     def forward(self,x):
         return torch.clip(self.offset+self.epsilon*(2*self.norm.cdf(x)-1),min=self.x_min,max=self.x_max)
     def inverse(self,x):
@@ -1514,5 +1528,73 @@ class NormalCDFLayer(torch.nn.Module):
     def string(self):
         return f"NormalCDFLayer(mu={self.mu},sigma={self.sigma})"
 
+class NormalToUnifLayer(torch.nn.Module):
+    def __init__(self,device='cpu',input_shape=None,low=0.,high=1.,epsilon = None, x_clean = None,x_min=0., x_max=1.,mu=0.,sigma=1.,
+                 ):
+        super(NormalToUnifLayer, self).__init__()
+        
+        self.device=device
+        self.norm = torch.distributions.Normal(0, 1)
+        
+        self.low = low
+        self.high = high
+        self.epsilon = epsilon
+        self.x_clean = x_clean
+        self.x_min = x_min
+        self.x_max = x_max
+        self.mu = mu
+        self.sigma = sigma
+        if low is None:
+            assert self.x_clean is not None, "x_clean must be specified if low is None"
+            assert self.epsilon is not None, "epsilon must be specified if low is None"
+            assert input_shape is not None or x_clean is not None, "input_shape or x_clean must be specified"
+            self.low=torch.maximum(self.x_clean-self.epsilon, self.x_min.view(-1,*self.input_shape).to(self.device))
+        if high is None:
+            assert self.x_clean is not None, "x_clean must be specified if high is None"
+            assert self.epsilon is not None, "epsilon must be specified if low is None"
+            assert input_shape is not None or x_clean is not None, "input_shape or x_clean must be specified"
+            self.high=torch.minimum(self.x_clean+self.epsilon, self.x_max.view(-1,*self.input_shape).to(self.device))
+        self.range=self.high-self.low
+    def forward(self,x):
+        return self.low + self.range*self.norm.cdf(x)  
+    def inverse(self,x):
+        return self.norm.icdf(((x-self.low)/self.range))
+    def string(self):
+        return f"NormalToUnifLayer(mu={self.mu},sigma={self.sigma})"
+
+imagenet_simple_labels = get_imagenet_simple_labels()
+def plot_imagenet_pictures(X,y=None, nb_rows = 5, nb_cols = None,text_labels=imagenet_simple_labels):
+    """plots the first nb_pictures pictures of the imagenet dataset with subfigures and saves them in the exp_config.exp_log_path + '/imagenet_pictures/' folder"""
+    #using suplots to plot in an approximate square shape
+     
+    nb_rows = nb_rows
+    nb_cols = nb_cols if nb_cols is not None else nb_rows
+    if nb_rows*nb_cols > X.shape[0]:
+        nb_rows = int(np.sqrt(X.shape[0]))
+        nb_cols = nb_rows
+    nb_pictures = nb_rows*nb_cols
+    print(f"Plotting {nb_pictures} ImageNet pictures")
+    fig, axs = plt.subplots(nrows=nb_rows,ncols=nb_cols, figsize=(15, 15))
+    fig.subplots_adjust(hspace = .5, wspace=.001)
+    #making sure that axs is a 1D array
+    axs = axs.ravel()
+    # plotting the pictures
+    for i in range(nb_pictures):
+        #permuting the dimensions of the picture to get the right format
+        X_numpy = X[i].permute(1,2,0).detach().cpu().numpy()
+        axs[i].imshow(X[i].permute(1,2,0).detach().cpu().numpy())
+        del X_numpy
+        if y is not None:
+            numpy_label=y[i].detach().cpu().numpy()
+            if text_labels is not None:
+                text_label = text_labels[numpy_label]
+            else:
+                text_label = numpy_label
+            axs[i].set_title(f"Label: {text_label}")
+        axs[i].set_axis_off()
+    # saving the pictures   
+    plt.show()
+    plt.savefig('imagenet_pictures.png')
+    plt.close()
 
 

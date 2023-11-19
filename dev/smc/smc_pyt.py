@@ -2,21 +2,22 @@ import torch
 import math
 import numpy as np
 from stat_reliability_measure.dev.torch_utils import TimeStepPyt, adapt_verlet_mcmc, apply_gaussian_kernel,verlet_mcmc
+from stat_reliability_measure.dev.torch_utils2 import adapt_verlet_mcmc3
+
 from stat_reliability_measure.dev.smc.smc_utils import nextBetaESS,nextBetaSimpESS,SimpAdaptBetaPyt,ESSAdaptBetaPyt
     
 supported_beta_adapt={'ess':nextBetaESS,'simp_ess':nextBetaSimpESS,'simp':ESSAdaptBetaPyt}
 
-def SamplerSMC(gen, V, gradV,adapt_func='ess', min_rate=0.8, alpha =0.1, N=300, T = 1, L=1, n_max=5000, 
+def SamplerSMC(gen, V, gradV,adapt_func='', min_rate=0.8, alpha =0.1, N=300, T = 1, L=1, n_max=5000, 
 max_beta=1e6, verbose=False,device=None,ess_alpha=0.875,mh_opt=True,
 track_accept=False,track_beta=False,return_log_p=False,gaussian=True,
 adapt_dt=False, track_finish=False, save_X=False,save_v=False,
 track_calls=True,track_dt=False,track_H=False,track_v_means=False,track_ratios=False,
-track_X=False,track_advs:bool=False,track_iter:bool=False,
-target_accept=0.574,accept_spread=0.1,dt_decay=0.99,dt_gain=None,
-dt_min=1e-5,dt_max=0.5,v_min_opt=True,kappa_opt=False,
+target_accept=0.574,accept_spread=0.1,dt_decay=0.999,dt_gain=None,
+dt_min=1e-5,dt_max=1e-2,v_min_opt=True,kappa_opt=False,
  track_ess=False,M_opt=False,adapt_step=False,alpha_p=0.1,FT=False,sig_dt=0.015,L_min=1,only_duplicated=False,
  GK_opt=False,GV_opt=False,dt_d=1,skip_mh=False,
- lambda_0=1,g_target=0.8,grad_calls_mult=2.,**kwargs):
+ lambda_0=1,g_target=0.8,**kwargs):
     """
       Adaptive SMC estimator with transition kernels either based on:
       underdamped Langevin dynamics  (L=1) or Hamiltonian dynamics (L>1) kernels (GK_opt=False)
@@ -52,13 +53,12 @@ dt_min=1e-5,dt_max=0.5,v_min_opt=True,kappa_opt=False,
     #cpu/gpu switch
     if device is None: 
         device= "cuda:0" if torch.cuda.is_available() else "cpu"
-    if isinstance(adapt_func,str):
-        if adapt_func.lower()=='simp_ess':
-            adapt_func = lambda beta,v : nextBetaSimpESS(beta_old=beta,v=v,lambda_0=lambda_0,max_beta=1e6)
-        elif adapt_func.lower()=='simp':
-            adapt_func = lambda beta,v: SimpAdaptBetaPyt(beta,v,g_target,v_min_opt=v_min_opt)
-        elif adapt_func.lower()=='ess':
-            adapt_func = lambda beta,v : nextBetaESS(beta_old=beta,v=v,ess_alpha=ess_alpha,max_beta=1e6)
+    if adapt_func.lower()=='simp_ess':
+        adapt_func = lambda beta,v : nextBetaSimpESS(beta_old=beta,v=v,lambda_0=lambda_0,max_beta=1e6)
+    elif adapt_func.lower()=='simp':
+        adapt_func = lambda beta,v: SimpAdaptBetaPyt(beta,v,g_target,v_min_opt=v_min_opt)
+    elif adapt_func.lower()=='ess':
+        adapt_func = lambda beta,v : nextBetaESS(beta_old=beta,v=v,ess_alpha=ess_alpha,max_beta=1e6)
 
     # adaptative parameters
     if adapt_dt and dt_gain is None:
@@ -81,7 +81,7 @@ dt_min=1e-5,dt_max=0.5,v_min_opt=True,kappa_opt=False,
     if track_H:
         H_s=[]
     if track_beta:
-        betas=[0.]
+        betas=[]
     if track_v_means: 
         v_means=[]
     
@@ -105,14 +105,22 @@ dt_min=1e-5,dt_max=0.5,v_min_opt=True,kappa_opt=False,
         if n==1:
             X=gen(N)
             #p=torch.randn_like(X)
+            v=V(X)
+            Count_v+=N
             
-            grad_v,v=gradV(X)
-            Count_v+=grad_calls_mult*N # each call to gradV costs 2 calls to V
+            grad_v,_=gradV(X)
+            Count_v+=2*N # each call to gradV costs 2 calls to V
+            
+            
+
             d=X.shape[-1]
             assert dt_d==1 or dt_d==d,"dt dimension can be 1 (isotropic diff.) or d (anisotropic diff.)"
-            dt_scalar =alpha*TimeStepPyt(v=v,grad_v=grad_v)
+            dt_scalar =alpha*TimeStepPyt(v_x=v,grad_v_x=grad_v)
+            
             dt=torch.clamp(dt_scalar*torch.ones(size=(N,dt_d),device=device)+sig_dt*torch.randn(size=(N,dt_d),device=device),min=dt_min,max=dt_max)
             ind_L=torch.randint(low=L_min,high=L,size=(N,),).to(device).float() if L_min<L else L*torch.ones(size=(N,),device=device)
+            
+    
         else:
             if only_duplicated and nb_to_renew>0:
                 Y=X[to_renew]
@@ -142,8 +150,8 @@ dt_min=1e-5,dt_max=0.5,v_min_opt=True,kappa_opt=False,
             else:
                 
                 if adapt_step:
-                    Y,v_y,grad_v_y,nb_calls,dict_out=mcmc_func(q=Y,v_q=v_y,grad_v_q=grad_v_y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
-                        V=V,gradV=gradV,T=T, L=L,delta_t=dt_y,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
+                    Y,v_y,grad_v_y,nb_calls,dict_out=mcmc_func(q=Y,v_q=v_y,grad_V_q=grad_v_y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
+                        V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_y,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
                         alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,L_min=L_min,
                         gaussian_verlet=GV_opt,dt_min=dt_min,skip_mh=skip_mh)
                     if FT:
@@ -157,8 +165,8 @@ dt_min=1e-5,dt_max=0.5,v_min_opt=True,kappa_opt=False,
                             print(f"New dt mean:{dt.mean().item()}, dt std:{dt.std().item()}")
                             print(f"New L mean: {ind_L.mean().item()}, L std:{ind_L.std().item()}")
                 else:
-                    Y,v_y,grad_v_y,nb_calls,dict_out=verlet_mcmc(q=Y,grad_v_q=grad_v_y,v_q=v_y,beta=beta,gaussian=gaussian,
-                                        V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_y,device=device,save_H=track_H,save_func=None,
+                    Y,v_y,grad_v_y,nb_calls,dict_out=verlet_mcmc(q=Y,grad_V_q=grad_v_y,beta=beta,gaussian=gaussian,
+                                        V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt,device=device,save_H=track_H,save_func=None,
                                         scale_M=scale_M)
                     if track_H:
                         H_s.extend(list(dict_out['H']))
@@ -184,13 +192,9 @@ dt_min=1e-5,dt_max=0.5,v_min_opt=True,kappa_opt=False,
             if only_duplicated and nb_to_renew>0:
                 X[to_renew]=Y
                 v[to_renew]=v_y
-                if gradient_use:
-                    grad_v[to_renew]=grad_v_y
             else:
                 X=Y
                 v=v_y
-                if gradient_use:
-                    grad_v=grad_v_y
                 
 
 
@@ -206,11 +210,9 @@ dt_min=1e-5,dt_max=0.5,v_min_opt=True,kappa_opt=False,
         #Selecting next beta
         beta_old=beta
         beta,ess = adapt_func(beta_old,v)
-        if verbose:
+        if verbose>=0.5:
             print(f'Beta old {beta_old}, new beta {beta}, delta_beta={beta-beta_old}')
         
-        if track_beta:
-            betas.append(beta)
         
         if track_ess:
             ess_.append(ess)
@@ -250,11 +252,7 @@ dt_min=1e-5,dt_max=0.5,v_min_opt=True,kappa_opt=False,
             prenew_idx=torch.randint(low=0,high=len(surv_idx),size=(nb_to_renew,))
             renew_idx=surv_idx[prenew_idx]
         
-            X[to_renew] = X[renew_idx] 
-            v[to_renew] = v[renew_idx]
-            if gradient_use:
-                grad_v[to_renew]=grad_v[renew_idx]
-
+            X[to_renew] = X[renew_idx]
     finish_flag=(v<=0).float().mean().item() >=min_rate
     if verbose>=1.:
         print(f"finished flag:{finish_flag}")
@@ -268,14 +266,11 @@ dt_min=1e-5,dt_max=0.5,v_min_opt=True,kappa_opt=False,
         dict_out['v']=v
     if track_finish:
         dict_out['finish_flag']=finish_flag
-    if track_iter:
-        dict_out['nb_iter']=n
     if track_accept:
-        if isinstance(accept_rates_mcmc,torch.Tensor):
-            accept_rates_mcmc = accept_rates_mcmc.cpu().numpy()
-        dict_out['acc_ratios']= np.array(accept_rates_mcmc)
+        
+        dict_out['accept_rates_mcmc']=np.array(accept_rates_mcmc)
     else:
-        dict_out['acc_ratios']=None
+        dict_out['accept_rates']=None
     if track_beta:
         dict_out['betas']=np.array(betas) 
     else:
@@ -286,10 +281,6 @@ dt_min=1e-5,dt_max=0.5,v_min_opt=True,kappa_opt=False,
         dict_out['log_p_est']=None
     if track_calls:
         dict_out['nb_calls']=Count_v
-    if track_X:
-        dict_out['X'] = X 
-    if track_advs:
-        dict_out['advs']=X[v==0].detach().to('cpu').numpy()
     if track_v_means: 
         dict_out['v_means']=np.array(v_means)
     if track_dt:
@@ -298,7 +289,7 @@ dt_min=1e-5,dt_max=0.5,v_min_opt=True,kappa_opt=False,
     return P_est,dict_out
 
 
-def SamplerMultiSMC(gen,  V, gradV,adapt_func,min_rate=0.8,alpha =0.1,N=300,T = 1,L=1,n_max=5000, 
+def SamplerSMC2(gen,  V, gradV,adapt_func,min_rate=0.8,alpha =0.1,N=300,T = 1,L=1,n_max=5000, 
 max_beta=1e6, verbose=False,device=None,ess_alpha=0.875,mh_opt=True,
 track_accept=False,track_beta=False,return_log_p=False,gaussian=False,
 adapt_dt=False,
@@ -342,8 +333,8 @@ debug=False,kappa_opt=False,
     # adaptative parameters
     if adapt_dt and dt_gain is None:
         dt_gain= 1/dt_decay
-   
-    mcmc_func= adapt_verlet_mcmc if adapt_step else verlet_mcmc
+    assert adapt_step
+    mcmc_func= adapt_verlet_mcmc3
     #Initializing failure probability
     g_prod=1
 
@@ -388,12 +379,12 @@ debug=False,kappa_opt=False,
             d=X.shape[-1]
             assert dt_d==1 or dt_d==d,"dt dimension can be 1 (isotropic diff.) or d (anisotropic diff.)"
             grad_v=gradV(X)
-            dt_scalar =alpha*TimeStepPyt(v=v,grad_v=grad_v,)
+            dt_scalar =alpha*TimeStepPyt(v_x=v,grad_v_x=grad_v,)
             
             dt= torch.clamp(dt_scalar*torch.ones(size=(N,dt_d),device=device)+sig_dt*torch.randn(size=(N,dt_d),device=device),min=dt_min,max=dt_max)
             ind_L=torch.randint(low=L_min,high=L,size=(N,)).float() if L_min<L else L*torch.ones(size=(N,),device=device)
             if track_calls:
-                Count_v = 3*N #N calls to V + 2*N calls with N computations of grad_v
+                Count_v = 3*N #N calls to V + 2*N calls with N computations of grad_V
     
         else:
             if only_duplicated and nb_to_renew>0:
@@ -478,9 +469,7 @@ debug=False,kappa_opt=False,
         if verbose>=0.5:
             print(f'Beta old {beta_old}, new beta {beta}, delta_beta={beta-beta_old}')
         
-        if track_beta:
-            betas.append(beta)
-
+        
         if track_ess:
             ess_.append(ess)
             if verbose:
@@ -531,9 +520,6 @@ debug=False,kappa_opt=False,
             print(f"g_iter_final:{g_iter},g_final:{P_est}")
     dic_out = {'p_est':P_est,'X':X,'v':v,'finished':finished_flag}
     if track_accept:
-        if isinstance(accept_rates_mcmc,torch.Tensor):
-            accept_rates_mcmc = accept_rates_mcmc.cpu().numpy()
-        
         dic_out['accept_rates_mcmc']=np.array(accept_rates_mcmc)
     else:
         dic_out['accept_rates']=None
@@ -646,7 +632,7 @@ debug=False,kappa_opt=False,
             dt= torch.clamp(dt_scalar*torch.ones(size=(N,dt_d),device=device)+sig_dt*torch.randn(size=(N,dt_d),device=device),min=dt_min,max=dt_max)
             ind_L=torch.randint(low=L_min,high=L,size=(N,)).float() if L_min<L else L*torch.ones(size=(N,))
             if track_calls:
-                Count_v = 3*N #N calls to V + 2*N calls to grad_v
+                Count_v = 3*N #N calls to V + 2*N calls to grad_V
     
         else:
 
@@ -665,6 +651,7 @@ debug=False,kappa_opt=False,
                 
                 if adapt_step:
                     Y,v_y,nb_calls,dict_out=mcmc_func(q=Y,v_q=v_y,ind_L=ind_L_y,beta=beta,gaussian=gaussian,
+                                                        
                         V=V,gradV=gradV,T=T, L=L,kappa_opt=kappa_opt,delta_t=dt_y,device=device,save_H=track_H,save_func=None,scale_M=scale_M,
                         alpha_p=alpha_p,dt_max=dt_max,sig_dt=sig_dt,FT=FT,verbose=verbose,L_min=L_min,
                         gaussian_verlet=GV_opt,dt_min=dt_min,skip_mh=skip_mh)
@@ -777,7 +764,6 @@ debug=False,kappa_opt=False,
     if track_dt:
         dict_out['dt_means']=dt_means
     return P_est,dict_out
-
 
 
 

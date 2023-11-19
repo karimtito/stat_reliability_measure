@@ -77,7 +77,7 @@ if not GV_opt and L==1:
     kernel='MALA'
 method_str=f"{kernel}-SMC"
 T_range = [10,]
-triplets=[('image_idx',img_idx,'='),('n_rep',50,'>='),
+triplets=[('input_idx',img_idx,'='),('n_rep',50,'>='),
           ('only_duplicated',only_duplicated,'='),('model_name',model_name,'='),
          (x_col,x_max,'<='),('L',L,'='),('ess_alpha',ess_alpha,'='),('GV_opt',GV_opt,'=')]
 
@@ -106,7 +106,7 @@ if not GV_opt and L==1:
     kernel='MALA'
 method_str=f"{kernel}-SMC"
 T_range = [10]
-triplets=[('image_idx',img_idx,'='),('n_rep',50,'>='),
+triplets=[('input_idx',img_idx,'='),('n_rep',50,'>='),
           ('only_duplicated',only_duplicated,'='),('model_name',model_name,'='),
          (x_col,x_max,'<='),('L',L,'='),('ess_alpha',ess_alpha,'='),('GV_opt',GV_opt,'=')]
 
@@ -135,7 +135,7 @@ if not GV_opt and L==1:
     kernel='MALA'
 method_str=f"MLS-SMC"
 T_range = [10,20,50]
-triplets=[('image_idx',img_idx,'='),('n_rep',50,'>='),
+triplets=[('input_idx',img_idx,'='),('n_rep',50,'>='),
           ('model_name',model_name,'='),
          (x_col,x_max,'<='),]
 

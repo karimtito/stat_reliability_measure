@@ -19,7 +19,9 @@ from stat_reliability_measure.dev.mls.webb_config import MLS_Webb_Config
 from stat_reliability_measure.dev.form.form_pyt import FORM_pyt as FORM_pyt
 from stat_reliability_measure.dev.form.form_config import FORM_config
 from stat_reliability_measure.dev.smc.smc_pyt import SamplerSMC, SamplerSmcMulti
+from stat_reliability_measure.dev.smc.smc_pyt2 import SamplerSMC as SamplerSMC2
 from stat_reliability_measure.dev.smc.smc_config import SMCSamplerConfig
+from stat_reliability_measure.dev.smc.smc_config2 import SMCSamplerConfig as SMCSamplerConfig2
 from stat_reliability_measure.dev.mc.mc_config import CrudeMC_Config
 from stat_reliability_measure.dev.mc.mc_pyt import MC_pf
 from stat_reliability_measure.dev.hmls.hmls_config import HMLS_Config
@@ -31,7 +33,7 @@ from itertools import product as cartesian_product
 method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,
                     'mls_webb':MLS_Webb_Config,
                     'hmls':HMLS_Config,'importance_sampling':IS_Config,
-                    'imp_samp':IS_Config,'is':IS_Config,
+                    'imp_samp':IS_Config,'is':IS_Config,'mala2':SMCSamplerConfig2,
                     'mala':SMCSamplerConfig,'amls_batch':MLS_SMC_Config,
                     'mc':CrudeMC_Config,'crudemc':CrudeMC_Config,'crude_mc':CrudeMC_Config,
                     'form':FORM_config,'rw_smc':SMCSamplerConfig,
@@ -41,7 +43,7 @@ method_config_dict={'amls':MLS_SMC_Config,'amls_webb':MLS_Webb_Config,
 method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,
                   'rw_smc':SamplerSMC,
                   'hmls':HybridMLS,'importance_sampling':GaussianIS,
-                  'imp_samp':GaussianIS,
+                  'imp_samp':GaussianIS,'is':GaussianIS,'mala2':SamplerSMC2,
                   'mc':MC_pf,'crudemc':MC_pf,'crude_mc':MC_pf, 
                   'amls_webb': amls_webb.multilevel_uniform,'form':FORM_pyt,
                   'mls_webb':amls_webb.multilevel_uniform,
@@ -49,12 +51,15 @@ method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,
                     'amls_batch':amls_pyt.ImportanceSplittingPytBatch,
                     'smc_multi':SamplerSMC}
 
-def run_est(model, X, y, method='amls_webb', epsilon_range=[], 
+weighted_methods = ['is','imp_samp']
+mmp_methods = ['form','imp_samp','is','ls','line_samp','importance sampling','line sampling']
+
+def run_est(model, X, y, method='amls_webb', epsilon_range=[], input_idx=None,
                      noise_dist='uniform',dataset_name = 'dataset',
                  model_name='model', plot_errorbar=True,
                  verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None,
                  mask_cond=None,p_ref=None, nb_points_errorbar=100, 
-                 alpha_CI=0.05,
+                 alpha_CI=0.05, save_weights=True, shuffle=False,
                  log_hist_=True, aggr_res_path='',batch_opt=False,
                  log_txt_=True,exp_config=None,method_config=None,
                  smc_multi=False,**kwargs):
@@ -72,10 +77,12 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
 
         method_config = method_config_dict[method]()
     if exp_config is None:
-        exp_config=ExpModelConfig(model=model,X=X,y=y,
+        if input_idx is None:
+            input_idx=0
+        exp_config=ExpModelConfig(model=model,X=X,y=y,input_start= input_idx,input_stop=input_idx+1,
         dataset_name=dataset_name,model_name=model_name,epsilon_range=epsilon_range,
         aggr_res_path=aggr_res_path,x_min=x_min,x_max=x_max,mask_opt=mask_opt,
-        mask_idx=mask_idx,mask_cond=mask_cond,verbose=verbose)
+        mask_idx=mask_idx,mask_cond=mask_cond,verbose=verbose,shuffle=shuffle,)
     else:
         exp_config.model,exp_config.X,exp_config.y,=model,X,y
         exp_config.dataset, exp_config.model_name, exp_config.epsilon_range=dataset_name,model_name,epsilon_range
@@ -147,6 +154,7 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
     track_dt = hasattr(method_config,'track_dt') and method_config.track_dt
     track_advs= hasattr(method_config,'track_advs') and method_config.track_advs
     first_iter=True
+    weights_list=[]
     for l in range(exp_config.input_start, exp_config.input_stop):
         with torch.no_grad():
             exp_config.x_clean,exp_config.y_clean = exp_config.X[l], exp_config.y[l]
@@ -199,7 +207,7 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                                 print("Experiment already done for method: "+method_config.method_name)
                                 try:
                                     triplets=[('model_name',exp_config.model_name,'='),('epsilon',exp_config.epsilon,'='),
-                                    ('image_idx',l,'='),('n_rep',exp_config.n_rep,'='),('noise_dist',exp_config.noise_dist,'=')]
+                                    ('input_idx',l,'='),('n_rep',exp_config.n_rep,'='),('noise_dist',exp_config.noise_dist,'=')]
 
                                     same_exp_df = get_sel_df(df=same_method_df, cols=method_keys, vals=method_vals, 
                                     triplets =triplets)
@@ -229,7 +237,7 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                 if os.path.exists(log_path):
                     log_path=log_path+'_rand_'+str(np.random.randint(low=1,high=100))
                 os.mkdir(log_path)
-                print(f"Starting {method_config.method_name} simulation {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},")
+                print(f"Starting {method_config.method_name} simulation {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon}, "+clean_method_args_str)
                                 
              
                 if exp_config.verbose>0:
@@ -355,8 +363,13 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                     elif 'std_est' in dict_out.keys():
                         std_est=dict_out['std_est']
                         var_ests.append(std_est**2)
-
+                    if save_weights and method in weighted_methods:
+                        weights=dict_out['weights']
+                        weights_path=os.path.join(log_path,f'weights_exp_{i}.txt')
+                        np.savetxt(fname=weights_path,X=weights)
+                        weights_list.append(weights)
                     del dict_out
+                    
                 times=np.array(times)
                 ests = np.array(ests)
                 log_ests=np.array(log_ests)
@@ -381,7 +394,7 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                         std_ests= np.sqrt(np.array(var_ests))
                         trunc_std_ests = std_ests[:nb_points]
                         plt.figure(figsize=(13,8))
-                        plt.errorbar(x=errorbar_idx,y=trunc_ests,yerr=trunc_std_ests,
+                        plt.errorbar(x=errorbar_idx,y=trunc_ests,yerr=q_alpha*trunc_std_ests,
                         fmt='o',errorevery=1,elinewidth=1.,capsize=2,
                         label = r'Est. Prob. +/- $q_{\alpha/2}\hat{\sigma}$')
                     else:
@@ -469,7 +482,7 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
                         exp_config.levels_png=os.path.join(log_path,'levels.png')
                         plt.close()
                 #with open(os.path.join(log_path,'results.txt'),'w'):
-                result={"image_idx":l,'mean_calls':calls.mean(),'std_calls':calls.std()
+                result={"i_idx":l,'mean_calls':calls.mean(),'std_calls':calls.std()
                 ,'mean_time':times.mean(),'std_time':times.std()
                 ,'mean_est':ests.mean(),'std_est':ests.std(), 'est_path':est_path,'times_path':times_path,
                 "std_rel":std_rel,"std_rel_adj":std_rel*mean_calls,
@@ -522,6 +535,7 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[],
         dict_out['X_list']=X_list
     if track_advs:
         dict_out['advs_list']=advs_list
-    
+    if save_weights:
+        dict_out['weights_list']=weights_list
     
     return p_est, dict_out

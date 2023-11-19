@@ -363,7 +363,7 @@ def main():
                         aggr_res_df = pd.read_csv(aggr_res_path)
                         same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method_name,'='),
                         ('model_name',model_name,'='),
-                        ('epsilon',epsilon,'='),('image_idx',l,'='),('n_rep',config.n_rep,'='),('N',N,'='),
+                        ('epsilon',epsilon,'='),('input_idx',l,'='),('n_rep',config.n_rep,'='),('N',N,'='),
                         ('batch_size',bs,'=')] )  
                         # if a similar experiment has been done in the current log directory we skip it
                         if len(same_exp_df)>0:
@@ -455,7 +455,7 @@ def main():
                     
 
                     #with open(os.path.join(log_path,'results.txt'),'w'):
-                    results={'method':method_name,'from_gaussian':str(config.from_gaussian),'image_idx':l,
+                    results={'method':method_name,'from_gaussian':str(config.from_gaussian),'input_idx':l,
                         'epsilon':epsilon,"model_name":model_name,'dataset':config.dataset,'n_rep':config.n_rep,
                     'batch_size':bs, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std_adj":ests.std()*mean_calls,
                     'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),'est_path':est_path,'times_path':times_path,

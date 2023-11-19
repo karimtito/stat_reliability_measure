@@ -555,7 +555,7 @@ for l in inp_indices:
                             results={"method":method_name,'T':T,'N':N,'L':L,
                             "ess_alpha":ess_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
                             "method":method,'adapt_dt':config.adapt_dt,"epsilon":epsilon,
-                            "model_name":model_name,"image_idx":l, 
+                            "model_name":model_name,"input_idx":l, 
                             'mean_calls':calls.mean(),'std_calls':calls.std()
                             ,'mean_time':times.mean(),'std_time':times.std()
                             ,'mean_est':ests.mean(),'std_est':ests.std(), 'est_path':est_path,'times_path':times_path,

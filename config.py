@@ -12,6 +12,7 @@ import numpy as np
 import torch
 import json
 from stat_reliability_measure.dev.utils import float_to_file_float
+import random
 
 model_dir = ROOT_DIR+'/models/'
 
@@ -98,15 +99,21 @@ class ExpConfig(Config):
                   'print_config_opt':True,'track_finish':False,
                   'track_gpu':False,'allow_multi_gpu':True,
                   'track_cpu':False,'save_img':False,
-                  'save_text':False,'device':'',
+                  'save_text':False,'device':'','random_seed':-1,
                   'tqdm_opt':True,'clip_min':0.,
                   'clip_max':1.,'force_train':False,
                   'repeat_exp':False,'data_dir':ROOT_DIR+"/data",
                   'noise_scale':1.,'exp_name':'',
                   'notebook':False,'device':''}
 
-    def __init__(self,config_dict=default_dict):   
+    def __init__(self,config_dict=default_dict,save_img=False,torch_seed=-1,np_seed=-1,verbose=0.,random_seed=-1,**kwargs):
+                 
+                
         vars(self).update(config_dict)
+        self.torch_seed=torch_seed
+        self.np_seed=np_seed
+        self.random_seed=random_seed
+        self.verbose=verbose
         super().__init__()
         if self.torch_seed==-1:
             """if the torch seed is not set, then it is set to the current time"""
@@ -116,13 +123,19 @@ class ExpConfig(Config):
             self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
             if self.verbose>=5:
                 print(self.device)
-        if 'cuda' in self.device: 
-            torch.cuda.manual_seed_all(seed=self.torch_seed)
+        
+        torch.cuda.manual_seed_all(seed=self.torch_seed)
+            
 
         if self.np_seed==-1:
             """if the numpy seed is not set, then it is set to the current time"""
             self.np_seed=int(time())
         np.random.seed(seed=self.np_seed)
+        
+        if self.random_seed==-1:
+            """if the random seed is not set, then it is set to the current time"""
+            self.random_seed=int(time())
+        random.seed(self.random_seed)
         # if not self.allow_multi_gpu:
         #     os.environ["CUDA_VISIBLE_DEVICES"]="0"
         if self.track_gpu:
@@ -247,20 +260,29 @@ class ExpModelConfig(ExpConfig):
                 'robust_eps':0.1,'load_batch_size':128,'nb_epochs': 15,'adversarial_every':1,}
     #p_ref_compute = False
     def __init__(self,config_dict=default_dict,X=None,y=None,model=None,epsilon_range=[],
-                dataset_name='mnist',aggr_res_path='',model_name='',verbose=0.,
-                method_name='',x_mean=None,x_std=None,**kwargs):
-        super().__init__()
+                dataset_name='mnist',aggr_res_path='',model_name='',model_arch='',verbose=0.,
+                torch_seed=-1,np_seed=-1,random_seed=-1,
+                method_name='',shuffle=False,real_uniform=False,x_mean=None,x_std=None,**kwargs):
+        super().__init__(torch_seed=torch_seed,np_seed=np_seed,verbose=verbose,random_seed = random_seed,)
         vars(self).update(config_dict)
         self.X = X
         self.y = y
+        self.model_name= model_name
+        self.model_arch = model_arch
         self.model = model
         self.epsilon_range=epsilon_range
         self.dataset=dataset_name
         self.aggr_res_path=aggr_res_path
         self.verbose=verbose
+        self.real_uniform=real_uniform
         vars(self).update(kwargs)
+        if hasattr(self,"model_name") and len(self.model_name)>0:
+            self.model_arch = self.model_name
+        elif type(self.model) == str:
+            self.model_arch = self.model
         self.normal_dist = torch.distributions.normal.Normal(loc=0.,scale=1.)
         self.commit= git.Repo(path=ROOT_DIR).head.commit.hexsha
+        
         if len(self.model_dir)==0:
             self.model_dir=os.path.join(ROOT_DIR+"/models/",self.dataset)
         if not os.path.exists(self.model_dir):
@@ -271,12 +293,15 @@ class ExpModelConfig(ExpConfig):
             self.input_stop=self.input_start+1
         else:
             assert self.input_start<self.input_stop,"/!\ input start must be strictly lower than input stop"
-        if len(self.noise_dist)==0:
+        if len(self.noise_dist)!=0:
             self.noise_dist=self.noise_dist.lower()
         if self.noise_dist not in ['uniform','gaussian']:
             raise NotImplementedError("Only uniform and Gaussian distributions are implemented.")
         # if not self.allow_multi_gpu:
         #     os.environ["CUDA_VISIBLE_DEVICES"]="0"
+        if self.noise_dist=='uniform':
+            if self.real_uniform:
+                print("Using real uniform distribution (no atoms)")
         if len(self.log_dir)==0:
             self.log_dir=os.path.join(ROOT_DIR+'/logs','exp_model_'+self.dataset)
         if not os.path.exists(ROOT_DIR+'/logs'):
@@ -290,7 +315,50 @@ class ExpModelConfig(ExpConfig):
         self.raw_logs = os.path.join(self.log_dir,'raw_logs/')
         if not os.path.exists(self.raw_logs):
             os.mkdir(self.raw_logs)
+        standard_dataset = self.dataset in t_u.supported_datasets
+        data_provided = (self.X is not None) and self.y is not None 
+        model_provided = hasattr(self,"model") and self.model is not None
+        assert standard_dataset or (data_provided and model_provided), "Either a standard dataset or a model and data must be provided"
+        if standard_dataset:
+            if self.dataset=='imagenet':
+                self.load_batch_size=64
+            test_loader = t_u.get_loader(train=False,data_dir=self.data_dir,download=self.download
+                ,dataset=self.dataset,batch_size=self.load_batch_size, shuffle=shuffle,
+                    x_mean=None,x_std=None)
+            if not model_provided:
+                if len(self.model_arch)==0:
+                    self.model_arch = t_u.datasets_default_arch[self.dataset]
+                if self.dataset=='imagenet':
+                    self.model, self.model_shape,self.model_name=t_u.get_model_imagenet(self.model_arch, 
+                        model_dir=self.model_dir,
+                        )
+                else:
+                    self.model, self.model_shape,self.model_name=t_u.get_model(self.model_arch, robust_model=self.robust_model, robust_eps=self.robust_eps,
+                        nb_epochs=self.nb_epochs,model_dir=self.model_dir,data_dir=self.data_dir,test_loader=test_loader,device=self.device,
+                        download=self.download,dataset=self.dataset, force_train=self.force_train,
+                    )
         
+            if not data_provided:
+                self.X,self.y,self.sample_accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=self.device,model=self.model)
+            else:
+                self.sample_accuracy=t_u.get_model_accuracy(model=self.model,X=self.X,y=self.y)
+            self.num_classes=t_u.datasets_num_c[self.dataset.lower()]
+            try:
+                
+                self.x_mean=t_u.datasets_means[self.dataset]
+                self.x_std=t_u.datasets_stds[self.dataset]
+            except KeyError:
+                self.x_mean=None
+                self.x_std =None
+                
+            
+            
+                
+
+        else:
+            
+            """compute the accuracy of the model on the sample batch"""
+            self.sample_accuracy=t_u.get_model_accuracy(model=self.model,X=self.X[self.input_start:self.input_stop],y=self.y[self.input_start:self.input_stop])
         
         
         if len(self.epsilon_range)==0:
@@ -303,37 +371,7 @@ class ExpModelConfig(ExpConfig):
             self.eps_min,self.eps_max=np.min(self.epsilon_range),np.max(self.epsilon_range)
         if self.epsilon==-1.:
             self.epsilon = self.epsilon_range[0]
-        standard_dataset = self.dataset in t_u.supported_datasets
-        data_provided = (self.X is not None) and self.y is not None 
-        model_provided = hasattr(self,"model") and self.model is not None
-        assert standard_dataset or (data_provided and model_provided)
-        if standard_dataset:
-            test_loader = t_u.get_loader(train=False,data_dir=self.data_dir,download=self.download
-                ,dataset=self.dataset,batch_size=self.load_batch_size,
-                    x_mean=None,x_std=None)
-            if not model_provided:
-                if len(self.model_arch)==0:
-                    self.model_arch = t_u.datasets_default_arch[self.dataset]
-                self.model, self.model_shape,self.model_name=t_u.get_model(self.model_arch, robust_model=self.robust_model, robust_eps=self.robust_eps,
-                    nb_epochs=self.nb_epochs,model_dir=self.model_dir,data_dir=self.data_dir,test_loader=test_loader,device=self.device,
-                    download=self.download,dataset=self.dataset, force_train=self.force_train,
-                )
-        
-            if not data_provided:
-                self.X,self.y,self.sample_accuracy=t_u.get_correct_x_y(data_loader=test_loader,device=self.device,model=self.model)
-            else:
-                self.sample_accuracy=t_u.get_model_accuracy(model=self.model,X=self.X,y=self.y)
-            self.num_classes=t_u.datasets_num_c[self.dataset.lower()]
-            self.x_mean=t_u.datasets_means[self.dataset]
-            self.x_std=t_u.datasets_stds[self.dataset]
-                
-            
-                
-
-        else:
-            
-            """compute the accuracy of the model on the sample batch"""
-            self.sample_accuracy=t_u.get_model_accuracy(model=self.model,X=self.X[self.input_start:self.input_stop],y=self.y[self.input_start:self.input_stop])
+       
         if (not hasattr(self,"model_name")) or self.model_name=='':
                 self.model_name = self.dataset + "_model"
         if (not hasattr(self,"model_arch")) or self.model_arch=='':
@@ -370,10 +408,7 @@ class ExpModelConfig(ExpConfig):
 
     def update(self, method_name=''):
         """ """
-        if self.noise_dist=='uniform':
-            self.normal_cdf_layer = t_u.NormalCDFLayer(offset=self.x_clean, 
-            epsilon=self.epsilon, 
-            x_min=self.x_min,x_max=self.x_max,device=self.device)
+        
         
         self.method_name = method_name
         raw_logs_path=os.path.join(self.log_dir,'raw_logs/'+method_name)
@@ -427,7 +462,16 @@ class ExpModelConfig(ExpConfig):
                     self.high[self.mask_idx]=self.x_clean[self.mask_idx]
             except AttributeError:
                 pass
-        
+        if self.noise_dist=='uniform':
+            if self.real_uniform:
+                self.normal_cdf_layer= t_u.NormalToUnifLayer( low = self.low, 
+                high = self.high, device=self.device)
+                    
+                
+            else:
+                self.normal_cdf_layer = t_u.NormalCDFLayer(offset=self.x_clean, 
+                epsilon=self.epsilon, 
+                x_min=self.x_min,x_max=self.x_max,device=self.device)
         return 
     
     def score(self,x):

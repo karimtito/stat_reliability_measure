@@ -15,11 +15,16 @@ import stat_reliability_measure.dev.amls.amls_pyt as amls_pyt
 import stat_reliability_measure.dev.mls.amls_uniform as amls_webb
 from stat_reliability_measure.dev.mls.webb_config import MLS_Webb_Config
 from stat_reliability_measure.dev.form.form_pyt import FORM_pyt as FORM_pyt
+ 
 from stat_reliability_measure.dev.form.form_config import FORM_config
+import stat_reliability_measure.dev.imp_sampling.is_pyt as is_pyt
+from stat_reliability_measure.dev.imp_sampling.is_config import IS_Config
 from stat_reliability_measure.dev.smc.smc_pyt import SamplerSMC
 from stat_reliability_measure.dev.smc.smc_pyt import SamplerSmcMulti
 from stat_reliability_measure.dev.smc.smc_config import SMCSamplerConfig
-from stat_reliability_measure.dev.smc.smc_config2 import SMCSamplerConfig2
+
+    
+from stat_reliability_measure.dev.smc.smc_config2 import SMCSamplerConfig as SMCSamplerConfig2
 from stat_reliability_measure.dev.mc.mc_config import CrudeMC_Config
 from stat_reliability_measure.dev.mc.mc_pyt import MC_pf
 from stat_reliability_measure.dev.hmls.hmls_config import HMLS_Config
@@ -32,7 +37,8 @@ method_config_dict={'amls':MLS_SMC_Config,
                     'mala':SMCSamplerConfig,'amls_batch':MLS_SMC_Config,
                     'mc':CrudeMC_Config,'crudemc':CrudeMC_Config,'crude_mc':CrudeMC_Config,
                     'form':FORM_config,'rw_smc':SMCSamplerConfig,
-                    'smc_multi':SMCSamplerConfig,
+                    'smc_multi':SMCSamplerConfig,'imp_samp':IS_Config,'is':IS_Config,
+                    'imp_sampling':IS_Config,
                     'hmc':SMCSamplerConfig,'smc':SMCSamplerConfig,
                     'smc2':SMCSamplerConfig2}
 

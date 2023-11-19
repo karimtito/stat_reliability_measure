@@ -15,7 +15,7 @@ from dev.utils import float_to_file_float
 class config:
     dataset_models_epsilons= {'mnist':{'dnn2':[0.15]},'cifar10':{'convnet':[0.1]}}
     n_rep=200
-    image_idx=0
+    input_idx=0
     np_seed=0
     torch_seed=0
     robust_model=False
@@ -119,7 +119,7 @@ def get_completion_rate(config):
                     
                     same_exp_df = get_sel_df(df=aggr_res_df,cols=params_keys, vals=params_vals, 
                         triplets=[('method',method,'=='),('n_rep',n_rep,'=='),
-                        ('model_name',model_name,'=='),('image_idx',config.image_idx,'=='),
+                        ('model_name',model_name,'=='),('input_idx',config.input_idx,'=='),
                         ('dataset',dataset,'==')])  
                     # if a similar experiment has been done in the current log directory we skip it
                     if len(same_exp_df)>0:
@@ -137,7 +137,7 @@ def main():
     aggr_res_path=os.path.join(config.log_dir,'aggr_res.csv')
     if not os.path.exists(aggr_res_path):
         print(f"Completion rate: 0%")
-        cols=['epsilon','method','dataset','N','model_name','image_idx','rho','ratio','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est','s',
+        cols=['epsilon','method','dataset','N','model_name','input_idx','rho','ratio','n_rep','T','alpha','min_rate','mean_time','std_time','mean_est','s',
             'bias','mean abs error','batch_size','mean_rel_error','std_est','freq underest','gpu_name','cpu_name','ratio',
             'ess_alpha','L','last_particle']
         aggr_res_df= pd.DataFrame(columns=cols)

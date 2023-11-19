@@ -470,7 +470,7 @@ def main():
                                 if (not config.repeat_exp) and config.update_aggr_res and os.path.exists(aggr_res_path):
                                     aggr_res_df = pd.read_csv(aggr_res_path)
                                     same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method,'='),
-                                    ('model_name',model_name,'='),('epsilon',epsilon,'='),('image_idx',l,'='),('n_rep',config.n_rep,'='),
+                                    ('model_name',model_name,'='),('epsilon',epsilon,'='),('input_idx',l,'='),('n_rep',config.n_rep,'='),
                         ('N',N,'='),('T',T,'='),('L',L,'='),('alpha',alpha,'='),
                         ('ess_alpha',ess_t,'=')] )  
                                     # if a similar experiment has been done in the current log directory we skip it
@@ -582,7 +582,7 @@ def main():
                                 "ess_alpha":ess_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
                                 "method":method,'adapt_dt':config.adapt_dt,"epsilon":epsilon,
                                 "model_name":model_name,"dataset":config.dataset
-                                ,"image_idx":l, 
+                                ,"input_idx":l, 
                                 'mean_calls':calls.mean(),'std_calls':calls.std()
                                 ,'mean_time':times.mean(),'std_time':times.std()
                                 ,'mean_est':ests.mean(),'std_est':ests.std(), 'est_path':est_path,'times_path':times_path,

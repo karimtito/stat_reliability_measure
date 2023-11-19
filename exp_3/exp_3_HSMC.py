@@ -554,7 +554,7 @@ for l in inp_indices:
                             "ess_alpha":ess_t,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
                             "method":method,'adapt_dt':config.adapt_dt,"std_rel_adj":std_rel*mean_calls,
                             'mean_calls':calls.mean(),'std_calls':calls.std(),"lg_est_path":lg_est_path,
-                            "mean_log_est":mean_log_est,"std_log_est":std_log_est,"image_idx":l, 
+                            "mean_log_est":mean_log_est,"std_log_est":std_log_est,"input_idx":l, 
                             "model_name":config.model_arch,
                             "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
                             'mean_time':times.mean(),'std_time':times.std(),'epsilon':epsilon

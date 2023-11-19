@@ -7,7 +7,6 @@ class MLS_Webb_Config(SamplerConfig):
         'method_name': "MLS_Webb",
         'requires_score':True,
         'requires_x_clean':True,
-        'requires_V':False,
         'requires_epsilon':True, 
 
         'N_range':[32,64,128,256,512,1024],

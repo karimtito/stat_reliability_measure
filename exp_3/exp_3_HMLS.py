@@ -455,7 +455,7 @@ for l in inp_indices:
                         
 
                         #with open(os.path.join(log_path,'results.txt'),'w'):
-                        results={'method':method_name,'from_gaussian':str(config.from_gaussian),'image_idx':l,
+                        results={'method':method_name,'from_gaussian':str(config.from_gaussian),'input_idx':l,
                             'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
                         'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std_adj":ests.std()*mean_calls,
                         'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),'est_path':est_path,'times_path':times_path,
