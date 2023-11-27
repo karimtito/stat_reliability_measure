@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from stat_reliability_measure.dev.utils import float_to_file_float
-from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,ConvNet,DenseNet3
+from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,ConvNet,DenseNet3,ResNet18
 from torchvision import transforms,datasets,models as tv_models
 from torch.utils.data import DataLoader
 import scipy.stats as stat
@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import json
 from pathlib import Path
+from pprint import pprint 
 def norm_batch_tensor(x,d):
     y = x.reshape(x.shape[:1]+(d,))
     return y.norm(dim=-1)
@@ -292,7 +293,6 @@ def compute_V_grad_pyt(model, input_, target_class,L=0):
     """ Returns potentials and associated gradients for given inputs, model and target classes """
     if input_.requires_grad!=True:
         input_.requires_grad=True
-    #input_.retain_grad()
     s=score_function(X=input_,y_clean=target_class,model=model)
     v=torch.clamp(L-s,min=0)
     # print(f"v={v},input_={input_}")
@@ -359,6 +359,12 @@ def h_pyt(x_,x_clean,model,target_class,low,high,from_gaussian=True,reshape=True
     h = compute_h_pyt(model=model,input_=x_p,target_class=target_class)
     return h
 
+def h_pyt_alt(x_,target_class,model,T_transform,L=0):
+    with torch.no_grad(): 
+        u_ = T_transform(x_)
+        s = score_function(X=u_, y_clean=target_class,model=model)-L
+    return s
+
 def gradh_pyt(x_,x_clean,model,target_class,low,high,from_gaussian=True,reshape=True,input_shape=None, noise_dist='gaussian',
               noise_scale=1.0,):
     gaussian_prior=noise_dist=='gaussian' or noise_dist=='normal'
@@ -413,6 +419,75 @@ def V_pyt(x_,x_clean,model,target_class,low,high,from_gaussian=True,
     v = compute_V_pyt(model=model,input_=x_p,target_class=target_class)
     return v
 
+
+def h_auto_diff(x_,model,target_class,  T_transform,noise_dist='uniform'):
+    with torch.no_grad():
+        u = T_transform(x_) 
+        h = compute_h_pyt(model=model, input_ = u,target_class=target_class)
+    return h
+
+def G_auto_diff(x_,model,target_class,  T_transform,noise_dist='uniform'):
+    with torch.no_grad():
+        u = T_transform(x_) 
+        s=score_function(X=u, y_clean=target_class, model=model)
+    return h
+
+def V_auto_diff(x_,model,target_class,  T_transform,noise_dist='uniform',L=0):
+    with torch.no_grad():
+        u = T_transform(x_) 
+        s=score_function(X=u, y_clean=target_class, model=model)
+        v =torch.clip(L-s,min=0)
+    return v
+
+def gradV_auto_diff(x_, model, target_class, T_transform,noise_dist='uniform',L=0):
+    if x_.requires_grad!=True:
+        x_.requires_grad=True
+    #input_.retain_grad()
+    u = T_transform(x_)
+    s=score_function(X=u,y_clean=target_class,model=model)
+    v=torch.clamp(L-s,min=0)
+    # print(f"v={v},input_={input_}")
+    # print(f"v.shape={v.shape},input_.shape={input_.shape}")
+    # print(f"v.requires_grad={v.requires_grad},input_.requires_grad={input_.requires_grad}")
+    # print(f"v.grad={v.grad},input_.grad={input_.grad}")
+    grad=torch.autograd.grad(outputs=v,inputs=x_,grad_outputs=torch.ones_like(v),retain_graph=False)[0]
+    with torch.no_grad():
+        grad = grad.view(x_.shape)
+    return grad.detach(),v.detach()
+    
+def gradG_auto_diff(x_, model, target_class, T_transform,noise_dist='uniform',L=0):
+    if x_.requires_grad!=True:
+        x_.requires_grad=True
+    #input_.retain_grad()
+    u = T_transform(x_)
+    g=-score_function(X=u,y_clean=target_class,model=model)
+    # print(f"v={v},input_={input_}")
+    # print(f"v.shape={v.shape},input_.shape={input_.shape}")
+    # print(f"v.requires_grad={v.requires_grad},input_.requires_grad={input_.requires_grad}")
+    # print(f"v.grad={v.grad},input_.grad={input_.grad}")
+    grad=torch.autograd.grad(outputs=g,inputs=x_,grad_outputs=torch.ones_like(g),retain_graph=False)[0]
+    with torch.no_grad():
+        grad = grad.view(x_.shape)
+    return grad.detach(),g.detach()
+
+
+def gradh_auto_diff(x_, model, target_class, T_transform,noise_dist='uniform',L=0):
+    if x_.requires_grad!=True:
+        x_.requires_grad=True
+    #input_.retain_grad()
+    u = T_transform(x_)
+    s=score_function(X=u,y_clean=target_class,model=model)
+    # print(f"v={v},input_={input_}")
+    # print(f"v.shape={v.shape},input_.shape={input_.shape}")
+    # print(f"v.requires_grad={v.requires_grad},input_.requires_grad={input_.requires_grad}")
+    # print(f"v.grad={v.grad},input_.grad={input_.grad}")
+    grad=torch.autograd.grad(outputs=v,inputs=x_,grad_outputs=torch.ones_like(s),retain_graph=False)[0]
+    with torch.no_grad():
+        grad = grad.view(x_.shape)
+    return grad.detach(),s.detach()
+
+
+
 def gradV_pyt(x_,x_clean,model,target_class,low,high,from_gaussian=True,reshape=True,input_shape=None, noise_dist='gaussian',
               noise_scale=1.0,):
     gaussian_prior = noise_dist=='gaussian' or noise_dist=='normal'
@@ -452,7 +527,7 @@ def correct_min_max(x_min,x_max,x_mean,x_std):
 supported_datasets=['mnist','fashion-mnist','cifar10','cifar100','imagenet']
 datasets_in_shape={'mnist':(1,28,28),'cifar10':(3,32,32),'cifar100':(3,32,32),'imagenet':(3,224,224)}
 datasets_dims={'mnist':784,'cifar10':3*1024,'cifar100':3*1024,'imagenet':3*224**2}
-datasets_num_c={'mnist':10,'cifar10':10,'imagenet':1000}
+datasets_num_c={'mnist':10,'cifar10':10,'cifar100':100,'imagenet':1000}
 datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465),'cifar100':[125.3/255.0, 123.0/255.0, 113.9/255.0], 
                 'imagenet':(0.485, 0.456, 0.406)}
 
@@ -461,7 +536,7 @@ std = [0.229, 0.224, 0.225]
 datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010),'cifar100':[63.0/255.0, 62.1/255.0, 66.7/255.0],
                'imagenet':(0.229, 0.224, 0.225)}
 datasets_supp_archs={'mnist':{'dnn2':dnn2,'dnn_2':dnn2,'dnn_4':dnn4,'dnn4':dnn4,'cnn_custom':CNN_custom},
-                    'cifar10':{'lenet':LeNet,'convnet':ConvNet,'dnn2':dnn2},
+                    'cifar10':{'lenet':LeNet,'convnet':ConvNet,'dnn2':dnn2,'resnet18':ResNet18},
                     'cifar100':{'densenet':DenseNet3}}
 datasets_default_arch={'mnist':'dnn2', 'cifar10':'convnet', 'cifar100':'densenet','imagenet':'resnet18'}
 defaults_datasets=['mnist','cifar10','cifar100','imagenet']
@@ -531,7 +606,7 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
                          
     return data_loader
 
-def plot_tensor(x,cmap='gray'):
+def plot_tensor(x,y=None,cmap='gray'):
     if 'cuda' in str(x.device):
         x=x.cpu()
     if len(x.shape)==4:
@@ -539,19 +614,36 @@ def plot_tensor(x,cmap='gray'):
     if len(x.shape)==3:
         x=x.permute(1,2,0)
     plt.imshow(x.detach(),cmap=cmap)
+    if y is not None:
+        plt.title(label=f"Label predicted:{y}")
     plt.show()
 
 def plot_k_tensor(X,figsize=(10,10),x_0=None,img_size=(28,28)):
     """plots k tensors representing images in a row of 4 columns"""
 
-    k = X.shape[0]
+    k = X.shape[0] 
+    img_size= X.shape[1:]
     nrows = k // 4 if k%4==0 else k // 4 +1
     if x_0 is not None:
-        plt.imshow(x_0.view(*img_size).detach().cpu().numpy(),cmap='gray')
+        x_img= x_0.view(*img_size).detach()
+        if len(x_img.shape)==3:
+            x_img=x_img.permute(1,2,0)
+        if x_img.is_cuda:
+            x_img=x_img.cpu()
+        x_img=x_img.numpy()
+        
+        plt.imshow(x_img,cmap='gray')
     plt.figure(figsize=(figsize[0]*k,figsize[1]))
     for i in range(k):
+        x_img= X[i].view(*img_size).detach()
+        if len(x_img.shape)==3:
+            x_img=x_img.permute(1,2,0)
+        if x_img.is_cuda:
+            x_img=x_img.cpu()
+        x_img=x_img.numpy()
         plt.subplot(nrows,4,i+1)
-        plt.imshow(X[i].view(*img_size).detach().cpu().numpy(),cmap='gray')
+        plt.imshow(x_img,cmap='gray')
+        del x_img
 
 
 def gaussian_to_image(gaussian_sample,normal_layer,image_shape=(28,28)):
@@ -805,8 +897,9 @@ def get_model_imagenet(model_arch,model_dir):
     model = torch.nn.Sequential(normalizer, model).cuda(0).eval()
     return model,mean,std
 
+cifar_datasets = ['cifar10','cifar100']
 def get_model(model_arch, test_loader, device=None , robust_model=False, robust_eps=0.1,nb_epochs=10,model_dir='./',data_dir='./',
-download=True,force_train=False,dataset='mnist',batch_size=100,lr=1E-1):
+download=True,force_train=False,dataset='mnist',batch_size=100,lr=1E-1,model_path='',train_loader=None):
     if device is None:
         device=device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  
     input_shape=datasets_in_shape[dataset]
@@ -815,13 +908,37 @@ download=True,force_train=False,dataset='mnist',batch_size=100,lr=1E-1):
         c_robust_eps=float_to_file_float(robust_eps)
     model_name=model_arch +'_' + dataset if not robust_model else f"model_{model_arch}_{dataset}_robust_{c_robust_eps}"
     
-    c_model_path=model_name+'.pt'
-    model_path=os.path.join(model_dir,c_model_path)
+    )
     support_arch=datasets_supp_archs[dataset]
-    assert model_arch.lower() in support_arch,f"/!\\Architectures supported for {dataset}:{list(support_arch.keys())}"
-    network=support_arch[model_arch.lower()](dataset=dataset)
+    pretrained_model=False
+    if model_arch.lower() not in support_arch and dataset in cifar_datasets:
+        
+        while True:
+            model_arch=model_arch.lower().replace('cifar10','').replace('cifar100','')
+            model_arch_cifar=dataset+'_'+model_arch
+            print(f"model arch cifar:{model_arch_cifar}")
+            try:
+                network = torch.hub.load("chenyaofo/pytorch-cifar-models", f"{model_arch_cifar}", pretrained=True)
+                input_shape=(3,32,32)
+                print(f"Loading pretrained model {model_arch} from torch hub for {dataset}")
+                pretrained_model=True
+                
+                break
+            except RuntimeError:
+                print(f"Model {model_arch}  not found in torch hub. Here is a list of available cifar10/100 pretrained models:")
+                pprint(torch.hub.list("chenyaofo/pytorch-cifar-models", force_reload=True)) 
+                print(f"Please input name of a valid model from the list above.")
+                model_arch=input()
+                continue
+            
+    else:
+        assert model_arch.lower() in support_arch,f"/!\\Architectures supported for {dataset}:{list(support_arch.keys())}"
+        network=support_arch[model_arch.lower()](dataset=dataset)
     normalizer=transforms.Normalize(mean=datasets_means[dataset], std=datasets_stds[dataset])
-    if not os.path.exists(model_path) or force_train: 
+    c_model_path=model_name+'.pt'
+    if model_path=='':
+        model_path=os.path.join(model_dir,c_model_path
+    if (not os.path.exists(model_path) and not pretrained_model) or force_train: 
         #if the model doesn't exist we retrain a model from scratch
         model=torch.nn.Sequential(normalizer, network)
         model.to(device)
@@ -1508,7 +1625,7 @@ def idx_negative(tensor):
     return (tensor<0)
 
 class NormalCDFLayer(torch.nn.Module):
-    def __init__(self,device='cpu',mu=0.,sigma=1.,x_clean = 0.,epsilon = 0.1,x_min=0., x_max=1., offset=0.,
+    def __init__(self,x_clean,device='cpu',mu=0.,sigma=1.,epsilon = 0.1,x_min=0., x_max=1., input_shape=None,
                  no_atoms=True):
         super(NormalCDFLayer, self).__init__()
         self.device=device
@@ -1519,22 +1636,42 @@ class NormalCDFLayer(torch.nn.Module):
         self.epsilon = epsilon
         self.x_min = x_min
         self.x_max = x_max
-        self.offset =offset
+        
+        
+        if input_shape is None: 
+            input_shape = x_clean.shape
+        self.input_shape=input_shape
         
     def forward(self,x):
-        return torch.clip(self.offset+self.epsilon*(2*self.norm.cdf(x)-1),min=self.x_min,max=self.x_max)
+        u= self.norm.cdf(x).view(-1,*self.input_shape)
+        return torch.clip(self.x_clean+self.epsilon*(2*u-1),min=self.x_min,max=self.x_max)
     def inverse(self,x):
-        return self.norm.icdf(((x-self.offset)/self.epsilon+1.)/2.)
+        return self.norm.icdf(((x-self.x_clean)/self.epsilon+1.)/2.)
     def string(self):
         return f"NormalCDFLayer(mu={self.mu},sigma={self.sigma})"
-
+    
+class NormalClampReshapeLayer(torch.nn.Module):
+    def __init__(self,offset,input_shape=None,x_max=0,x_min=1.,sigma=1.):
+        self.x_min =x_min
+        self.x_max = x_max
+        self.input_shape = input_shape if input_shape is not None else offset.shape[1:] 
+        self.offset=offset
+        self.sigma=sigma
+    def forward(self,x):
+        return self.offset+self.sigma*torch.clip(x,min=self.x_min,max=self.x_max).view(-1,*self.input_shape)
+    def inverse(self,x): 
+        return (x-self.offset)/self.sigma 
+    def string(self):
+        return f"NormalClampReshapeLayer(sigma={self.sigma})"
+        
 class NormalToUnifLayer(torch.nn.Module):
     def __init__(self,device='cpu',input_shape=None,low=0.,high=1.,epsilon = None, x_clean = None,x_min=0., x_max=1.,mu=0.,sigma=1.,
-                 ):
+                 dim=None):
         super(NormalToUnifLayer, self).__init__()
-        
+        assert input_shape is not None or x_clean is not None, "input_shape or x_clean must be specified"
         self.device=device
         self.norm = torch.distributions.Normal(0, 1)
+        
         
         self.low = low
         self.high = high
@@ -1544,25 +1681,29 @@ class NormalToUnifLayer(torch.nn.Module):
         self.x_max = x_max
         self.mu = mu
         self.sigma = sigma
+        
+        if input_shape is None:
+            input_shape = x_clean.shape
+        self.input_shape = input_shape
         if low is None:
             assert self.x_clean is not None, "x_clean must be specified if low is None"
             assert self.epsilon is not None, "epsilon must be specified if low is None"
-            assert input_shape is not None or x_clean is not None, "input_shape or x_clean must be specified"
             self.low=torch.maximum(self.x_clean-self.epsilon, self.x_min.view(-1,*self.input_shape).to(self.device))
         if high is None:
             assert self.x_clean is not None, "x_clean must be specified if high is None"
             assert self.epsilon is not None, "epsilon must be specified if low is None"
-            assert input_shape is not None or x_clean is not None, "input_shape or x_clean must be specified"
             self.high=torch.minimum(self.x_clean+self.epsilon, self.x_max.view(-1,*self.input_shape).to(self.device))
         self.range=self.high-self.low
     def forward(self,x):
-        return self.low + self.range*self.norm.cdf(x)  
+        u = self.norm.cdf(x.view(-1,*self.input_shape))  
+        return self.low + self.range*u
     def inverse(self,x):
         return self.norm.icdf(((x-self.low)/self.range))
     def string(self):
         return f"NormalToUnifLayer(mu={self.mu},sigma={self.sigma})"
 
 imagenet_simple_labels = get_imagenet_simple_labels()
+
 def plot_imagenet_pictures(X,y=None, nb_rows = 5, nb_cols = None,text_labels=imagenet_simple_labels):
     """plots the first nb_pictures pictures of the imagenet dataset with subfigures and saves them in the exp_config.exp_log_path + '/imagenet_pictures/' folder"""
     #using suplots to plot in an approximate square shape
