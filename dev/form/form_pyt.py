@@ -2,65 +2,14 @@ import scipy.stats as stats
 from stat_reliability_measure.dev.torch_utils import NormalCDFLayer
 from math import sqrt
 import torch
+from stat_reliability_measure.dev.mpp_utils import gradient_binary_search,gaussian_space_attack,mpp_search_newton, search_methods_list, binary_search_to_zero
 
-def latent_attack_pyt(x_clean,y_clean,model,noise_dist='uniform',
-                      attack = 'Carlini',num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1,
-                        sigma=1.,x_min=0.,x_max=1., random_init=False , sigma_init=0.5,**kwargs):
-    """ Performs an attack on the latent space of the model."""
-    device= x_clean.device
-    if max_dist is None:
-        max_dist = sqrt(x_clean.numel())*sigma
-    if attack.lower() in ('carlini','cw','carlini-wagner','carliniwagner','carlini_wagner','carlini_wagner_l2'):
-        attack = 'Carlini'
-        assert (x_clean is not None) and (y_clean is not None), "x_clean and y_clean must be provided for Carlini-Wagner attack"
-        assert (model is not None), "model must be provided for Carlini-Wagner attack"
-        import foolbox as fb
-        attack = fb.attacks.L2CarliniWagnerAttack(binary_search_steps=num_iter, 
-                                          stepsize=stepsize,
-                                        
-                                          steps=steps,)
-    elif attack.lower() in ('brendel','brendel-bethge','brendel_bethge'):
-        attack = 'Brendel'
-        import foolbox as fb
-        attack = fb.attacks.L2BrendelBethgeAttack(binary_search_steps=num_iter,
-        lr=stepsize, steps=steps,)
-    else:
-        raise NotImplementedError(f"Search method '{attack}' is not implemented.")
-    if noise_dist.lower() in ('gaussian','normal'):
-        
-        fmodel=fb.models.PyTorchModel(model, bounds=(x_min, x_max),device=device)
-        if not random_init:
-            x_0 = x_clean
-        else:
-            print(f"Random init with sigma_init={sigma_init}")
-            x_0 = x_clean + sigma_init*torch.randn_like(x_clean)
-        
-        _,advs,success= attack(fmodel, x_0[:1], y_clean.unsqueeze(0), epsilons=[max_dist])
-        assert success.item(), "The attack failed. Try to increase the number of iterations or steps."
-        design_point= advs[0]-x_clean
-        del advs
-    elif noise_dist.lower() in ('uniform','unif'):
-        normal_cdf_layer = NormalCDFLayer(device=device, offset=x_clean,epsilon =epsilon)
-        fake_bounds=(-10.,10.)
-        total_model = torch.nn.Sequential(normal_cdf_layer, model)
-        if not random_init:
-            x_0 = torch.zeros_like(x_clean)
-        else:
-            print(f"Random init with sigma_init={sigma_init}")
-            x_0 = sigma_init*torch.randn_like(x_clean)
-        total_model.eval()
-        fmodel=fb.models.PyTorchModel(total_model, bounds=fake_bounds,
-                device=device, )
-        _,advs,success= attack(fmodel,x_0[:1] , y_clean.unsqueeze(0), epsilons=[max_dist])
-        design_point= advs[0]
-        del advs 
+          
 
-    return design_point                
-
-def FORM_pyt(x_clean,y_clean,model,noise_dist='uniform',
-             search_method='Carlini',
-             num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1,
-              sigma=1.,x_min=0.,x_max=1., random_init=False , sigma_init=0.5,**kwargs):
+def FORM_pyt(x_mpp=None,x_clean=None, gradG=None, G=None,y_clean=None,model=None,noise_dist='uniform',
+             search_method='Carlini',normal_cdf_layer=None,nb_calls=-1.,verbose=0,
+             num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1,eps_real_mpp=1e-3,
+              sigma=1.,x_min=0.,x_max=1., random_init=False , sigma_init=0.5, real_mpp=True,**kwargs):
 
     """Computes the probability of failure using the First Order Method (FORM)
     Args:
@@ -83,113 +32,55 @@ def FORM_pyt(x_clean,y_clean,model,noise_dist='uniform',
         dict_out (dict): dictionary containing the parameters of the attack
 
     """
-    device= x_clean.device
-    if max_dist is None:
-        max_dist = sqrt(x_clean.numel())*sigma # maximum distance between the clean input and the adversarial example
-    if search_method.lower() in ('carlini','cw','carlini-wagner','carliniwagner','carlini_wagner','carlini_wagner_l2'):
-        assert (x_clean is not None) and (y_clean is not None), "x_clean and y_clean must be provided for Carlini-Wagner attack"
-        assert (model is not None), "model must be provided for Carlini-Wagner attack"
-        import foolbox as fb
-        attack = fb.attacks.L2CarliniWagnerAttack(binary_search_steps=num_iter, 
-                                          stepsize=stepsize,
-                                        
-                                          steps=steps,)
-    elif search_method.lower() in ('brendel','brendel-bethge','brendel_bethge'):
-        import foolbox as fb
-        attack = fb.attacks.L2BrendelBethgeAttack(binary_search_steps=num_iter,
-        lr=stepsize, steps=steps,)
-    else:
-        raise NotImplementedError(f"Search method '{search_method}' is not implemented.")
-        
-    if noise_dist.lower() in ('gaussian','normal'):
-        
-        fmodel=fb.models.PyTorchModel(model, bounds=(x_min, x_max),device=device)
-        if not random_init:
-            x_0 = x_clean
-        else:
-            print(f"Random init with sigma_init={sigma_init}")
-            x_0 = x_clean + sigma_init*torch.randn_like(x_clean)
-        
-        _,advs,success= attack(fmodel, x_0[:1], y_clean.unsqueeze(0), epsilons=[max_dist])
-        assert success.item(), "The attack failed. Try to increase the number of iterations or steps."
-        design_point= advs[0]-x_clean
-        del advs
-    elif noise_dist.lower() in ('uniform','unif'):
-        normal_cdf_layer = NormalCDFLayer(device=device, offset=x_clean,epsilon =epsilon)
-        fake_bounds=(-10.,10.)
-        total_model = torch.nn.Sequential(normal_cdf_layer, model)
-        if not random_init:
-            x_0 = torch.zeros_like(x_clean)
-        else:
-            print(f"Random init with sigma_init={sigma_init}")
-            x_0 = sigma_init*torch.randn_like(x_clean)
-        total_model.eval()
-        fmodel=fb.models.PyTorchModel(total_model, bounds=fake_bounds,
-                device=device, )
-        _,advs,success= attack(fmodel,x_0[:1] , y_clean.unsqueeze(0), epsilons=[max_dist])
-        design_point= advs[0]
-        del advs
-    else:
-        raise NotImplementedError(f"Noise distribution '{noise_dist}' is not implemented.")
-    
+    assert x_mpp is not None or (x_clean is not None and model is not None and y_clean is not None) 
+    device= x_clean.device if (x_mpp is None) else x_mpp.device
+    search_method=search_method.lower()
+    if x_mpp is None:
+        zero_latent=torch.zeros_like(x_clean)
+        if search_method not in search_methods_list:
+            raise NotImplementedError(f"Method {search_method} is not implemented.")
+        if search_method=='mpp_search':
+            assert gradG is not None, "gradG must be provided for mpp_search"
+            debug=verbose>=1
+            x_mpp,nb_calls=mpp_search_newton(zero_latent=zero_latent, 
+                        grad_f= gradG,stop_cond_type='beta',
+                        max_iter=num_iter,stop_eps=1E-2,debug=debug,) 
+        elif search_method=='gradient_binary_search':
+            assert gradG is not None, "gradG must be provided for gradient_binary_search"
+            assert G is not None, "G must be provided for gradient_binary_search"
+            x_mpp=gradient_binary_search(zero_latent=zero_latent,gradG=gradG, G=G)
+        elif search_method.lower() in ['carlini','carlini-wagner','cw','carlini_wagner','carlini_wagner_l2','adv','adv_attack']:
+            assert (model is not None), "model must be provided for Carlini-Wagner attack"
+            assert normal_cdf_layer is not None, "normal_cdf_layer must be provided for Carlini-Wagner attack"
+            x_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=y_clean,model=model,noise_dist='uniform',
+                                
+                      attack = search_method,num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=epsilon,
+                        sigma=1.,random_init=False , sigma_init=0.5,**kwargs)
+        elif search_method.lower() in ['brendel','brendel-bethge','brendel_bethge']:
+            assert normal_cdf_layer is not None, "normal_cdf_layer must be provided for Brendel-Bethge attack"
+            assert (model is not None), "model must be provided for Brendel-Bethge attack"
+            x_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=y_clean,model=model,noise_dist='uniform',
+                        attack = search_method,num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=epsilon,
+                            sigma=1., random_init=False , sigma_init=0.5,**kwargs)
+        elif search_method.lower() in ['fmna','fast_mininum_norm_attack','fmna_l2']: 
+            assert (model is not None), "model must be provided for FMNA attack"
+            assert normal_cdf_layer is not None, "normal_cdf_layer must be provided for FMNA attack"
+            x_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=y_clean,model=model,noise_dist='uniform',
+                        attack = search_method,num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=epsilon,
+                            sigma=1., random_init=False , sigma_init=0.5,**kwargs)
             
 
-
-
-    l2dist= design_point.norm(p=2)
-    p_fail= stats.norm.cdf(-l2dist.cpu()/sigma)
-    nb_calls= num_iter*steps
-    dict_out={'nb_calls':nb_calls}
+    if real_mpp:
+        assert G is not None, "G must be provided for real_mpp"
+        x_mpp = binary_search_to_zero(G=G,x=x_mpp,eps=eps_real_mpp)
+    design_point=x_mpp
+    nb_calls=nb_calls
+    l2dist= design_point.norm(p=2).detach().cpu().item()
+    p_fail= stats.norm.cdf(-l2dist/sigma)
+    
+    dict_out={'nb_calls':nb_calls,'l2dist':l2dist}
     return p_fail,dict_out
 
 
-#gradient descent in 1 dimension to find zero of a function f
-def find_zero_gd_pyt(f, grad_f, x0, obj='min', stepsize=1e-2, max_iter=100, tol=1e-3,random_init=False):
-    x = x0
-    
-    if random_init:
-        x = x0 + stepsize*torch.randn_like(x0)
-    if x.dim() == 1:
-        x = x.unsqueeze(0)
-    f_calls = 0
-    sign= 1 if obj=='max' else -1
-    for i in range(max_iter):
-        x = x + sign*stepsize * grad_f(x)
-        f_calls += 2 # we count 2 calls for each gradient evaluation (forward and backward)
-        if sign*f(x) > -tol:
-            f_calls += 1 # we count one more call for the last function evaluation
-            break
-    if i == max_iter-1:
-        print('Warning: max_iter reached in find_zero_gd')
-    return x, f_calls
 
-def mpp_search(f, grad_f, x_clean,max_iter=100,stop_cond_type='grad_norm',stop_eps=1e-3):
-    """ Search algorithm for the Most Probable Point (MPP) 
-        according to the course 'Probabilistc Engineering Design' from University of Missouri  """
-    x=x_clean 
-    grad_fx = grad_f(x)
-    f_calls+=2
-    beta=torch.norm(x)
-    k= 0
-    stop_cond=False
-    while k<max_iter & ~stop_cond: 
-        k+=1
-        a = grad_fx/torch.norm(grad_fx)
-        beta_new = beta + f(x)/torch.norm(grad_fx)
-        f_calls+=1
-        x_new=-a*beta
-        grad_f_xnew = grad_f(x_new)
-        f_calls+=2
-        if stop_cond_type not in ['grad_norm']:
-            raise NotImplementedError(f"Method {stop_cond_type} is not implemented.")
-        if stop_cond_type=='grad_norm':
-            stop_cond = torch.norm(grad_fx-grad_f_xnew)<stop_eps
-        beta=beta_new
-        x=x_new
-        grad_fx=grad_f_xnew
-    if k==max_iter:
-        print("Warning: maximum number of iteration has been reached")
-    return x, f_calls
-
-        
             

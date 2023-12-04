@@ -3,6 +3,7 @@ import scipy.stats as stats
 import numpy as np
 from math import sqrt
 from stat_reliability_measure.dev.torch_utils import NormalCDFLayer, NormalToUnifLayer
+from stat_reliability_measure.dev.mpp_utils import gradient_binary_search, gaussian_space_attack, mpp_search_newton, binary_search_to_zero
 
 def GaussianImportanceWeight(x,mu_1,mu_2,sigma_1=1.,sigma_2=1.):
     """ Computes importance weights for Gaussian distributions for Importance Sampling
@@ -26,7 +27,7 @@ def GaussianImportanceWeight(x,mu_1,mu_2,sigma_1=1.,sigma_2=1.):
 
 def mpp_search(grad_f, zero_latent,max_iter=100,stop_cond_type='grad_norm',
                stop_eps=1e-3,
-            mult_grad_calls=2.,debug=False,print_every=10):
+            mult_grad_calls=2.,debug=False,print_every=10,real_mpp=True):
     """ Search algorithm for the Most Probable Point (X_mpp) with a Newton method.  """
     x= zero_latent
     grad_fx,f_x = grad_f(x)
@@ -71,21 +72,21 @@ def mpp_search(grad_f, zero_latent,max_iter=100,stop_cond_type='grad_norm',
             print_count+=1
         x=x_new
         grad_fx=grad_f_xnew
-    if k==max_iter and debug_:
-        print("Warning: maximum number of iteration has been reached")
+    if k==max_iter:
+        print("Warning: maximum number of iteration has been reached for MPP search")
     nb_calls= mult_grad_calls*grad_calls
     return x, nb_calls
 
 
 
 
-search_methods= {'mpp_search':mpp_search ,'gradient_binary_search':'gradient_binary_search',}
 search_methods_list=['mpp_search','gradient_binary_search',
                      'carlini','carlini-wagner','cw','carlini_wagner','carlini_wagner_l2','brendel','brendel-bethge','brendel_bethge',
                      'adv','adv_attack','hlrf']
 def GaussianIS(x_clean,gen,h,N:int=int(1e4),batch_size:int=int(1e3),track_advs:bool=False,verbose=0.,track_X:bool=False,
-               nb_calls_mpp=0,sigma_bias=1.,G=None,gradG=None, real_uniform=False, normal_cdf_layer=None,
+               nb_calls_mpp=0,sigma_bias=1.,G=None,gradG=None, real_uniform=False, normal_cdf_layer=None,y_clean=None,
                model=None,search_method='mpp_search',X_mpp=None,save_weights=False, epsilon=0.1,
+               eps_real_mpp=1e-2,real_mpp=True,
                alpha_CI=0.05, max_iter=15,random_init=False,**kwargs):
     """ Gaussian importance sampling algorithm to compute probability of failure
 
@@ -104,14 +105,14 @@ def GaussianIS(x_clean,gen,h,N:int=int(1e4),batch_size:int=int(1e3),track_advs:b
     d=x_clean.numel()
     zero_latent = torch.zeros((1,d),device=x_clean.device)
     if X_mpp is None:
-        if search_method not in search_methods.keys():
+        if search_method not in search_methods_list:
             raise NotImplementedError(f"Method {search_method} is not implemented.")
         if search_method=='mpp_search':
             assert gradG is not None, "gradG must be provided for mpp_search"
             debug=verbose>=1
             X_mpp,nb_calls_mpp=mpp_search(zero_latent=zero_latent, 
                         grad_f= gradG,stop_cond_type='beta',
-                        max_iter=max_iter,stop_eps=1E-2,debug=debug,**kwargs) 
+                        max_iter=max_iter,stop_eps=1E-2,debug=debug,) 
         elif search_method=='gradient_binary_search':
             assert gradG is not None, "gradG must be provided for gradient_binary_search"
             assert G is not None, "G must be provided for gradient_binary_search"
@@ -119,13 +120,14 @@ def GaussianIS(x_clean,gen,h,N:int=int(1e4),batch_size:int=int(1e3),track_advs:b
         elif search_method.lower() in ['carlini','carlini-wagner','cw','carlini_wagner','carlini_wagner_l2','adv','adv_attack']:
             assert (model is not None), "model must be provided for Carlini-Wagner attack"
             assert normal_cdf_layer is not None, "normal_cdf_layer must be provided for Carlini-Wagner attack"
-            X_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=None,model=model,noise_dist='uniform',
+            X_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=y_clean,model=model,noise_dist='uniform',
+                                
                       attack = search_method,num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=epsilon,
                         sigma=1.,random_init=False , sigma_init=0.5,**kwargs)
         elif search_method.lower() in ['brendel','brendel-bethge','brendel_bethge']:
             assert normal_cdf_layer is not None, "normal_cdf_layer must be provided for Brendel-Bethge attack"
             assert (model is not None), "model must be provided for Brendel-Bethge attack"
-            X_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=None,model=model,noise_dist='uniform',
+            X_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=y_clean,model=model,noise_dist='uniform',
                         attack = search_method,num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=epsilon,
                             sigma=1., random_init=False , sigma_init=0.5,**kwargs)
             
@@ -134,6 +136,9 @@ def GaussianIS(x_clean,gen,h,N:int=int(1e4),batch_size:int=int(1e3),track_advs:b
         assert nb_calls_mpp>0, "nb_calls_mpp must be provided if X_mpp is provided" 
     if batch_size>N:
         batch_size=N
+    if real_mpp:    
+        X_mpp = binary_search_to_zero(G=G,x=X_mpp,eps=eps_real_mpp)   
+    
     d = x_clean.shape[-1]
     gen_bias = lambda n: X_mpp+sigma_bias*gen(n)
     p_f = 0
@@ -181,7 +186,8 @@ def GaussianIS(x_clean,gen,h,N:int=int(1e4),batch_size:int=int(1e3),track_advs:b
     var_est = (1/N)*(pre_var-p_f**2).item()
     dict_out['var_est']=var_est
     dict_out['std_est']=np.sqrt(var_est)
-    dict_out['weights']=torch.cat(weights,dim=0).to('cpu').numpy()
+    if save_weights:
+        dict_out['weights']=torch.cat(weights,dim=0).to('cpu').numpy()
     CI = stats.norm.interval(1-alpha_CI,loc=p_f.item(),scale=np.sqrt(var_est))
     dict_out['CI']=CI
     if track_advs:
@@ -190,7 +196,7 @@ def GaussianIS(x_clean,gen,h,N:int=int(1e4),batch_size:int=int(1e3),track_advs:b
 
 
 def gaussian_space_attack(x_clean,y_clean,model,noise_dist='uniform',
-                      attack = 'Carlini',num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1, normal_cdf_layer=None,
+                      attack = 'Carlini',num_iter=50,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1, normal_cdf_layer=None,
                         sigma=1.,x_min=-int(1e2),x_max=int(1e2), random_init=False , sigma_init=0.5,real_uniform=False,**kwargs):
     """ Performs an attack on the latent space of the model."""
     device= x_clean.device
@@ -210,6 +216,10 @@ def gaussian_space_attack(x_clean,y_clean,model,noise_dist='uniform',
         import foolbox as fb
         attack = fb.attacks.L2BrendelBethgeAttack(binary_search_steps=num_iter,
         lr=stepsize, steps=steps,)
+    elif attack.lower() in ('fmna','fast_minimum_norm_attack','fmna_l2'):
+        attack='FMNA'
+        import foolbox as fb
+        attack = fb.attacks.FastMinimumNormAttack(  steps=steps,)
     else:
         raise NotImplementedError(f"Search method '{attack}' is not implemented.")
     
@@ -222,7 +232,7 @@ def gaussian_space_attack(x_clean,y_clean,model,noise_dist='uniform',
             print(f"Random init with sigma_init={sigma_init}")
             x_0 = x_clean + sigma_init*torch.randn_like(x_clean)
         
-        _,advs,success= attack(fmodel, x_0[:1], y_clean.unsqueeze(0), epsilons=[max_dist])
+        _,advs,success= attack(fmodel, x_0.unsqueeze(), y_clean.unsqueeze(0), epsilons=[max_dist])
         assert success.item(), "The attack failed. Try to increase the number of iterations or steps."
         design_point= advs[0]-x_clean
         del advs
@@ -232,7 +242,7 @@ def gaussian_space_attack(x_clean,y_clean,model,noise_dist='uniform',
             if not real_uniform:
                 normal_cdf_layer = NormalCDFLayer(device=device, offset=x_clean,epsilon =epsilon)
             else:
-                normal_cdf_layer = NormalToUnifLayer(device=device, offset=x_clean,epsilon =epsilon)
+                normal_cdf_layer = NormalToUnifLayer(device=device, x_clean=x_clean,epsilon =epsilon)
         fake_bounds=(x_min,x_max)
         total_model = torch.nn.Sequential(normal_cdf_layer,
                                           model)
@@ -244,7 +254,7 @@ def gaussian_space_attack(x_clean,y_clean,model,noise_dist='uniform',
         total_model.eval()
         fmodel=fb.models.PyTorchModel(total_model, bounds=fake_bounds,
                 device=device, )
-        _,advs,success= attack(fmodel,x_0[:1] , y_clean.unsqueeze(0), 
+        _,advs,success= attack(fmodel,x_0.unsqueeze(0) , y_clean.unsqueeze(0), 
                                epsilons=[max_dist])
         design_point= advs[0]
         del advs 

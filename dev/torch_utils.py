@@ -14,9 +14,38 @@ import matplotlib.pyplot as plt
 import json
 from pathlib import Path
 from pprint import pprint 
+
 def norm_batch_tensor(x,d):
     y = x.reshape(x.shape[:1]+(d,))
     return y.norm(dim=-1)
+
+def gram_schmidt(vv):
+    def projection(u, v):
+        return (v * u).sum() / (u * u).sum() * u
+
+    nk = vv.size(0)
+    uu = torch.zeros_like(vv, device=vv.device)
+    uu[:, 0] = vv[:, 0].clone()
+    for k in range(1, nk):
+        vk = vv[k].clone()
+        uk = 0
+        for j in range(0, k):
+            uj = uu[:, j].clone()
+            uk = uk + projection(uj, vk)
+        uu[:, k] = vk - uk
+    for k in range(nk):
+        uk = uu[:, k].clone()
+        uu[:, k] = uk / uk.norm()
+    return uu
+
+def rotation_matrix(u):
+    """constructs a rotation matrix such that the first coordinate axis is the direction of u, using gram-schmidt"""
+    Q = torch.eye(u.shape[-1])
+    Q[:,0] = u.squeeze(0)
+    G = gram_schmidt(Q)
+    R = G.t()
+    return R 
+
 
 def TimeStepPyt(v,grad_v,p=1,p_p=2):
     """computes the initial time step for the langevin/hmc kernel"""
@@ -908,7 +937,7 @@ download=True,force_train=False,dataset='mnist',batch_size=100,lr=1E-1,model_pat
         c_robust_eps=float_to_file_float(robust_eps)
     model_name=model_arch +'_' + dataset if not robust_model else f"model_{model_arch}_{dataset}_robust_{c_robust_eps}"
     
-    )
+    
     support_arch=datasets_supp_archs[dataset]
     pretrained_model=False
     if model_arch.lower() not in support_arch and dataset in cifar_datasets:
@@ -937,7 +966,7 @@ download=True,force_train=False,dataset='mnist',batch_size=100,lr=1E-1,model_pat
     normalizer=transforms.Normalize(mean=datasets_means[dataset], std=datasets_stds[dataset])
     c_model_path=model_name+'.pt'
     if model_path=='':
-        model_path=os.path.join(model_dir,c_model_path
+        model_path=os.path.join(model_dir,c_model_path)
     if (not os.path.exists(model_path) and not pretrained_model) or force_train: 
         #if the model doesn't exist we retrain a model from scratch
         model=torch.nn.Sequential(normalizer, network)

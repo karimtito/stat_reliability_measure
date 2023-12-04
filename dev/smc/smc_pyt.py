@@ -8,7 +8,7 @@ from stat_reliability_measure.dev.smc.smc_utils import nextBetaESS,nextBetaSimpE
     
 supported_beta_adapt={'ess':nextBetaESS,'simp_ess':nextBetaSimpESS,'simp':ESSAdaptBetaPyt}
 
-def SamplerSMC(gen, V, gradV,adapt_func='', min_rate=0.8, alpha =0.1, N=300, T = 1, L=1, n_max=5000, 
+def SamplerSMC(gen, V, gradV,adapt_func='ess', min_rate=0.8, alpha =0.1, N=300, T = 1, L=1, n_max=5000, 
 max_beta=1e6, verbose=False,device=None,ess_alpha=0.875,mh_opt=True,
 track_accept=False,track_beta=False,return_log_p=False,gaussian=True,
 adapt_dt=False, track_finish=False, save_X=False,save_v=False,
@@ -115,7 +115,7 @@ dt_min=1e-5,dt_max=1e-2,v_min_opt=True,kappa_opt=False,
 
             d=X.shape[-1]
             assert dt_d==1 or dt_d==d,"dt dimension can be 1 (isotropic diff.) or d (anisotropic diff.)"
-            dt_scalar =alpha*TimeStepPyt(v_x=v,grad_v_x=grad_v)
+            dt_scalar =alpha*TimeStepPyt(v=v,grad_v=grad_v)
             
             dt=torch.clamp(dt_scalar*torch.ones(size=(N,dt_d),device=device)+sig_dt*torch.randn(size=(N,dt_d),device=device),min=dt_min,max=dt_max)
             ind_L=torch.randint(low=L_min,high=L,size=(N,),).to(device).float() if L_min<L else L*torch.ones(size=(N,),device=device)

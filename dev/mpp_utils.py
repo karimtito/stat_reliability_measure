@@ -2,10 +2,53 @@ import torch
 from math import sqrt
 from .torch_utils import NormalCDFLayer,NormalToUnifLayer
 
-search_methods_list=['mpp_search','gradient_binary_search',
-                     'carlini','carlini-wagner','cw','carlini_wagner','carlini_wagner_l2','brendel','brendel-bethge','brendel_bethge',
+search_methods_list=['mpp_search','gradient_binary_search','carliniwagner'
+                     'carlini','carlini-wagner','cw','carlini_wagner','carlini_wagner_l2','brendel','brendel-bethge','brendel_bethge','brendelbethge', 
+                     'fmna','fmna_attack','fmna_attack_l2',
                      'adv','adv_attack','hlrf']
 
+
+def binary_search_to_zero(G,x,lambda_min=0.,lambda_max=4.,eps=1e-3, max_iter=32,verbose=False):
+    """binary search to find the zero of a function"""
+    
+    i=1
+    if G(x)>0:
+        
+        a = 1
+        b = lambda_max
+
+        c = (a+b)/2
+        G_c = G(c*x)
+        while G_c.abs()>eps and i<max_iter:
+            i+=1
+            G_c = G(c*x)
+            if verbose:
+                print(f"c={c},G_c={G_c}")
+            if G(c*x)>0:
+                a = c
+            else:
+                b = c
+            c = (a+b)/2
+            G_c = G(c*x)
+    else:
+        a = lambda_min
+        b = 1
+        c = (a+b)/2
+        G_c = G(c*x)
+        while G_c.abs()>eps and i<max_iter:
+            i+=1
+            G_c = G(c*x)
+            if verbose:
+                print(f"c={c},G_c={G_c}")
+            if G(c*x)>0:
+                a = c
+            else:
+                b = c
+            c = (a+b)/2
+            G_c = G(c*x)
+    if i==max_iter:
+        print("Warning: maximum number of iteration has been reached")
+    return (c, i)
 
 def mpp_search_newton(grad_f, zero_latent,max_iter=100,stop_cond_type='grad_norm',
                stop_eps=1e-3,
@@ -84,6 +127,11 @@ def gaussian_space_attack(x_clean,y_clean,model,noise_dist='uniform',
         import foolbox as fb
         attack = fb.attacks.L2BrendelBethgeAttack(binary_search_steps=num_iter,
         lr=stepsize, steps=steps,)
+    elif attack.lower() in ('fmna','fast_mininum_norm_attack','fmna_l2'):
+        attack = 'FMNA'
+        import foolbox as fb
+        attack = fb.attacks.L2FMNAttack(binary_search_steps=num_iter,
+        gamma=stepsize, steps=steps,)
     else:
         raise NotImplementedError(f"Search method '{attack}' is not implemented.")
     
