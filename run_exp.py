@@ -54,15 +54,15 @@ method_func_dict={'amls':amls_pyt.ImportanceSplittingPyt,'mala':SamplerSMC,
 weighted_methods = ['is','imp_samp']
 mmp_methods = ['form','imp_samp','is','ls','line_samp','importance sampling','line sampling']
 
-def run_est(model, X, y, method='amls_webb', epsilon_range=[], input_idx=None,
+def run_est(model, X, y, method='amls_webb', epsilon_range=[], 
                      noise_dist='uniform',dataset_name = 'dataset',
                  model_name='model', plot_errorbar=True,
                  verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None,
                  mask_cond=None,p_ref=None, nb_points_errorbar=100, 
-                 alpha_CI=0.05, save_weights=True, shuffle=False,
+                 alpha_CI=0.05, save_weights=True, shuffle=False,input_index=None,
                  log_hist_=True, aggr_res_path='',batch_opt=False,
-                 log_txt_=True,exp_config=None,method_config=None,
-                 smc_multi=False,**kwargs):
+                 log_txt_=True,exp_config=None,method_config=None,input_start=0,input_stop=None,
+                 smc_multi=False,alt_functions=False,**kwargs):
     """ Running reliability experiments on neural network model with supervised data (X,y)
         values 
     """
@@ -77,10 +77,13 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[], input_idx=None,
 
         method_config = method_config_dict[method]()
     if exp_config is None:
-        if input_idx is None:
-            input_idx=0
-        exp_config=ExpModelConfig(model=model,X=X,y=y,input_start= input_idx,input_stop=input_idx+1,
+        if input_index is None:
+            input_index=0
+        if input_stop is None:
+            input_stop=input_start+10
+        exp_config=ExpModelConfig(model=model,X=X,y=y,
         dataset_name=dataset_name,model_name=model_name,epsilon_range=epsilon_range,
+        input_start=input_start,input_stop=input_stop,noise_dist=noise_dist,
         aggr_res_path=aggr_res_path,x_min=x_min,x_max=x_max,mask_opt=mask_opt,
         mask_idx=mask_idx,mask_cond=mask_cond,verbose=verbose,shuffle=shuffle,)
     else:
@@ -155,9 +158,12 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[], input_idx=None,
     track_advs= hasattr(method_config,'track_advs') and method_config.track_advs
     first_iter=True
     weights_list=[]
+    if exp_config.input_stop>len(exp_config.X):
+        exp_config.input_stop=len(exp_config.X)
     for l in range(exp_config.input_start, exp_config.input_stop):
         with torch.no_grad():
             exp_config.x_clean,exp_config.y_clean = exp_config.X[l], exp_config.y[l]
+        exp_config.update(input_idx=l)
         for idx in range(len(exp_config.epsilon_range)):
             if first_iter:
                 first_iter=False
@@ -290,6 +296,12 @@ def run_est(model, X, y, method='amls_webb', epsilon_range=[], input_idx=None,
                 
                 #selecting only method configuration variables relevent to the estimation function
                 func_args_vars = {k:simple_vars(method_config)[k] for k in simple_vars(method_config).keys() if ('require' not in k) and ('name' not in k) and ('calls' not in k)}
+                alt_func_list = ['V','G','h','gradG','gradV','gradh']
+                if alt_functions:
+                    #replacing the default functions by the alternative ones
+                    for func in alt_func_list:
+                        if func in exp_required.keys():
+                            exp_required[func]  = getattr(exp_config,func+'_alt')
                 args_dict = {**func_args_vars,**exp_required}
                 method_config.update()
                 var_ests=[]
