@@ -15,11 +15,12 @@ tests*
 *.suo
 *.user
 *.userosscache
-*.sln.docstates
-
+*.sln.docstatesf
+*.raw_logs
 ./data
 ./logs
 
+./older_logs
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
@@ -29,7 +30,7 @@ tests*
 mono_crash.*
 
 
-
+./notebooks.*
 
 # Build results
 [Dd]ebug/
