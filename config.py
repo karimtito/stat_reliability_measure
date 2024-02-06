@@ -14,7 +14,6 @@ import json
 from stat_reliability_measure.dev.utils import float_to_file_float
 import random
 
-model_dir = ROOT_DIR+'/models/'
 
 class Config:
     def __init__(self,config_dict={}):
@@ -93,13 +92,13 @@ class Config:
 
 
 class ExpConfig(Config):
-    default_dict={'config_name':'Experiment','torch_seed':-1,'np_seed':-1,
+    default_dict={'config_name':'Experiment','torch_seed':0,'np_seed':0,
                   'verbose':0,'aggr_res_path':'',
-                  'update_aggr_res':True,'save_config':False,
+                  'update_aggr_res':False,'save_config':False,
                   'print_config_opt':True,'track_finish':False,
                   'track_gpu':False,'allow_multi_gpu':True,
                   'track_cpu':False,'save_img':False,
-                  'save_text':False,'device':'','random_seed':-1,
+                  'save_text':False,'device':'','random_seed':0,
                   'tqdm_opt':True,'clip_min':0.,
                   'clip_max':1.,'force_train':False,
                   'repeat_exp':False,'data_dir':ROOT_DIR+"/data",
@@ -216,11 +215,14 @@ class ExpToyConfig(ExpConfig):
         self.normal_dist = torch.distributions.normal.Normal(loc=0.,scale=1.)
         self.x_clean = torch.zeros(size=(self.dim,),device=torch.device(self.device))
         self.input_shape = (self.dim,)
-
+   
     def update(self):
         """ update the score and V functions """
         log_name=self.method_name+'_'+self.loc_time
-        exp_log_path=os.path.join(self.raw_logs_path,log_name)
+        self.date_path = self.raw_logs_path+''+'/'+ self.loc_time.split('T')[0] 
+        if not os.path.exists(self.date_path):
+            os.mkdir(self.date_path)
+        exp_log_path=os.path.join(self.date_path,log_name)
         log_path_prop = exp_log_path
         k=1
         index_level=0
@@ -249,9 +251,9 @@ class ExpToyConfig(ExpConfig):
     
 class ExpModelConfig(ExpConfig):
     default_dict={'config_name':'ModelExperimentConfig','dataset':'',
-                  'data_dir':ROOT_DIR+"/data",'model':None,
-                'log_dir':"",'low':None,'high':None,'simga_noise':1.,
-                'model_arch':'','model_dir':'','epsilon_range':[],'eps_max':0.3,'eps_min':0.2,
+                  'data_dir':'./','model':None,
+                'log_dir':"./",'low':None,'high':None,'simga_noise':1.,
+                'model_arch':'','model_dir':'./','epsilon_range':[],'eps_max':0.3,'eps_min':0.2,
                 'eps_num':5,'epsilon':-1.,'input_start':0,'input_stop':-1,'n_rep':100,'model_path':'',
                 'export_to_onnx':False,'use_attack':False,'attack':'PGD','X':None,'y':None,
                 'lirpa_bounds':False,'download':True,'train_model_epochs':10,'method_name':'',
@@ -261,8 +263,11 @@ class ExpModelConfig(ExpConfig):
     #p_ref_compute = False
     def __init__(self,config_dict=default_dict,X=None,y=None,model=None,epsilon_range=[],
                 dataset_name='mnist',aggr_res_path='',model_name='',model_arch='',verbose=0.,input_index=-1 ,
-                torch_seed=-1,np_seed=-1,random_seed=-1,normal_cdf_layer=None,sigma_noise=1.,model_path='',
-                method_name='',shuffle=False,real_uniform=False,x_mean=None,x_std=None,**kwargs):
+                torch_seed=-1,np_seed=-1,random_seed=-1,t_transform=None,sigma_noise=1.,model_path='',
+                method_name='',shuffle=False,real_uniform=False,x_mean=None,x_std=None ,u_mpp   =None,**kwargs):
+        if verbose>0:
+            
+            print(f"torch_seed, np_seed, random_seed (1): {torch_seed, np_seed, random_seed}")
         super().__init__(torch_seed=torch_seed,np_seed=np_seed,verbose=verbose,random_seed = random_seed,)
         vars(self).update(config_dict)
         self.X = X
@@ -271,7 +276,7 @@ class ExpModelConfig(ExpConfig):
         self.model_arch = model_arch
         self.model = model
         self.model_path = model_path
-        
+        self.u_mpp=u_mpp
         self.epsilon_range=epsilon_range
         self.dataset=dataset_name
         self.aggr_res_path=aggr_res_path
@@ -322,7 +327,7 @@ class ExpModelConfig(ExpConfig):
             os.mkdir(self.raw_logs)
         standard_dataset = self.dataset in t_u.supported_datasets
         data_provided = (self.X is not None) and self.y is not None 
-        model_provided = hasattr(self,"model") and self.model is not None
+        model_provided = hasattr(self,"model") and self.model is not None and type(self.model) != str
         assert standard_dataset or (data_provided and model_provided), "Either a standard dataset or a model and data must be provided"
         if standard_dataset:
             if self.dataset=='imagenet':
@@ -331,7 +336,10 @@ class ExpModelConfig(ExpConfig):
                 ,dataset=self.dataset,batch_size=self.load_batch_size, shuffle=shuffle,
                     x_mean=None,x_std=None)
             if not model_provided:
+                if type(self.model) == str:
+                    self.model_arch = self.model
                 if len(self.model_arch)==0:
+                    
                     self.model_arch = t_u.datasets_default_arch[self.dataset]
                 if self.dataset=='imagenet':
                     self.model, self.model_shape,self.model_name=t_u.get_model_imagenet(self.model_arch, 
@@ -395,16 +403,17 @@ class ExpModelConfig(ExpConfig):
             self.gen = lambda N: (2*torch.rand(size=(N,self.d), device=torch.device(self.device) )-1)
         self.x_clean=self.X[self.input_index]
         self.input_shape = self.x_clean.shape
+        print(f"Current data index: {self.input_index}")
         self.y_clean=self.y[self.input_index]
         if self.noise_dist in ('gaussian','normal'):
-            self.normal_cdf_layer = t_u.NormalClampReshapeLayer(offset=self.x_clean, sigma=self.sigma_noise,)
-        
+            self.t_transform = t_u.NormalClampReshapeLayer(offset=self.x_clean, sigma=self.sigma_noise,)
+        self.zero_latent = torch.zeros((1,self.d),device=self.device)
         self.build_parser()
 
-    def update(self, input_idx=None, method_name=''):
+    def update(self, input_index=None, method_name=''):
         """ """
         
-        if len(self.method_name)>0:
+        if len(method_name)>0:
             self.method_name = method_name
         
         raw_logs_path=os.path.join(self.log_dir,'raw_logs/'+method_name)
@@ -413,16 +422,20 @@ class ExpModelConfig(ExpConfig):
         self.raw_logs_path = raw_logs_path
         self.loc_time= datetime.today().isoformat().split('.')[0].replace('-','_').replace(':','_')
         self.log_name=method_name+'_'+self.loc_time
-        exp_log_path=os.path.join(self.raw_logs_path,self.log_name)
+        self.date_path = self.raw_logs_path+''+'/'+self.loc_time.split('T')[0]
+        if not os.path.exists(self.date_path):
+            os.mkdir(self.date_path)
+        exp_log_path=os.path.join(self.date_path,self.log_name)
         log_path_prop = exp_log_path
         k=1
         index_level=0
-        if input_idx is not None:
-            self.input_index = input_idx
+        if input_index is not None:
+            self.input_index = input_index
         self.x_clean=self.X[self.input_index]
-        self.y_clean=self.y[self.input_index]
+        if len(self.y) > 0:
+            self.y_clean=self.y[self.input_index]
         print(f"Current data index: {self.input_index}")
-        t_u.plot_tensor(self.x_clean,y=self.y_clean)
+        #t_u.plot_tensor(self.x_clean,y=self.y_clean)
         while os.path.exists(log_path_prop):
             if k==10: 
                 exp_log_path= log_path_prop.replace('9','1')
@@ -439,17 +452,17 @@ class ExpModelConfig(ExpConfig):
         if self.x_min is not None:
             if not isinstance(self.x_min,torch.Tensor):
                 self.x_min = self.x_min*torch.ones_like(self.x_clean)
-            if self.low is None:
-                self.low=torch.maximum(self.x_clean-self.epsilon, self.x_min.view(-1,*self.input_shape).to(self.device))
-        elif self.low is None:
+            
+            self.low=torch.maximum(self.x_clean-self.epsilon, self.x_min.view(-1,*self.input_shape).to(self.device))
+        else:
             self.low=torch.maximum(self.x_clean-self.epsilon, torch.zeros_like(self.x_clean))
         if self.x_max is not None:
             if not isinstance(self.x_max,torch.Tensor):
                 self.x_max = self.x_max*torch.ones_like(self.x_clean)
-            if self.high is None:
-                self.high=torch.minimum(self.x_clean+self.epsilon, self.x_max.view(-1,*self.input_shape).to(self.device))
-        elif self.high is None:
-            self.high=self.x_clean+self.epsilon
+            
+            self.high=torch.minimum(self.x_clean+self.epsilon, self.x_max.view(-1,*self.input_shape).to(self.device))
+        else:
+            self.high=torch.minimum(self.x_clean+self.epsilon, torch.ones_like(self.x_clean))
         if self.mask_opt:
             try:
                 if self.mask_cond is not None:
@@ -467,16 +480,16 @@ class ExpModelConfig(ExpConfig):
             
         if self.noise_dist=='uniform':
             if self.real_uniform:
-                self.normal_cdf_layer= t_u.NormalToUnifLayer( low = self.low, 
+                self.t_transform= t_u.NormalToUnifLayer( low = self.low, 
                 high = self.high, device=self.device, input_shape = self.input_shape)
                     
                 
             else:
-                self.normal_cdf_layer = t_u.NormalCDFLayer(x_clean=self.x_clean, 
+                self.t_transform = t_u.NormalCDFLayer(x_clean=self.x_clean, 
                 epsilon=self.epsilon, 
                 x_min=self.x_min,x_max=self.x_max,device=self.device)
         elif self.noise_dist in ['gaussian','normal']:
-            self.normal_cdf_layer = t_u.NormalClampReshapeLayer(offset=self.x_clean, sigma=self.sigma_noise,)
+            self.t_transform = t_u.NormalClampReshapeLayer(offset=self.x_clean, sigma=self.sigma_noise, x_min=self.x_min,x_max=self.x_max,)
             
         return 
     
@@ -491,11 +504,13 @@ class ExpModelConfig(ExpConfig):
         return image
     
     def h(self,X):
+        
         return t_u.h_pyt(X,x_clean=self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
                 ,from_gaussian=self.from_gaussian,noise_dist=self.noise_dist,
                 noise_scale=self.noise_scale)
     
     def gradh(self,X):
+
         return t_u.gradh_pyt(X,self.x_clean,model=self.model,low=self.low,high=self.high,target_class=self.y_clean
                 ,from_gaussian=self.from_gaussian,noise_dist=self.noise_dist,
                 noise_scale=self.noise_scale)
@@ -518,19 +533,19 @@ class ExpModelConfig(ExpConfig):
                 noise_scale=self.noise_scale)
         
     def V_alt(self,X):
-        return t_u.V_auto_diff( x_= X,target_class=self.y_clean,T_transform=self.normal_cdf_layer, model=self.model,)
+        return t_u.V_auto_diff( x_= X,target_class=self.y_clean,T_transform=self.t_transform, model=self.model,)
     
     def gradV_alt(self,X):
-        return t_u.gradV_auto_diff(x_ = X, target_class=self.y_clean, T_transform=self.normal_cdf_layer, model=self.model,)
+        return t_u.gradV_auto_diff(x_ = X, target_class=self.y_clean, T_transform=self.t_transform, model=self.model,)
     
     def h_alt(self,X):
-        return t_u.h_pyt_alt(x_ = X, target_class=self.y_clean, T_transform=self.normal_cdf_layer, model=self.model,)
+        return t_u.h_pyt_alt(x_ = X, target_class=self.y_clean, T_transform=self.t_transform, model=self.model,)
     def gradh_alt(self,X):
-        return t_u.gradh_auto_diff(x_ = X, target_class=self.y_clean, T_transform=self.normal_cdf_layer, model=self.model,)
+        return t_u.gradh_auto_diff(x_ = X, target_class=self.y_clean, T_transform=self.t_transform, model=self.model,)
     def G_alt(self,X):
         return -self.h_alt(X)
     def gradG_alt(self,X):
-        return t_u.gradG_auto_diff(x_ = X, target_class=self.y_clean, T_transform=self.normal_cdf_layer, model=self.model,)
+        return t_u.gradG_auto_diff(x_ = X, target_class=self.y_clean, T_transform=self.t_transform, model=self.model,)
     
     
 

@@ -389,6 +389,7 @@ def h_pyt(x_,x_clean,model,target_class,low,high,from_gaussian=True,reshape=True
     return h
 
 def h_pyt_alt(x_,target_class,model,T_transform,L=0):
+    
     with torch.no_grad(): 
         u_ = T_transform(x_)
         s = score_function(X=u_, y_clean=target_class,model=model)-L
@@ -436,7 +437,7 @@ def V_pyt(x_,x_clean,model,target_class,low,high,from_gaussian=True,
         if from_gaussian and not gaussian_prior:
             u=normal_dist.cdf(x_)
         else:
-            u=noise_scale*x_+x_clean
+            u=noise_scale*x_.reshape(-1,input_shape)+x_clean
         if reshape:
             u=torch.reshape(u,(u.shape[0],)+input_shape)
 
@@ -459,7 +460,7 @@ def G_auto_diff(x_,model,target_class,  T_transform,noise_dist='uniform'):
     with torch.no_grad():
         u = T_transform(x_) 
         s=score_function(X=u, y_clean=target_class, model=model)
-    return h
+    return -s
 
 def V_auto_diff(x_,model,target_class,  T_transform,noise_dist='uniform',L=0):
     with torch.no_grad():
@@ -469,8 +470,7 @@ def V_auto_diff(x_,model,target_class,  T_transform,noise_dist='uniform',L=0):
     return v
 
 def gradV_auto_diff(x_, model, target_class, T_transform,noise_dist='uniform',L=0):
-    if x_.requires_grad!=True:
-        x_.requires_grad=True
+    x_.requires_grad=True
     #input_.retain_grad()
     u = T_transform(x_)
     s=score_function(X=u,y_clean=target_class,model=model)
@@ -480,13 +480,12 @@ def gradV_auto_diff(x_, model, target_class, T_transform,noise_dist='uniform',L=
     # print(f"v.requires_grad={v.requires_grad},input_.requires_grad={input_.requires_grad}")
     # print(f"v.grad={v.grad},input_.grad={input_.grad}")
     grad=torch.autograd.grad(outputs=v,inputs=x_,grad_outputs=torch.ones_like(v),retain_graph=False)[0]
-    with torch.no_grad():
-        grad = grad.view(x_.shape)
+    x_.requires_grad=False
+    grad = grad.view(x_.shape)
     return grad.detach(),v.detach()
     
-def gradG_auto_diff(x_, model, target_class, T_transform,noise_dist='uniform',L=0):
-    if x_.requires_grad!=True:
-        x_.requires_grad=True
+def gradG_auto_diff(x_, model, target_class, T_transform,L=0):
+    x_.requires_grad=True
     #input_.retain_grad()
     u = T_transform(x_)
     g=-score_function(X=u,y_clean=target_class,model=model)
@@ -495,14 +494,15 @@ def gradG_auto_diff(x_, model, target_class, T_transform,noise_dist='uniform',L=
     # print(f"v.requires_grad={v.requires_grad},input_.requires_grad={input_.requires_grad}")
     # print(f"v.grad={v.grad},input_.grad={input_.grad}")
     grad=torch.autograd.grad(outputs=g,inputs=x_,grad_outputs=torch.ones_like(g),retain_graph=False)[0]
-    with torch.no_grad():
-        grad = grad.view(x_.shape)
+    x_.requires_grad=False
+    grad = grad.view(x_.shape)
+    
     return grad.detach(),g.detach()
 
 
 def gradh_auto_diff(x_, model, target_class, T_transform,noise_dist='uniform',L=0):
-    if x_.requires_grad!=True:
-        x_.requires_grad=True
+    
+    x_.requires_grad=True
     #input_.retain_grad()
     u = T_transform(x_)
     s=score_function(X=u,y_clean=target_class,model=model)
@@ -511,8 +511,8 @@ def gradh_auto_diff(x_, model, target_class, T_transform,noise_dist='uniform',L=
     # print(f"v.requires_grad={v.requires_grad},input_.requires_grad={input_.requires_grad}")
     # print(f"v.grad={v.grad},input_.grad={input_.grad}")
     grad=torch.autograd.grad(outputs=v,inputs=x_,grad_outputs=torch.ones_like(s),retain_graph=False)[0]
-    with torch.no_grad():
-        grad = grad.view(x_.shape)
+    x_.requires_grad=False
+    grad = grad.view(x_.shape)
     return grad.detach(),s.detach()
 
 
@@ -554,21 +554,22 @@ def correct_min_max(x_min,x_max,x_mean,x_std):
     return x_min,x_max
 
 supported_datasets=['mnist','fashion-mnist','cifar10','cifar100','imagenet']
-datasets_in_shape={'mnist':(1,28,28),'cifar10':(3,32,32),'cifar100':(3,32,32),'imagenet':(3,224,224)}
-datasets_dims={'mnist':784,'cifar10':3*1024,'cifar100':3*1024,'imagenet':3*224**2}
-datasets_num_c={'mnist':10,'cifar10':10,'cifar100':100,'imagenet':1000}
-datasets_means={'mnist':0,'cifar10':(0.4914, 0.4822, 0.4465),'cifar100':[125.3/255.0, 123.0/255.0, 113.9/255.0], 
+datasets_in_shape={'mnist':(1,28,28),'fashion-mnist':(1,28,28),'cifar10':(3,32,32),'cifar100':(3,32,32),'imagenet':(3,224,224)}
+datasets_dims={'mnist':784,'fashion-mnist':784,'cifar10':3*1024,'cifar100':3*1024,'imagenet':3*224**2}
+datasets_num_c={'mnist':10,'fashion-mnist':10,'cifar10':10,'cifar100':100,'imagenet':1000}
+datasets_means={'mnist':0,'fashion-mnist':0,'cifar10':(0.4914, 0.4822, 0.4465),'cifar100':[125.3/255.0, 123.0/255.0, 113.9/255.0], 
                 'imagenet':(0.485, 0.456, 0.406)}
 
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
-datasets_stds={'mnist':1,'cifar10':(0.2023, 0.1994, 0.2010),'cifar100':[63.0/255.0, 62.1/255.0, 66.7/255.0],
+datasets_stds={'mnist':1,'fashion-mnist':1,'cifar10':(0.2023, 0.1994, 0.2010),'cifar100':[63.0/255.0, 62.1/255.0, 66.7/255.0],
                'imagenet':(0.229, 0.224, 0.225)}
 datasets_supp_archs={'mnist':{'dnn2':dnn2,'dnn_2':dnn2,'dnn_4':dnn4,'dnn4':dnn4,'cnn_custom':CNN_custom},
-                    'cifar10':{'lenet':LeNet,'convnet':ConvNet,'dnn2':dnn2,'resnet18':ResNet18},
+                     'fashion-mnist':{'dnn2':dnn2,'dnn_2':dnn2,'dnn_4':dnn4,'dnn4':dnn4,'cnn_custom':CNN_custom},
+                    'cifar10':{'lenet':LeNet,'cnn_custom':CNN_custom,'convnet':ConvNet,'dnn2':dnn2,'resnet18':ResNet18},
                     'cifar100':{'densenet':DenseNet3}}
-datasets_default_arch={'mnist':'dnn2', 'cifar10':'convnet', 'cifar100':'densenet','imagenet':'resnet18'}
-defaults_datasets=['mnist','cifar10','cifar100','imagenet']
+datasets_default_arch={'mnist':'dnn2', 'fashion-mnist':'cnn_custom', 'cifar10':'convnet', 'cifar100':'densenet','imagenet':'resnet18'}
+defaults_datasets=['mnist','fashion-mnist','cifar10','cifar100','imagenet']
 def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=None,x_std=None,shuffle=False): 
     assert dataset in supported_datasets,f"support datasets are in {supported_datasets}"
     if dataset=='mnist':
@@ -585,6 +586,20 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
         mnist_dataset = datasets.MNIST(data_dir, train=train, download=download,
          transform=transform_)
         data_loader = DataLoader(mnist_dataset, batch_size = batch_size, shuffle=train)
+    elif dataset=='fashion-mnist':
+        if x_mean is not None and x_std is not None:
+            assert x_std!=0, "Can't normalize with 0 std."
+            transform_=transforms.Compose([
+
+                                transforms.ToTensor(),
+                                #transforms.Normalize((x_mean,), (x_std,)) we perform normalization at the model level
+                            ])
+        else:
+            transform_=transforms.ToTensor()
+        fashion_mnist_dataset = datasets.FashionMNIST(data_dir, train=train, download=download,
+            transform=transform_)
+        data_loader = DataLoader(fashion_mnist_dataset, batch_size = batch_size, shuffle=train)
+        
     elif dataset in ('cifar10','cifar100'):
         if train:
             data_transform = transforms.Compose([
@@ -647,11 +662,12 @@ def plot_tensor(x,y=None,cmap='gray'):
         plt.title(label=f"Label predicted:{y}")
     plt.show()
 
-def plot_k_tensor(X,figsize=(10,10),x_0=None,img_size=(28,28)):
+def plot_k_tensor(X,figsize=(10,10),img_size=None,x_0=None,y=None):
     """plots k tensors representing images in a row of 4 columns"""
 
     k = X.shape[0] 
-    img_size= X.shape[1:]
+    if img_size is None:
+        img_size= X.shape[1:]
     nrows = k // 4 if k%4==0 else k // 4 +1
     if x_0 is not None:
         x_img= x_0.view(*img_size).detach()
@@ -672,6 +688,8 @@ def plot_k_tensor(X,figsize=(10,10),x_0=None,img_size=(28,28)):
         x_img=x_img.numpy()
         plt.subplot(nrows,4,i+1)
         plt.imshow(x_img,cmap='gray')
+        if y is not None:
+            plt.title(label=f"Label predicted:{y[i]}")
         del x_img
 
 
@@ -1680,14 +1698,15 @@ class NormalCDFLayer(torch.nn.Module):
         return f"NormalCDFLayer(mu={self.mu},sigma={self.sigma})"
     
 class NormalClampReshapeLayer(torch.nn.Module):
-    def __init__(self,offset,input_shape=None,x_max=0,x_min=1.,sigma=1.):
+    def __init__(self,offset,input_shape=None,x_max=1.,x_min=0.,sigma=1.):
+        super(NormalClampReshapeLayer, self).__init__()
         self.x_min =x_min
         self.x_max = x_max
-        self.input_shape = input_shape if input_shape is not None else offset.shape[1:] 
+        self.input_shape = input_shape if input_shape is not None else offset.shape 
         self.offset=offset
         self.sigma=sigma
     def forward(self,x):
-        return self.offset+self.sigma*torch.clip(x,min=self.x_min,max=self.x_max).view(-1,*self.input_shape)
+        return torch.clip(self.offset.unsqueeze(0)+self.sigma*x.view(-1,*self.input_shape),min=self.x_min.view(-1,*self.input_shape),max=self.x_max.view(-1,*self.input_shape))
     def inverse(self,x): 
         return (x-self.offset)/self.sigma 
     def string(self):
@@ -1768,3 +1787,7 @@ def plot_imagenet_pictures(X,y=None, nb_rows = 5, nb_cols = None,text_labels=ima
     plt.close()
 
 
+def get_off_diagonal_elements(M):
+    res = M.clone()
+    res.diagonal(dim1=-1, dim2=-2).zero_()
+    return res

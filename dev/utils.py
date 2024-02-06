@@ -21,6 +21,24 @@ class CustomEncoder(json.JSONEncoder):
             return str(obj)
         return super(CustomEncoder, self).default(obj)
 
+
+from math import floor, log10
+def sci_notation(num, decimal_digits=1, precision=None, exponent=None):
+    """
+    Returns a string representation of the scientific
+    notation of the given number formatted for use with
+    LaTeX or Mathtext, with specified number of significant
+    decimal digits and precision (number of decimal digits
+    to show). The exponent to be used can also be specified
+    explicitly.
+    """
+    if exponent is None:
+        exponent = int(floor(log10(abs(num))))
+    coeff = round(num / float(10**exponent), decimal_digits)
+    if precision is None:
+        precision = decimal_digits
+
+    return r"${0:.{2}f}\cdot10^{{{1:d}}}$".format(coeff, exponent, precision)
 def dichotomic_search(f, a, b, thresh=0, n_max =50):
     """Implementation of dichotomic search of minimum solution for an increasing function
         Args:

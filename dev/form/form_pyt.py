@@ -7,7 +7,7 @@ from stat_reliability_measure.dev.mpp_utils import gradient_binary_search,gaussi
           
 
 def FORM_pyt(x_mpp=None,x_clean=None, gradG=None, G=None,y_clean=None,model=None,noise_dist='uniform',
-             search_method='Carlini',normal_cdf_layer=None,nb_calls=-1.,verbose=0,
+             search_method='Carlini',t_transform=None,nb_calls=-1.,verbose=0,
              num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1,eps_real_mpp=1e-3,
               sigma=1.,x_min=0.,x_max=1., random_init=False , sigma_init=0.5, real_mpp=True,**kwargs):
 
@@ -51,20 +51,20 @@ def FORM_pyt(x_mpp=None,x_clean=None, gradG=None, G=None,y_clean=None,model=None
             x_mpp=gradient_binary_search(zero_latent=zero_latent,gradG=gradG, G=G)
         elif search_method.lower() in ['carlini','carlini-wagner','cw','carlini_wagner','carlini_wagner_l2','adv','adv_attack']:
             assert (model is not None), "model must be provided for Carlini-Wagner attack"
-            assert normal_cdf_layer is not None, "normal_cdf_layer must be provided for Carlini-Wagner attack"
+            assert t_transform is not None, "t_transform must be provided for Carlini-Wagner attack"
             x_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=y_clean,model=model,noise_dist='uniform',
                                 
                       attack = search_method,num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=epsilon,
                         sigma=1.,random_init=False , sigma_init=0.5,**kwargs)
         elif search_method.lower() in ['brendel','brendel-bethge','brendel_bethge']:
-            assert normal_cdf_layer is not None, "normal_cdf_layer must be provided for Brendel-Bethge attack"
+            assert t_transform is not None, "t_transform must be provided for Brendel-Bethge attack"
             assert (model is not None), "model must be provided for Brendel-Bethge attack"
             x_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=y_clean,model=model,noise_dist='uniform',
                         attack = search_method,num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=epsilon,
                             sigma=1., random_init=False , sigma_init=0.5,**kwargs)
         elif search_method.lower() in ['fmna','fast_mininum_norm_attack','fmna_l2']: 
             assert (model is not None), "model must be provided for FMNA attack"
-            assert normal_cdf_layer is not None, "normal_cdf_layer must be provided for FMNA attack"
+            assert t_transform is not None, "t_transform must be provided for FMNA attack"
             x_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=y_clean,model=model,noise_dist='uniform',
                         attack = search_method,num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=epsilon,
                             sigma=1., random_init=False , sigma_init=0.5,**kwargs)

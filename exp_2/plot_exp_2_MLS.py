@@ -93,7 +93,7 @@ img_idx=0
 eps=0.15
 ratio=0.1
 T_range = [20,50,100,200,500,1000]
-triplets=[('input_idx',img_idx,'='),('epsilon',eps,'='),('n_rep',50,'>='),
+triplets=[('input_index',img_idx,'='),('epsilon',eps,'='),('n_rep',50,'>='),
          (x_col,x_max,'<='),('ratio',ratio,'=')]
 method_str='MLS-SMC'
 

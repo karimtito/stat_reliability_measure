@@ -19,6 +19,7 @@ class SMCSamplerConfig(Config):
         'L_range':[],
         'L':1,
         'GV_opt':False,
+        'n_max':100,
 
      }
     

@@ -41,7 +41,9 @@ def MC_pf(gen,h,N:int=int(1e4),batch_size:int=int(1e2),track_advs:bool=False,ver
     assert N==N
     dict_out = {'nb_calls':N}
     if track_advs:
-        dict_out['advs']=torch.cat(x_advs,dim=0).to('cpu').numpy()
-    
-    
-    return p_f.cpu(),dict_out
+        dict_out['u_rare']=torch.cat(x_advs,dim=0).to('cpu').numpy()
+    p_f = p_f.cpu().item()
+    dict_out['CI_low']=p_f-1.96*(p_f*(1-p_f)/N)**.5
+    dict_out['CI_up']=p_f+1.96*(p_f*(1-p_f)/N)**.5
+    dict_out['var_est']=p_f*(1-p_f)/N
+    return p_f,dict_out

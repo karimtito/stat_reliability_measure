@@ -443,7 +443,7 @@ def main():
                                     same_method_df=get_sel_df(df=aggr_res_df,triplets=[('method',method,'=')])
                                     if len(same_method_df)>0:
                                         same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method,'='),
-                                        ('model_name',model_name,'='),('epsilon',epsilon,'='),('input_idx',l,'='),('n_rep',config.n_rep,'='),
+                                        ('model_name',model_name,'='),('epsilon',epsilon,'='),('input_index',l,'='),('n_rep',config.n_rep,'='),
                             ('N',N,'='),('T',T,'='),('L',L,'='),('alpha',alpha,'='),
                             ('ratio',ratio,'=')] )  
                                         # if a similar experiment has been done in the current log directory we skip it
@@ -563,7 +563,7 @@ def main():
                                 "ratio":ratio,'alpha':alpha,'n_rep':config.n_rep,'min_rate':config.min_rate,'d':d,
                                 "method":method,'adapt_dt':config.adapt_dt,"epsilon":epsilon,
                                 "model_name":model_name,"dataset":exp_config.dataset
-                                ,"input_idx":l, 
+                                ,"input_index":l, 
                                 'mean_calls':calls.mean(),'std_calls':calls.std()
                                 ,'mean_time':times.mean(),'std_time':times.std()
                                 ,'mean_est':ests.mean(),'std_est':ests.std(), 'est_path':est_path,'times_path':times_path,

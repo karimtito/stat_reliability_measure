@@ -15,7 +15,7 @@ class MLS_SMC_Config(SamplerConfig):
         'ratio':0.1,
         'clip_s':True,'s_min':8e-3,'s_max':3,
         's':1.,
-        'n_max':2000,
+        'n_max':20,
         'track_finish':False,
         'track_accept':False,
         'track_calls':True,

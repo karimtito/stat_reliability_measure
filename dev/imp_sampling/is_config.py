@@ -8,24 +8,33 @@ class IS_Config(SamplerConfig):
 
         'requires_gen':True,
         'requires_h':True,
-        'N':1000,
-        'N_range':[],
-        'batch_size':1000,
-        'batch_size_range':[],
-        'track_advs':False,
-        'alpha_CI':0.05,
-        'sigma_bias':1.,
-        'zero_latent':None,
         'requires_gradG':True,
         'requires_G':True,
         'requires_model':True,
         'requires_x_clean':True,
+        'requires_y_clean':True,
+        'requires_t_transform':True,
+        'requires_u_mpp':True,
+        'N':int(1E4),
+        'N_range':[],
+        'batch_size':int(1E3),
+        'batch_size_range':[],
+        'save_rare':False,
+        'alpha_CI':0.05,
+        'sigma_bias':1.,
+        'zero_latent':None,
+        'save_mpp':False,
         'search_method':'mpp_search',
-        'requires_normal_cdf_layer':True,
-        'requires_low':False,
-        'requires_high':False,
+        'real_mpp':True,
+        'stepsize':1E-2,
+        'stepsize_range':[],
+        'num_iter':20,
+        'num_iter_range':[],
+        'random_init':False,
+        'sigma_init':0.1,
+        'steps':100,
+        'gamma':0.5,
         
-
        }
     
     
@@ -38,7 +47,11 @@ class IS_Config(SamplerConfig):
             self.N_range=[self.N]
       
         if len(self.batch_size_range)==0:
-            self.batch_size_range=[self.T]
+            self.batch_size_range=[self.batch_size]
+        if len(self.stepsize_range)==0:
+            self.stepsize_range=[self.stepsize]
+        if len(self.num_iter_range)==0:
+            self.num_iter_range=[self.num_iter]   
 
         return 
   

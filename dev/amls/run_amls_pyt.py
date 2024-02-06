@@ -160,7 +160,7 @@ def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_nam
                                 try:
                                     same_exp_df = get_sel_df(df=same_method_df, cols=method_keys, vals=method_vals, 
                                     triplets =[('model_name',exp_config.model_name,'='),('epsilon',exp_config.epsilon,'='),
-                                    ('input_idx',l,'='),('n_rep',exp_config.n_rep,'='),('noise_dist',exp_config.noise_dist,'=')])
+                                    ('input_index',l,'='),('n_rep',exp_config.n_rep,'='),('noise_dist',exp_config.noise_dist,'=')])
                                     # if a similar experiment has been done in the current log directory we skip it
 
                                     if len(same_exp_df)>0:
@@ -298,7 +298,7 @@ def run_amls_exp(model, X, y, epsilon_range=[], noise_dist='uniform',dataset_nam
                     plt.savefig(os.path.join(log_path,'log10_ests_hist.png'))
                     plt.close()
                 #with open(os.path.join(log_path,'results.txt'),'w'):
-                result={"input_idx":l,'mean_calls':calls.mean(),'std_calls':calls.std()
+                result={"input_index":l,'mean_calls':calls.mean(),'std_calls':calls.std()
                 ,'mean_time':times.mean(),'std_time':times.std()
                 ,'mean_est':ests.mean(),'std_est':ests.std(), 'est_path':est_path,'times_path':times_path,
                 "std_rel":std_rel,"std_rel_adj":std_rel*mean_calls,

@@ -251,7 +251,7 @@ dt_min=1e-5,dt_max=1e-2,v_min_opt=True,kappa_opt=False,
             
             prenew_idx=torch.randint(low=0,high=len(surv_idx),size=(nb_to_renew,))
             renew_idx=surv_idx[prenew_idx]
-        
+            
             X[to_renew] = X[renew_idx]
     finish_flag=(v<=0).float().mean().item() >=min_rate
     if verbose>=1.:

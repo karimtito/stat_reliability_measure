@@ -53,7 +53,7 @@ def binary_search_to_zero(G,x,lambda_min=0.,lambda_max=4.,eps=1e-3, max_iter=32,
 def mpp_search_newton(grad_f, zero_latent,max_iter=100,stop_cond_type='grad_norm',
                stop_eps=1e-3,
             mult_grad_calls=2.,debug=False,print_every=10):
-    """ Search algorithm for the Most Probable Point (X_mpp) with a Newton method.  """
+    """ Search algorithm for the Most Probable Point (u_mpp) with a Newton method.  """
     x= zero_latent
     grad_fx,f_x = grad_f(x)
     grad_calls=1
@@ -107,7 +107,7 @@ def mpp_search_newton(grad_f, zero_latent,max_iter=100,stop_cond_type='grad_norm
 
 
 def gaussian_space_attack(x_clean,y_clean,model,noise_dist='uniform',
-                      attack = 'Carlini',num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1, normal_cdf_layer=None,
+                      attack = 'Carlini',num_iter=10,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1, t_transform=None,
                         sigma=1.,x_min=-int(1e2),x_max=int(1e2), random_init=False , sigma_init=0.5,real_uniform=False,**kwargs):
     """ Performs an attack on the latent space of the model."""
     device= x_clean.device
@@ -150,13 +150,13 @@ def gaussian_space_attack(x_clean,y_clean,model,noise_dist='uniform',
         del advs
         
     elif noise_dist.lower() in ('uniform','unif'):
-        if normal_cdf_layer is None:
+        if t_transform is None:
             if not real_uniform:
-                normal_cdf_layer = NormalCDFLayer(device=device, offset=x_clean,epsilon =epsilon)
+                t_transform = NormalCDFLayer(device=device, offset=x_clean,epsilon =epsilon)
             else:
-                normal_cdf_layer = NormalToUnifLayer(device=device, x_clean=x_clean,epsilon =epsilon)
+                t_transform = NormalToUnifLayer(device=device, x_clean=x_clean,epsilon =epsilon)
         fake_bounds=(x_min,x_max)
-        total_model = torch.nn.Sequential(normal_cdf_layer,
+        total_model = torch.nn.Sequential(t_transform,
                                           model)
         if not random_init:
             x_0 = torch.zeros_like(x_clean)

@@ -348,7 +348,7 @@ def main():
                             if (not config.repeat_exp) and config.update_aggr_res and os.path.exists(aggr_res_path):
                                 aggr_res_df = pd.read_csv(aggr_res_path)
                                 same_exp_df = get_sel_df(df=aggr_res_df,triplets=[('method',method_name,'='),
-                                ('model_name',model_name,'='),('epsilon',epsilon,'='),('input_idx',l,'='),('n_rep',config.n_rep,'='),
+                                ('model_name',model_name,'='),('epsilon',epsilon,'='),('input_index',l,'='),('n_rep',config.n_rep,'='),
                     ('N',N,'='),('T',T,'='),('s',s,'='),('last_particle',config.last_particle,'=='),
                     ('ratio',ratio,'=')] )  
                                 # if a similar experiment has been done in the current log directory we skip it
@@ -468,7 +468,7 @@ def main():
 
                             #with open(os.path.join(log_path,'results.txt'),'w'):
                             results={'method':method_name,'from_gaussian':str(config.from_gaussian),
-                            'input_idx':l,'dataset':config.dataset,
+                            'input_index':l,'dataset':config.dataset,
                                 'epsilon':epsilon,"model_name":model_name,'n_rep':config.n_rep,'T':T,'ratio':ratio,'K':K,'s':s,
                             'min_rate':config.min_rate, "N":N, "mean_calls":calls.mean(),"std_calls":calls.std(),"std_adj":ests.std()*mean_calls,
                             'mean_time':times.mean(),'std_time':times.std(),'mean_est':ests.mean(),'est_path':est_path,'times_path':times_path,

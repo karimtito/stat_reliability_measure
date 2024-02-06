@@ -5,7 +5,8 @@ import math
 import torch
 
 
-datasets_in_shape={'mnist':(1,28,28),'cifar10':(3,32,32),'cifar100':(3,32,32)}
+datasets_in_shape={'mnist':(1,28,28),'fashion-mnist':(1,28,28),
+                   'cifar10':(3,32,32),'cifar100':(3,32,32)}
 
 class Flatten(nn.Module):
     def forward(self, x):
@@ -73,7 +74,7 @@ class CNN_custom(nn.Module):
         self.activation2=nn.ReLU()
         self.conv3=nn.Conv2d(32,64,3,padding=1)
         self.conv4=nn.Conv2d(64,64,3,padding=1,stride=2)
-        flat_shapes={'mnist':3136,'cifar10':4096}
+        flat_shapes={'mnist':3136,'cifar10':4096,'fashion-mnist':3136,'cifar100':4096}
         self.linear1=nn.Linear(flat_shapes[dataset],100)
         self.linear2=nn.Linear(100,num_classes)
 
