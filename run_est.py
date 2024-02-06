@@ -66,7 +66,7 @@ parametric_methods=['ce_is']
 def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False, p_target=1e-3,
                      noise_dist='uniform',dataset_name = 'dataset',data_dir='./',model_dir='./',
                  model_name='', plot_errorbar=False, allow_extra_arg=False,figsize=(13,8),
-                 verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None,
+                 verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None, update_aggr_res=True,
                  mask_cond=None,p_ref=None, nb_points_errorbar=100, plot_example_img=False,
                  torch_seed=0,np_seed=0,random_seed=0,allow_unused=True,
                  alpha_CI=0.05, save_weights=True, shuffle=False,input_index=None,log_hist_=True,
@@ -97,13 +97,14 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
             input_stop=input_start+10
     
         exp_config=ExpModelConfig(model=model,X=X,y=y,real_uniform=real_uniform,data_dir=data_dir, 
-                                  model_dir=model_dir,
+                                  model_dir=model_dir,update_aggr_res=update_aggr_res,
         dataset_name=dataset_name,model_name=model_name,epsilon_range=epsilon_range,
         input_start=input_start,input_stop=input_stop,noise_dist=noise_dist,
         aggr_res_path=aggr_res_path,x_min=x_min,x_max=x_max,mask_opt=mask_opt,
         mask_idx=mask_idx,mask_cond=mask_cond,verbose=verbose,shuffle=shuffle,
         torch_seed=torch_seed,np_seed=np_seed,)
     else:
+        exp_config.update_aggr_res=update_aggr_res
         exp_config.model,exp_config.X,exp_config.y,=model,X,y
         exp_config.dataset, exp_config.model_name, exp_config.epsilon_range=dataset_name,model_name,epsilon_range
         exp_config.aggr_res_path, exp_config.verbose=aggr_res_path ,float(verbose)
@@ -658,6 +659,7 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                 "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
                 "log_path":log_path,"log_name":log_name,
                 }
+                result.update({"form_est":form_est,"form_naif":form_naif,"fosm_est":fosm_est})
                 result.update(dict_coverage)
                 result.update({"method_name":method_config.method_name})
                 if plot_errorbar:
