@@ -8,6 +8,7 @@ class CE_IS_Config(SamplerConfig):
         'rho':0.5,
         'rho_range':[],
         't_max':100,
+        'ce_masri':False,
         'theta_0':None,
         'save_theta':False,
         'save_sigma':False,
