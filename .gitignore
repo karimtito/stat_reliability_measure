@@ -21,13 +21,13 @@ tests*
 ./logs
 
 ./notebooks/*
-./older_logs
+./older_logs/*
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
 .vscode
 
-
+older_logs
 notebooks 
 .VSCodeCounter
 # Mono auto generated files
