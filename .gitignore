@@ -20,15 +20,19 @@ tests*
 ./data
 ./logs
 
+./notebooks/*
 ./older_logs
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
 .vscode
+
+
+notebooks 
 .VSCodeCounter
 # Mono auto generated files
 mono_crash.*
-
+./notebooks
 
 ./notebooks.*
 
