@@ -72,8 +72,8 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                  alpha_CI=0.05, save_weights=True, shuffle=False,input_index=None,log_hist_=True,
                  log_plots_=True, aggr_res_path='',batch_opt=False, real_uniform=False,
                  log_txt_=True,exp_config=None,method_config=None,input_start=0,input_stop=None,
-                 smc_multi=False,alt_functions=False,
-                 fontsize_title=20,fontsize_label=20,fontsize_legend=20,
+                 smc_multi=False,alt_functions=False,no_show=True,keep_mpp=False,mpp_hlrf=False,
+                 fontsize_title=18,fontsize_label=18,fontsize_legend=18,check_mpp=True,
                  
                  
                  **kwargs):
@@ -92,9 +92,9 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
         method_config = method_config_dict[method]()
     if exp_config is None:
         if input_index is None:
-            input_index=0
+            input_index=input_start
         if input_stop is None:
-            input_stop=input_start+10
+            input_stop=input_start+1
     
         exp_config=ExpModelConfig(model=model,X=X,y=y,real_uniform=real_uniform,data_dir=data_dir, 
                                   model_dir=model_dir,update_aggr_res=update_aggr_res,
@@ -198,7 +198,16 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
         exp_config.input_stop=len(exp_config.X)
     self_coverages = []
     ref_coverages = []
+    if hasattr(method_config,'save_rare') and method_config.save_rare:
+        save_rare=True
+        rare_list = []
+    else:
+        save_rare=False
+        rare_list=None
+    print(range(exp_config.input_start, exp_config.input_stop))
     for l in range(exp_config.input_start, exp_config.input_stop):
+        relative_index=l-exp_config.input_start
+        
         dict_coverage = {}
         with torch.no_grad():
             exp_config.x_clean,exp_config.y_clean = exp_config.X[l], exp_config.y[l]
@@ -207,8 +216,10 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
         for idx in range(len(exp_config.epsilon_range)):
             # if fit_noise_to_input:
             #     if exp_config.noise_dist=='uniform':
-                    
-        
+            if hasattr(exp_config,'mpp'):
+                del exp_config.mpp
+                exp_config.mpp=None       
+            
             if first_iter:
                 first_iter=False
             else:
@@ -236,28 +247,37 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                 xx = exp_config.t_transform(uu)
                 ll = exp_config.model(xx)
                 yy = torch.argmax(ll,dim=1)
-                t_u.plot_k_tensor(X=torch.cat([x_0,xx]),y=torch.cat([exp_config.y_clean.unsqueeze(0),yy]),)
-                plt.show()
+                
+                t_u.plot_k_tensor(X=torch.cat([x_0,xx]),y=torch.cat([exp_config.y_clean.unsqueeze(0),yy]),dataset=exp_config.dataset)
+                if not no_show:
+                    plt.show()
+                if noise_dist=='uniform':
+                    plt.savefig(f"examples_noisy_img_idx_{l}_eps_{exp_config.epsilon}.pdf",bbox_inches='tight')
+                else:
+                    plt.savefig(f"examples_noisy_img_idx_{l}_sigma_{exp_config.sigma_noise}.pdf",bbox_inches='tight')
             lists_cart= cartesian_product(*method_param_lists)
             zeros_d = torch.zeros((1,exp_config.d)).to(exp_config.device)
             gradG_0,G_0 = exp_config.gradG_alt(zeros_d)
             norm_gradG_0 = torch.norm(gradG_0)
             fosm_est = exp_config.normal_dist.cdf(-G_0/norm_gradG_0)
             print(f'fosm_est:{fosm_est}')
-             
-            mpp = hlrf( grad_f= exp_config.gradG_alt, zero_latent=zeros_d,num_iter=50,
-                       step_size=0.8,stop_cond_type='beta',stop_eps=0.001)[0] 
-            gradG_mpp,G_mpp = exp_config.gradG_alt(mpp)
-            norm_grad = torch.norm(gradG_mpp)
-            beta_mpp = -(mpp*(gradG_mpp/norm_grad)).sum() + G_mpp/norm_grad
-            beta_naif = torch.norm(mpp)
-            form_est = exp_config.normal_dist.cdf(-beta_mpp)
-            form_naif = exp_config.normal_dist.cdf(-beta_naif)
-            print(f"form est:{form_est}")
-            print(f'form_naif:{form_naif}')
+            if mpp_hlrf:
+                mpp_hlrf = hlrf(grad_f= exp_config.gradG_alt, zero_latent=zeros_d,num_iter=50,
+                        step_size=0.8,stop_cond_type='beta',stop_eps=0.001)[0] 
+                gradG_mpp_hlrf,G_mpp_hlrf = exp_config.gradG_alt(mpp_hlrf)
+                norm_grad = torch.norm(gradG_mpp_hlrf)
+                beta_mpp_hlrf = -(mpp_hlrf*(gradG_mpp_hlrf/norm_grad)).sum() + G_mpp_hlrf/norm_grad
+                beta_naif = torch.norm(mpp_hlrf)
+                form_est = exp_config.normal_dist.cdf(-beta_mpp_hlrf)
+                form_naif = exp_config.normal_dist.cdf(-beta_naif)
+                
+                print(f"HLRF form est:{form_est}")
+                print(f'HLRF form_naif:{form_naif}')
             for method_params in lists_cart:
                 i_exp+=1
                 vars(method_config).update(method_params)
+                if check_mpp:
+                    checked_mpp=False
                 method_keys= list(simple_vars(method_config).keys())
                 method_vals= list(simple_vars(method_config).values())
                 clean_method_args_str = str(method_params).replace('{','').replace('}','').replace("'",'').replace('(',"").replace(')',"").replace(',',':')
@@ -323,9 +343,10 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                 if os.path.exists(log_path):
                     log_path=log_path+'_rand_'+str(np.random.randint(low=1,high=10000))
                 os.mkdir(log_path)
-                print(f"Starting {method_config.method_name} estimation {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon}, "+clean_method_args_str)
-                                
-             
+                if exp_config.noise_dist=='uniform':
+                    print(f"Starting {method_config.method_name} estimation {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l}, eps:{exp_config.epsilon}, "+clean_method_args_str)
+                else:
+                    print(f"Starting {method_config.method_name} estimation {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l}, sigma:{exp_config.sigma_noise}, "+clean_method_args_str)
                 if exp_config.verbose>0:
                     print(f"with model: {model_name}, input_index:{l},eps:{exp_config.epsilon},")
               
@@ -348,12 +369,7 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                     track_levels=False
                 if track_X:
                     X_list=[]
-                if hasattr(method_config,'save_rare') and method_config.save_rare:
-                    save_rare=True
-                    rare_list = []
-                else:
-                    save_rare=False
-                    rare_list=None
+                
                 if exp_config.tqdm_opt:
                     if exp_config.notebook:
                         from tqdm.notebook import tqdm
@@ -398,11 +414,25 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                     if exp_config.verbose>1:
                         print(f"Est:{p_est}")
                     if method in mpp_methods:
-                        
+                        if keep_mpp:
+                            exp_config.mpp = dict_out['mpp']
                         if method_config.save_mpp:
                             mpp=dict_out['mpp']
-                            mpp_path=os.path.join(log_path,f'mpp_exp_{i}.txt')
-                            np.savetxt(fname=mpp_path,X=mpp)
+                            
+                        if check_mpp and not checked_mpp:
+                            checked_mpp=True
+                            mpp = torch.from_numpy(dict_out['mpp']).to(exp_config.device)
+                            norm_mpp = torch.norm(mpp)
+                            gradG_mpp,G_mpp = exp_config.gradG_alt(mpp)
+                            cosine_G_mpp = torch.cosine_similarity(gradG_mpp, mpp,)
+                            print(f"Norm mpp:{norm_mpp}, cosine(mpp,gradG(mpp)):{cosine_G_mpp}")
+                            beta_mpp = -(mpp*(gradG_mpp/norm_mpp)).sum() + G_mpp/norm_mpp
+                            del gradG_mpp
+                            if not method_config.save_mpp:
+                                del mpp
+                            print(f"G_mpp:{G_mpp}")
+                            
+                            form_mpp = exp_config.normal_dist.cdf(-beta_mpp)
                     if method in parametric_methods:
                             if method_config.save_thetas:
                                 thetas_paths = os.path.join(log_path,f'thetas')
@@ -443,7 +473,7 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                             ,X=accept_rates)
                             x_T=np.arange(len(accept_rates))
                             plt.plot(x_T,accept_rates)
-                            plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'))
+                            plt.savefig(os.path.join(accept_logs,f'accept_rates_{i}.png'),bbox_inches='tight')
                             plt.close()
                             exp_config.mean_acc_ratio = np.array(dict_out['acc_ratios']).mean()
                     if track_beta:
@@ -539,7 +569,7 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                     if p_ref is not None:
                         
                         if type(p_ref)==list:
-                            p_ref_ = p_ref[l]
+                            p_ref_ = p_ref[relative_index]
                         else:
                             p_ref_ = p_ref
                             
@@ -576,8 +606,9 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                           fontsize=fontsize_title)
                    
                     ploterror_path=os.path.join(log_path,'errorbar.png')
-                    plt.savefig(ploterror_path)
-                    plt.show()
+                    plt.savefig(ploterror_path,bbox_inches='tight')
+                    if not no_show:
+                        plt.show()
                     plt.close()
 
                     times_errorbar = times[errorbar_idx]
@@ -595,7 +626,7 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                 print(f"std. rel. adj.:{std_rel_adj}")
                 if p_ref is not None:
                     if type(p_ref)==list:
-                        p_ref_ = p_ref[l]
+                        p_ref_ = p_ref[relative_index]
                     else:
                         p_ref_ = p_ref
                     rel_error = np.abs(ests-p_ref_)/p_ref_
@@ -659,7 +690,12 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                 "lg_q_1":lg_q_1,"lg_q_3":lg_q_3,"lg_med_est":lg_med_est,
                 "log_path":log_path,"log_name":log_name,
                 }
-                result.update({"form_est":form_est,"form_naif":form_naif,"fosm_est":fosm_est})
+                result.update({"fosm_est":fosm_est})
+                if mpp_hlrf:
+                    result.update({"form_hlrf_est":form_est,"form_hlrf_naif":form_naif,"G_mpp_hlrf":G_mpp_hlrf,})
+                if method in mpp_methods:
+                    if check_mpp:
+                        result.update({"norm_mpp":norm_mpp,"cosine_G_mpp":cosine_G_mpp,"form_mpp":form_mpp,"G_mpp":G_mpp})
                 result.update(dict_coverage)
                 result.update({"method_name":method_config.method_name})
                 if plot_errorbar:
@@ -676,7 +712,7 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                     result.update({"beta_path":beta_logs})
                 if p_ref is not None:
                     if type(p_ref)==list:
-                        p_ref_ = p_ref[l]
+                        p_ref_ = p_ref[relative_index]
                     else:
                         p_ref_ = p_ref
                     result.update({"rel_error":rel_error.mean(),"std_rel_error":rel_error.std(),
@@ -713,8 +749,11 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
     if track_X: 
         dict_out['X_list']=X_list
     if save_rare:
-        dict_out['rare_list']=rare_list
-        dict_out['u_rare'] = rare_list[-1]
+        if len(rare_list)>0:
+            dict_out['rare_list']=rare_list
+            dict_out['u_rare'] = rare_list[-1]
+        else:
+            dict_out['rare_list']=None
     if method in weighted_methods and save_weights:
         dict_out['weights_list']=weights_list
     if method in parametric_methods:

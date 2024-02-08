@@ -15,7 +15,7 @@ def gen_batched(N_ce,batch_size,gen):
     return torch.cat(xs,dim=0)
 
 def CrossEntropyIS(gen,h,rho=0.5,N:int=int(1e4), t_max=100, estimate_covar=False,
-                   estimate_var=False, N_ce=None, theta_0=None,
+                   estimate_var=False, N_ce=None, theta_0=None,ce_masri=False,
                    batch_size:int=int(1e3),save_rare:bool=False,verbose=0.,track_X:bool=False,
                nb_calls_mpp=0,sigma_bias=1.,G=None,gradG=None,  t_transform=None,y_clean=None,
                save_mpp=False,save_theta=False,save_thetas=False,save_sigma=False,save_sigmas=False,
@@ -73,12 +73,26 @@ def CrossEntropyIS(gen,h,rho=0.5,N:int=int(1e4), t_max=100, estimate_covar=False
     while t<t_max and gamma_t<0:
         t+=1
         theta_t = (normed_weights*U_surv).sum(0).unsqueeze(0)
-  
-        if estimate_covar:
-            Sigma_t = torch.eye(d)
-        elif estimate_var:
-            sigma_t = (normed_weights*(U_surv-theta_t)**2 ).sum(0).unsqueeze(0).sqrt()
-        U = theta_t[:] + gen_batched(N_ce,batch_size=batch_size,gen=gen)*sigma_t
+
+
+        if ce_masri:
+            print("using CE-Masri")
+            theta_norm = torch.norm(theta_t)
+            u_t = theta_t/theta_norm
+            y = (u_t[None,:]*U_surv).sum(-1)
+            v_hat = (normed_weights.squeeze(1)*(y-theta_norm).square()).sum()
+            
+        
+            seed_U = gen_batched(N_ce,batch_size=batch_size,gen=gen)
+            U= theta_t[:] + (seed_U +  ((v_hat-1)/(1+sqrt(v_hat)))*(u_t.unsqueeze(0)*(u_t[None,:]*seed_U).sum(-1)))
+        else:   
+        
+            if estimate_covar:
+                Sigma_t = torch.eye(d)
+            elif estimate_var:
+                sigma_t = (normed_weights*(U_surv-theta_t)**2 ).sum(0).unsqueeze(0).sqrt()
+            
+            U = theta_t[:] + gen_batched(N_ce,batch_size=batch_size,gen=gen)*sigma_t
         with torch.no_grad():
             SU = h(U)
         Count_h += N_ce

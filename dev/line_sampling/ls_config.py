@@ -15,16 +15,17 @@ class LS_Config(SamplerConfig):
         'requires_y_clean':True,
         'requires_t_transform':True,
         'requires_u_mpp':True,
+        'requires_num_classes':True,
         'N':int(1E4),
         'N_range':[],
         'batch_size':int(1E3),
         'batch_size_range':[],
         'save_rare':False,
         'alpha_CI':0.05,
-  
+        'default_params':True,
         'zero_latent':None,
         'save_mpp':False,
-        'search_method':'mpp_search',
+        'search_method':'hlrf',
         
         'stepsize':1E-2,
         'stepsize_range':[],
@@ -34,6 +35,7 @@ class LS_Config(SamplerConfig):
         'sigma_init':0.1,
         'steps':100,
         'gamma':0.5,
+        'real_mpp':True,
         
        }
     

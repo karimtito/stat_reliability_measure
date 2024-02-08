@@ -48,7 +48,7 @@ def binary_search_to_zero(G,x,lambda_min=0.,lambda_max=4.,eps=1e-3, max_iter=32,
             G_c = G(c*x)
     if i==max_iter:
         print("Warning: maximum number of iteration has been reached")
-    return (c, i)
+    return (b, i)
 
 def mpp_search_newton(grad_f, zero_latent,max_iter=100,stop_cond_type='grad_norm',
                stop_eps=1e-3,

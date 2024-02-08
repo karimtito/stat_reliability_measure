@@ -165,15 +165,17 @@ def hlrf(grad_f, zero_latent,num_iter=10,stop_cond_type='grad_norm',
         dict_out['u_history'] = u_history
     return u, dict_out
 
-search_methods_list=['mpp_search','gradient_binary_search',''
+search_methods_list=['mpp_search','gradient_binary_search','bp','hlrf','iHLRF','nhl_rf','nhlrf','ihlrf','ihl_rf',
+                     'bp_armijo',
                      'carlini','carlini-wagner','cw','carlini_wagner','carlini_wagner_l2','brendel','brendel-bethge','brendel_bethge',
                      'adv','adv_attack','hlrf','fmna','fast_minimum_norm_attack','fmna_l2']
 
 def GaussianIS(x_clean,gen,h,N:int=int(1e4),batch_size:int=int(1e3),save_rare:bool=False,verbose=0.,track_X:bool=False,
                nb_calls_mpp=0,sigma_bias=1.,G=None,gradG=None,  t_transform=None,y_clean=None,save_mpp=False,
-               model=None,search_method='mpp_search',u_mpp=None,save_weights=True, epsilon=0.1,
-               eps_real_mpp=1e-2,real_mpp=True, steps=100,stepsize=1e-2,gamma=0.05,
-               alpha_CI=0.05, num_iter=32,stop_eps=1E-2,stop_cond_type='beta',
+               model=None,search_method='mpp_search',u_mpp=None,save_weights=True, epsilon=0.1,num_classes=10,
+               eps_real_mpp=1e-2,real_mpp=True, steps=100,stepsize=1e-2,gamma=0.05, gamma_bp=0.3,
+               alpha_CI=0.05, num_iter=32,stop_eps=1E-2,stop_cond_type='beta',default_params=True,
+               check_mpp=False,
                random_init=False, sigma_init=0.1,**kwargs):
     """ Gaussian importance sampling algorithm to compute probability of failure
 
@@ -191,7 +193,7 @@ def GaussianIS(x_clean,gen,h,N:int=int(1e4),batch_size:int=int(1e3),save_rare:bo
     """
     d=x_clean.numel()
     zero_latent = torch.zeros((1,d),device=x_clean.device)
-   
+    search_method=search_method.lower()
     if u_mpp is None:
         
         if search_method not in search_methods_list:
@@ -218,14 +220,14 @@ def GaussianIS(x_clean,gen,h,N:int=int(1e4),batch_size:int=int(1e3),save_rare:bo
             assert (model is not None), "model must be provided for Carlini-Wagner attack"
             assert t_transform is not None, "t_transform must be provided for Carlini-Wagner attack"
             u_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=y_clean,model=model,noise_dist='uniform',
-                                        t_transform=t_transform,num_iter=num_iter,
+                                        t_transform=t_transform,num_iter=num_iter,default_params=default_params,
                       attack = search_method,steps=steps, stepsize=stepsize, max_dist=None, epsilon=epsilon,
                         sigma=1.,random_init=random_init , sigma_init=sigma_init,**kwargs)
         elif search_method.lower() in ['brendel','brendel-bethge','brendel_bethge']:
             assert t_transform is not None, "t_transform must be provided for Brendel-Bethge attack"
             assert (model is not None), "model must be provided for Brendel-Bethge attack"
             u_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=y_clean,model=model,noise_dist='uniform',
-                                         t_transform=t_transform, num_iter=num_iter,
+                                         t_transform=t_transform, num_iter=num_iter,default_params=default_params,
                         attack = search_method,steps=steps, stepsize=stepsize, max_dist=None, epsilon=epsilon,
                             sigma=1., random_init=random_init , sigma_init=sigma_init,**kwargs)
         
@@ -233,10 +235,20 @@ def GaussianIS(x_clean,gen,h,N:int=int(1e4),batch_size:int=int(1e3),save_rare:bo
             assert t_transform is not None, "t_transform must be provided for FMNA attack"
             assert (model is not None), "model must be provided for FMNA attack"
             u_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=y_clean,model=model,noise_dist='uniform',
-                                         t_transform=t_transform, 
+                                         t_transform=t_transform, default_params=default_params,
                         attack = search_method,num_iter=num_iter,steps=steps, stepsize=gamma, max_dist=None, epsilon=epsilon,
                             sigma=1., random_init=random_init , sigma_init=sigma_init,**kwargs)
-            
+        elif search_method.lower() in ('bp','boundary','boundary_projection'):
+            assert (model is not None), "model must be provided for BP attack"
+            u_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=y_clean,model=model,noise_dist='uniform',t_transform=t_transform,
+                                         default_params=default_params,
+                        attack = search_method,steps=steps, stepsize=gamma, max_dist=None, epsilon=epsilon,num_classes=num_classes,
+                            sigma=1., random_init=random_init , sigma_init=sigma_init,**kwargs)
+        elif search_method.lower() in ('ihl_rf','ihlrf','hlrf'):
+            assert (model is not None), "model must be provided for iHLRF attack"
+            u_mpp= gaussian_space_attack(x_clean=x_clean,y_clean=y_clean,model=model,noise_dist='uniform',t_transform=t_transform,
+                        attack = search_method,steps=steps, stepsize=gamma, max_dist=None, epsilon=epsilon,default_params=default_params,
+                            sigma=1., random_init=random_init , sigma_init=sigma_init,**kwargs)
         
     else:
         assert nb_calls_mpp>0, "nb_calls_mpp must be provided if u_mpp is provided" 
@@ -303,8 +315,8 @@ def GaussianIS(x_clean,gen,h,N:int=int(1e4),batch_size:int=int(1e3),save_rare:bo
     dict_out['std_est']=np.sqrt(var_est)
     if save_weights:
         dict_out['weights']=torch.cat(weights,dim=0).to('cpu').numpy()
-    if save_mpp:
-        dict_out['mpp']=u_mpp.to('cpu').numpy()
+    
+    dict_out['mpp']=u_mpp.to('cpu').numpy()
     CI = stats.norm.interval(1-alpha_CI,loc=p_f.item(),scale=np.sqrt(var_est))
     dict_out['CI']=CI
     if save_rare:
@@ -312,8 +324,8 @@ def GaussianIS(x_clean,gen,h,N:int=int(1e4),batch_size:int=int(1e3),save_rare:bo
     return p_f.cpu().item(),dict_out
 
 
-def gaussian_space_attack(x_clean,y_clean,model,noise_dist='uniform',
-                      attack = 'Carlini',num_iter=50,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1, t_transform=None,
+def gaussian_space_attack(x_clean,y_clean,model,noise_dist='uniform',default_params=False,
+                      attack = 'Carlini',num_iter=50,steps=100, stepsize=1e-2, max_dist=None, epsilon=0.1, t_transform=None,num_classes=10,
                         sigma=1.,x_min=-int(1e2),x_max=int(1e2), random_init=False , sigma_init=0.5,real_uniform=False,**kwargs):
     """ Performs an attack on the latent space of the model."""
     device= x_clean.device
@@ -324,21 +336,61 @@ def gaussian_space_attack(x_clean,y_clean,model,noise_dist='uniform',
         assert (x_clean is not None) and (y_clean is not None), "x_clean and y_clean must be provided for Carlini-Wagner attack"
         assert (model is not None), "model must be provided for Carlini-Wagner attack"
         import foolbox as fb
-        attack = fb.attacks.L2CarliniWagnerAttack(binary_search_steps=num_iter, 
-                                          stepsize=stepsize,
-                                        
-                                          steps=steps,)
+        if not default_params:
+            attack = fb.attacks.L2CarliniWagnerAttack(binary_search_steps=num_iter, 
+                                            stepsize=stepsize,
+                                            
+                                            steps=steps,)
+        else:
+            attack = fb.attacks.L2CarliniWagnerAttack(steps=steps)
+            nb_calls = 9*steps
     elif attack.lower() in ('brendel','brendel-bethge','brendel_bethge'):
         attack = 'Brendel'
         import foolbox as fb
-        attack = fb.attacks.L2BrendelBethgeAttack(binary_search_steps=num_iter,
-        lr=stepsize, steps=steps,)
+        if not default_params:
+            attack = fb.attacks.L2BrendelBethgeAttack(binary_search_steps=num_iter,
+                lr=stepsize, steps=steps,)
+        else:
+            attack = fb.attacks.L2BrendelBethgeAttack(steps=steps)
+            nb_calls = 10*steps
+        
     elif attack.lower() in ('fmna','fast_minimum_norm_attack','fmna_l2','fmna2'):
         attack='FMNA'
         import foolbox as fb
-        attack = fb.attacks.L2FMNAttack(binary_search_steps=num_iter,steps=steps)
+        if not default_params:
+            attack = fb.attacks.L2FMNAttack(binary_search_steps=num_iter,steps=steps)
+        else:
+            print(f"using default parameters for FMNA attack")
+            attack = fb.attacks.L2FMNAttack(steps=steps)
+    elif attack.lower() in ('bp','boundary','boundary_projection'):
+        attack = 'BP'
+        import foolbox as fb
+        if not default_params:
+            attack = fb.attacks.BP( steps=steps,gamma=stepsize,num_classes=num_classes)
+        else:
+            attack = fb.attacks.BP(steps=steps)
+    elif attack.lower() in ('ihl_rf','ihlrf','hlrf'):
+        attack = 'iHLRF'
+        import foolbox as fb
+        if not default_params:
+            attack = fb.attacks.iHL_RFAttack(steps=steps,)
+        else:
+            attack = fb.attacks.iHL_RFAttack(steps=steps,)
+    elif attack.lower() in ('nhl_rf','nhlrf'):
+        import foolbox as fb
+        
+        attack = fb.attacks.iHL_RFAttack(steps=steps,nhl_rf=True)
+    elif attack.lower() in ('bp_armijo'):
+        import foolbox as fb
+        if not default_params:
+            attack = fb.attacks.BPArmijo(steps=steps,gamma=stepsize,num_classes=num_classes,confidence=0.1)
+        else:
+            attack = fb.attacks.BPArmijo(steps=steps)
+        
     else:
         raise NotImplementedError(f"Search method '{attack}' is not implemented.")
+    
+    
     
     if noise_dist.lower() in ('gaussian','normal'):
         

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from stat_reliability_measure.dev.utils import float_to_file_float
-from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,ConvNet,DenseNet3,ResNet18
+from stat_reliability_measure.dev.torch_arch import CNN_custom,dnn2,dnn4,LeNet,ConvNet,DenseNet3,ResNet18,dnn2_tanh
 from torchvision import transforms,datasets,models as tv_models
 from torch.utils.data import DataLoader
 import scipy.stats as stat
@@ -564,13 +564,15 @@ mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
 datasets_stds={'mnist':1,'fashion-mnist':1,'cifar10':(0.2023, 0.1994, 0.2010),'cifar100':[63.0/255.0, 62.1/255.0, 66.7/255.0],
                'imagenet':(0.229, 0.224, 0.225)}
-datasets_supp_archs={'mnist':{'dnn2':dnn2,'dnn_2':dnn2,'dnn_4':dnn4,'dnn4':dnn4,'cnn_custom':CNN_custom},
-                     'fashion-mnist':{'dnn2':dnn2,'dnn_2':dnn2,'dnn_4':dnn4,'dnn4':dnn4,'cnn_custom':CNN_custom},
+datasets_supp_archs={'mnist':{'dnn2':dnn2,'dnn2_tanh':dnn2_tanh,'dnn_2':dnn2,'dnn_4':dnn4,'dnn4':dnn4,'cnn_custom':CNN_custom},
+                     'fashion-mnist':{'dnn2':dnn2,'dnn2_tanh':dnn2_tanh,'dnn_2':dnn2,'dnn_4':dnn4,'dnn4':dnn4,'cnn_custom':CNN_custom},
                     'cifar10':{'lenet':LeNet,'cnn_custom':CNN_custom,'convnet':ConvNet,'dnn2':dnn2,'resnet18':ResNet18},
                     'cifar100':{'densenet':DenseNet3}}
 datasets_default_arch={'mnist':'dnn2', 'fashion-mnist':'cnn_custom', 'cifar10':'convnet', 'cifar100':'densenet','imagenet':'resnet18'}
 defaults_datasets=['mnist','fashion-mnist','cifar10','cifar100','imagenet']
 def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=None,x_std=None,shuffle=False): 
+    if train:
+        shuffle=True
     assert dataset in supported_datasets,f"support datasets are in {supported_datasets}"
     if dataset=='mnist':
         if x_mean is not None and x_std is not None: 
@@ -585,7 +587,7 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
             transform_ =transforms.ToTensor()
         mnist_dataset = datasets.MNIST(data_dir, train=train, download=download,
          transform=transform_)
-        data_loader = DataLoader(mnist_dataset, batch_size = batch_size, shuffle=train)
+        data_loader = DataLoader(mnist_dataset, batch_size = batch_size, shuffle=shuffle)
     elif dataset=='fashion-mnist':
         if x_mean is not None and x_std is not None:
             assert x_std!=0, "Can't normalize with 0 std."
@@ -598,7 +600,7 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
             transform_=transforms.ToTensor()
         fashion_mnist_dataset = datasets.FashionMNIST(data_dir, train=train, download=download,
             transform=transform_)
-        data_loader = DataLoader(fashion_mnist_dataset, batch_size = batch_size, shuffle=train)
+        data_loader = DataLoader(fashion_mnist_dataset, batch_size = batch_size, shuffle=shuffle)
         
     elif dataset in ('cifar10','cifar100'):
         if train:
@@ -615,7 +617,7 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
                         #transforms.Normalize(mean=datasets_stds['cifar10'],std=datasets_stds['cifar10'])
                         ])
         cifar10_dataset = datasets.CIFAR10("../data", train=train, download=download, transform=data_transform)
-        data_loader = DataLoader(cifar10_dataset , batch_size = batch_size, shuffle=train)  
+        data_loader = DataLoader(cifar10_dataset , batch_size = batch_size, shuffle=shuffle)  
     elif dataset=='cifar100':
         if train:
             data_transform = transforms.Compose([
@@ -631,7 +633,7 @@ def get_loader(train,data_dir,download,dataset='mnist',batch_size=100,x_mean=Non
                         #transforms.Normalize(mean=datasets_stds['cifar10'],std=datasets_stds['cifar10'])
                         ])
         cifar100_dataset = datasets.CIFAR100("../data", train=train, download=download, transform=data_transform)
-        data_loader = DataLoader(cifar100_dataset , batch_size = batch_size, shuffle=train)  
+        data_loader = DataLoader(cifar100_dataset , batch_size = batch_size, shuffle=shuffle)  
    
 
     elif dataset=='imagenet':
@@ -662,7 +664,7 @@ def plot_tensor(x,y=None,cmap='gray'):
         plt.title(label=f"Label predicted:{y}")
     plt.show()
 
-def plot_k_tensor(X,figsize=(10,10),img_size=None,x_0=None,y=None):
+def plot_k_tensor(X,figsize=(10,10),img_size=None,x_0=None,y=None,dataset=''):
     """plots k tensors representing images in a row of 4 columns"""
 
     k = X.shape[0] 
@@ -679,6 +681,11 @@ def plot_k_tensor(X,figsize=(10,10),img_size=None,x_0=None,y=None):
         
         plt.imshow(x_img,cmap='gray')
     plt.figure(figsize=(figsize[0]*k,figsize[1]))
+    if dataset=='imagenet':
+        imagenet_labels = get_imagenet_dict()
+    elif dataset=='cifar10':
+        cifar10_labels = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+    plt.tight_layout()
     for i in range(k):
         x_img= X[i].view(*img_size).detach()
         if len(x_img.shape)==3:
@@ -688,8 +695,23 @@ def plot_k_tensor(X,figsize=(10,10),img_size=None,x_0=None,y=None):
         x_img=x_img.numpy()
         plt.subplot(nrows,4,i+1)
         plt.imshow(x_img,cmap='gray')
+        #remove all ticks
+        plt.tick_params(
+            axis='both',          # changes apply to the x-axis
+            which='both',      # both major and minor ticks are affected
+            bottom=False,      # ticks along the bottom edge are off
+            top=False,         # ticks along the top edge are off
+            left=False,
+            right=False,
+            labelbottom=False,
+            labelleft=False)
         if y is not None:
-            plt.title(label=f"Label predicted:{y[i]}")
+            if dataset=='imagenet':
+                plt.title(label=f"Label predicted:{imagenet_labels[y[i]]}",fontsize=37)
+            elif dataset=='cifar10':
+                plt.title(label=f"Label predicted:{cifar10_labels[y[i]]}",fontsize=37)
+            else:
+                plt.title(label=f"Label predicted:{y[i]}",fontsize=37)
         del x_img
 
 
@@ -942,7 +964,8 @@ def get_model_imagenet(model_arch,model_dir):
         normalizer = transforms.Normalize(mean=mean, std=std)
 
     model = torch.nn.Sequential(normalizer, model).cuda(0).eval()
-    return model,mean,std
+    model_name=model_arch+'_imagenet'
+    return model,(224,224,3),model_name
 
 cifar_datasets = ['cifar10','cifar100']
 def get_model(model_arch, test_loader, device=None , robust_model=False, robust_eps=0.1,nb_epochs=10,model_dir='./',data_dir='./',

@@ -261,7 +261,8 @@ class ExpModelConfig(ExpConfig):
                 'sigma':1.,'x_max':1.,'x_mean':None,'x_std':1.,'lirpa_cert':False,'robust_model':False,
                 'robust_eps':0.1,'load_batch_size':128,'nb_epochs': 15,'adversarial_every':1,}
     #p_ref_compute = False
-    def __init__(self,config_dict=default_dict,X=None,y=None,model=None,epsilon_range=[],
+    def __init__(self,config_dict=default_dict,X=None,y=None,model=None,epsilon_range=[],input_start=0,
+                 input_stop=None,
                 dataset_name='mnist',aggr_res_path='',model_name='',model_arch='',verbose=0.,input_index=-1 ,
                 torch_seed=-1,np_seed=-1,random_seed=-1,t_transform=None,sigma_noise=1.,model_path='',
                 method_name='',shuffle=False,real_uniform=False,x_mean=None,x_std=None ,u_mpp   =None,**kwargs):
@@ -272,6 +273,8 @@ class ExpModelConfig(ExpConfig):
         vars(self).update(config_dict)
         self.X = X
         self.y = y
+        self.input_start = input_start
+        self.input_stop = input_stop
         self.model_name= model_name
         self.model_arch = model_arch
         self.model = model
@@ -299,7 +302,7 @@ class ExpModelConfig(ExpConfig):
             os.mkdir(self.model_dir)
         #color_dataset=self.dataset in ('cifar10','cifar100','imagenet')
         #prblm_str=self.dataset
-        if self.input_stop==-1:
+        if self.input_stop==-1 or input_stop is None:
             self.input_stop=self.input_start+1
         else:
             assert self.input_start<self.input_stop,"/!\ input start must be strictly lower than input stop"
@@ -365,7 +368,7 @@ class ExpModelConfig(ExpConfig):
                 self.x_std =None
         else:
             """compute the accuracy of the model on the sample batch"""
-            self.sample_accuracy=t_u.get_model_accuracy(model=self.model,X=self.X[self.input_start:self.input_stop],y=self.y[self.input_start:self.input_stop])
+            self.sample_accuracy=t_u.get_model_accuracy(model=self.model,X=self.X,y=self.y)
         if len(self.epsilon_range)==0:
             log_min,log_max=np.log(self.eps_min),np.log(self.eps_max)
             log_line=np.linspace(start=log_min,stop=log_max,num=self.eps_num)
