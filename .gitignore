@@ -24,9 +24,11 @@ tests*
 ./older_logs/*
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
+test_imagenet*
 
+notebooks*
 .vscode
-
+examples*
 older_logs
 notebooks 
 .VSCodeCounter
@@ -35,7 +37,7 @@ mono_crash.*
 ./notebooks
 raw_logs*
 ./notebooks.*
-
+aggr_res.csv
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
