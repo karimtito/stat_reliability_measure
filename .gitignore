@@ -33,7 +33,7 @@ notebooks
 # Mono auto generated files
 mono_crash.*
 ./notebooks
-
+raw_logs*
 ./notebooks.*
 
 # Build results
