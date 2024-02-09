@@ -4,7 +4,7 @@ import numpy as np
 from math import sqrt
 from stat_reliability_measure.dev.torch_utils import NormalCDFLayer, NormalToUnifLayer
 from stat_reliability_measure.dev.mpp_utils import gradient_binary_search, gaussian_space_attack, mpp_search_newton, binary_search_to_zero
-from stat_reliability_measure.dev.imp_sampling.is_pyt import GaussianImportanceWeight2
+from stat_reliability_measure.dev.imp_sampling.is_pyt import GaussianImportanceWeight2, GaussianImportanceWeight3
 
 def gen_batched(N_ce,batch_size,gen):
     xs = []
@@ -41,10 +41,13 @@ def CrossEntropyIS(gen,h,rho=0.5,N:int=int(1e4), t_max=100, estimate_covar=False
     if N_ce is None:
         N_ce = N
     K = int(N_ce*rho)
-    U = gen_batched(N_ce,batch_size=batch_size,gen=gen)
-    d = U[0].numel()
-    sigma_0 = torch.ones((1,d),device=U.device)
-    device = U.device
+    test = gen(1)
+    d= test.numel()
+    
+    
+    sigma_0 = torch.ones((1,d),device=test.device)
+    device = test.device
+    del test
     zero_latent = torch.zeros((1,d),device=device)
     if theta_0 is None:
         theta_t = zero_latent
@@ -57,19 +60,29 @@ def CrossEntropyIS(gen,h,rho=0.5,N:int=int(1e4), t_max=100, estimate_covar=False
     sigma_t=sigma_0
     if save_sigmas:
         sigmas = [sigma_t]
-        
+    U = gen_batched(N_ce,batch_size=batch_size,gen=gen)+theta_t
+    
     with torch.no_grad():
         SU = h(U)
     Count_h = N_ce
     ind= torch.argsort(input=SU,dim=0,descending=True).squeeze(-1)
     S_sort = SU[ind]
+    
     gamma_t = S_sort[K]
     h_mean = SU.mean()
     t=0
+    
     if verbose>=1:
         print('Iter = ',t, ' tau_j = ', gamma_t.item(), "h_mean",h_mean.item(),  " Calls = ", Count_h)
     U_surv = U[ind[0:K]]
-    normed_weights = 1/K
+    gauss_weights = GaussianImportanceWeight2( x=U_surv,mu_1 = zero_latent, sigma_1=sigma_0,mu_2=theta_t,sigma_2=sigma_t )
+    if gauss_weights.sum()==0:
+        print('gauss_weights.sum()==0 at first iteration')
+        
+    if gauss_weights.sum()<1e-10:
+        print('gauss_weights.sum()<1e-10 at first iteration')
+        
+    normed_weights = (gauss_weights/gauss_weights.sum()).unsqueeze(1)
     while t<t_max and gamma_t<0:
         t+=1
         theta_t = (normed_weights*U_surv).sum(0).unsqueeze(0)

@@ -68,20 +68,25 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                  model_name='', plot_errorbar=False, allow_extra_arg=False,figsize=(13,8),
                  verbose=0, x_min=0,x_max=1., mask_opt=False,mask_idx=None, update_aggr_res=True,
                  mask_cond=None,p_ref=None, nb_points_errorbar=100, plot_example_img=False,
-                 torch_seed=0,np_seed=0,random_seed=0,allow_unused=True,
+                 torch_seed=0,np_seed=0,random_seed=0,allow_unused=True,fontsize_exp=20,
                  alpha_CI=0.05, save_weights=True, shuffle=False,input_index=None,log_hist_=True,
                  log_plots_=True, aggr_res_path='',batch_opt=False, real_uniform=False,
                  log_txt_=True,exp_config=None,method_config=None,input_start=0,input_stop=None,
                  smc_multi=False,alt_functions=False,no_show=True,keep_mpp=False,mpp_hlrf=False,
-                 fontsize_title=18,fontsize_label=18,fontsize_legend=18,check_mpp=True,
+                 fontsize_title=18,fontsize_label=18,fontsize_legend=18,check_mpp=True,theta_0=None,
+                 theta_0_hlrf =False,nb_examples=2,
                  
                  
                  **kwargs):
     """ Running reliability experiments on neural network model with supervised data (X,y)
         values 
     """
+    
     if dataset_name=='imagenet':
-        from stat_reliability_measure.dev.torch_utils import plot_k_tensor
+        #imagenet dataset is too large to be stored in memory and ordered by class
+        #we need to shuffle the data for variety
+        shuffle=True
+        
     method=method.lower()
     if method=='amls' and batch_opt:
         method='amls_batch'
@@ -123,7 +128,9 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
         np.random.seed(np_seed)
         random.seed(random_seed)
         
-    
+    exp_config.theta_0=theta_0
+    if theta_0 is not None:
+        method_config.used_theta_0=True
     for k,v in kwargs.items():
         if hasattr(method_config,k):
             if hasattr(exp_config,k) and  not ('config' in k):
@@ -242,15 +249,17 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                                 ,model=model, device=exp_config.device)
            
             if plot_example_img:
+                
                 #print('try plotting example image')
                 x_0 = exp_config.x_clean.unsqueeze(0)
-                uu = exp_config.gen(3)
+                uu = exp_config.gen(nb_examples)
                 
                 xx = exp_config.t_transform(uu)
                 ll = exp_config.model(xx)
                 yy = torch.argmax(ll,dim=1)
                 
-                t_u.plot_k_tensor(X=torch.cat([x_0,xx]),y=torch.cat([exp_config.y_clean.unsqueeze(0),yy]),dataset=exp_config.dataset)
+                t_u.plot_k_tensor(X=torch.cat([x_0,xx]),y=torch.cat([exp_config.y_clean.unsqueeze(0),yy]),dataset=exp_config.dataset,
+                                  fontsize=fontsize_exp,)
                 if not no_show:
                     plt.show()
                 if noise_dist=='uniform':
@@ -420,8 +429,7 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                     if method in mpp_methods:
                         if keep_mpp:
                             exp_config.mpp = dict_out['mpp']
-                        if method_config.save_mpp:
-                            mpp=dict_out['mpp']
+                        
                             
                         if check_mpp and not checked_mpp:
                             checked_mpp=True
@@ -435,8 +443,10 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                             if not method_config.save_mpp:
                                 del mpp
                             print(f"G_mpp:{G_mpp}")
-                            
                             form_mpp = exp_config.normal_dist.cdf(-beta_mpp)
+                        if method_config.save_mpp:
+                            mpp=dict_out['mpp']  
+                            
                     if method in parametric_methods:
                             if method_config.save_thetas:
                                 thetas_paths = os.path.join(log_path,f'thetas')

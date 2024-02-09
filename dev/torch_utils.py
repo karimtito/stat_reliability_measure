@@ -664,7 +664,7 @@ def plot_tensor(x,y=None,cmap='gray'):
         plt.title(label=f"Label predicted:{y}")
     plt.show()
 
-def plot_k_tensor(X,figsize=(10,10),img_size=None,x_0=None,y=None,dataset=''):
+def plot_k_tensor(X,figsize=(10,10),img_size=None,x_0=None,y=None,fontsize=25,dataset=''):
     """plots k tensors representing images in a row of 4 columns"""
 
     k = X.shape[0] 
@@ -707,11 +707,11 @@ def plot_k_tensor(X,figsize=(10,10),img_size=None,x_0=None,y=None,dataset=''):
             labelleft=False)
         if y is not None:
             if dataset=='imagenet':
-                plt.title(label=f"Label predicted:{imagenet_labels[y[i]]}",fontsize=37)
+                plt.title(label=f"Label predicted:{imagenet_labels[y[i]]}",fontsize=fontsize)
             elif dataset=='cifar10':
-                plt.title(label=f"Label predicted:{cifar10_labels[y[i]]}",fontsize=37)
+                plt.title(label=f"Label predicted:{cifar10_labels[y[i]]}",fontsize=fontsize)
             else:
-                plt.title(label=f"Label predicted:{y[i]}",fontsize=37)
+                plt.title(label=f"Label predicted:{y[i]}",fontsize=fontsize)
         del x_img
 
 

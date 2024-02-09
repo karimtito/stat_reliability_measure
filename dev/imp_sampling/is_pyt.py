@@ -40,7 +40,14 @@ def GaussianImportanceWeight2(x,mu_1,mu_2,sigma_1=1.,sigma_2=1.,d=1):
     density_ratio = torch.exp(-0.5*((x-mu_1)/sigma_1).square().sum(-1)+0.5*((x-mu_2)/sigma_2).square().sum(-1)) * (sigma_2.prod()/sigma_1.prod())
     return density_ratio
 
-
+def GaussianImportanceWeight3(x,u,mu_1,mu_2,sigma_1=1.,v_hat=1,d=1):
+    det_sigma_2=sqrt(v_hat)
+    if v_hat>0:
+        print(f"Warning: v_hat={v_hat} is not greater than 1")
+    pre_sq = x-mu_2 - ((v_hat-1)/v_hat)*((x-mu_2[None,:])*u[None,:]).sum(-1)*u[None,:]
+    sq = (x-mu_2)*pre_sq
+    torch.exp(-0.5*((x-mu_1)/sigma_1).square().sum(-1)+0.5*()) *(1/det_sigma_2)
+    return 2
 
 def mpp_search(grad_f, zero_latent,num_iter=100,stop_cond_type='grad_norm',
                stop_eps=1e-3,

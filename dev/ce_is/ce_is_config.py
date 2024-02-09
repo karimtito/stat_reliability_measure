@@ -15,6 +15,7 @@ class CE_IS_Config(SamplerConfig):
         'save_thetas':False,
         'save_sigmas':False,
         'save_rare':False,
+        'requires_theta_0':True,
         'estimate_var':False,
         'estimate_covar':False,
         'requires_gen':True,
