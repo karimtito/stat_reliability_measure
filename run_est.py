@@ -319,7 +319,7 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                                     triplets.append(('epsilon',exp_config.epsilon,'='))
                                 else:
                                     triplets.append(('sigma_noise',exp_config.sigma_noise,'='))
-                                keys_triplets = [k for k in triplets]
+                                keys_triplets = [k[0] for k in triplets]
                                 print(f"keys_triplets:{keys_triplets}")
                                 
                                 
