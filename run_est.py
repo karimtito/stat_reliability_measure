@@ -80,6 +80,8 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
     """ Running reliability experiments on neural network model with supervised data (X,y)
         values 
     """
+    if dataset_name=='imagenet':
+        from stat_reliability_measure.dev.torch_utils import plot_k_tensor
     method=method.lower()
     if method=='amls' and batch_opt:
         method='amls_batch'
@@ -312,10 +314,12 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                                         triplets.append(('epsilon',exp_config.epsilon,'='))
                                     else:
                                         triplets.append(('sigma_noise',exp_config.sigma_noise,'='))
-                                    
+                                    same_exp= get_sel_df(df=same_method_df, triplets=triplets)
+                                    print(same_exp)
                                     #return samexp_df
                                     same_exp_df = get_sel_df(df=same_method_df, cols=method_keys, vals=method_vals, 
                                     triplets =triplets)
+                                    print(same_exp_df)
                                     
                                     # if a similar experiment has been done in the current log directory we skip it
 

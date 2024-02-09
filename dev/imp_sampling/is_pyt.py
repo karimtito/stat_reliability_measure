@@ -360,7 +360,7 @@ def gaussian_space_attack(x_clean,y_clean,model,noise_dist='uniform',default_par
         if not default_params:
             attack = fb.attacks.L2FMNAttack(binary_search_steps=num_iter,steps=steps)
         else:
-            print(f"using default parameters for FMNA attack")
+            #print(f"using default parameters for FMNA attack")
             attack = fb.attacks.L2FMNAttack(steps=steps)
     elif attack.lower() in ('bp','boundary','boundary_projection'):
         attack = 'BP'
