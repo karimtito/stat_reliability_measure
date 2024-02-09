@@ -308,6 +308,9 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                                 print("Experiments already done for method: "+method_config.method_name)
                                 try:
                                     print(same_method_df)
+                                    same_method_df_ = same_method_df[['model_name','input_index','n_rep','noise_dist',]]
+                                    print(f"same:{same_method_df_}")
+                                    print(same_method_df_)
                                     triplets=[('model_name',exp_config.model_name,'='),
                                     ('input_index',l,'='),('n_rep',exp_config.n_rep,'='),('noise_dist',exp_config.noise_dist,'=')]
                                     print(f"triplets:{triplets}")
