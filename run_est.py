@@ -314,19 +314,15 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                                 triplets=[('model_name',exp_config.model_name,'='),
                                 ('input_index',l,'='),('n_rep',exp_config.n_rep,'='),('noise_dist',exp_config.noise_dist,'=')]
                                 print(f"triplets:{triplets}")
-                                
+                                same_exp1= get_sel_df(df=same_method_df, triplets=triplets)
+                                print(f"same_exp1:{same_exp1}")
                                 if exp_config.noise_dist=='uniform':
                                     triplets.append(('epsilon',exp_config.epsilon,'='))
                                 else:
                                     triplets.append(('sigma_noise',exp_config.sigma_noise,'='))
                                 keys_triplets = [k[0] for k in triplets]
                                 print(f"keys_triplets:{keys_triplets}")
-                                
-                                
-                                
-                                
-                                
-                                
+                  
                                 same_triplets = same_method_df[keys_triplets]
                                 print(f"same triplets:{same_triplets}")
                                 same_exp= get_sel_df(df=same_method_df, triplets=triplets)
