@@ -306,48 +306,32 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                             
                             if len(same_method_df)>0:
                                 print("Experiments already done for method: "+method_config.method_name)
-                                #try:
-                                print(same_method_df)
-                                same_method_df_ = same_method_df[['model_name','input_index','n_rep','noise_dist',]]
-                                print(f"same:{same_method_df_}")
-                                print(same_method_df_)
-                                triplets=[('model_name',exp_config.model_name,'='),
-                                ('input_index',l,'='),('n_rep',exp_config.n_rep,'='),('noise_dist',exp_config.noise_dist,'=')]
-                                print(f"triplets:{triplets}")
-                                same_exp1= get_sel_df(df=same_method_df, triplets=triplets)
-                                print(f"same_exp1:{same_exp1}")
-                                if exp_config.noise_dist=='uniform':
-                                    triplets.append(('epsilon',exp_config.epsilon,'='))
-                                else:
-                                    triplets.append(('sigma_noise',exp_config.sigma_noise,'='))
-                                keys_triplets = [k[0] for k in triplets]
-                                print(f"keys_triplets:{keys_triplets}")
-                  
-                                same_triplets = same_method_df[keys_triplets]
-                                print(f"same triplets:{same_triplets}")
-                                same_exp= get_sel_df(df=same_method_df, triplets=triplets)
-                                print(f"same_exp:{same_exp}")
-                                print(f"len:{len(same_exp)}")
-                                ss = same_exp[method_keys]
-                                print(f"ss={ss}")
-                                print(f"{method_vals}")
-                                #return samexp_df
-                                same_exp_df = get_sel_df(df=same_method_df, cols=method_keys, vals=method_vals, 
-
-                                triplets =triplets)
-                                print(same_exp_df)
+                                try:
                                 
-                                # if a similar experiment has been done in the current log directory we skip it
+                                    triplets=[('model_name',exp_config.model_name,'='),
+                                    ('input_index',l,'='),('n_rep',exp_config.n_rep,'='),('noise_dist',exp_config.noise_dist,'=')]
+                                
+                                    if exp_config.noise_dist=='uniform':
+                                        triplets.append(('epsilon',exp_config.epsilon,'='))
+                                    else:
+                                        triplets.append(('sigma_noise',exp_config.sigma_noise,'='))
+                                
+                                    same_exp_df = get_sel_df(df=same_method_df, cols=method_keys, vals=method_vals, 
 
-                                if len(same_exp_df)>0:
-                                    print(f"Skipping {method_config.method_name} run {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+clean_method_args_str)
-                                    p_est = same_exp_df['mean_est'].iloc[0]
-                                    std_est = same_exp_df['std_est'].iloc[0]
-                                    continue
-                                # except KeyError:
-                                #     if exp_config.verbose>=1:
-                                #         print(f"No similar experiment found for {method_config.method_name} run {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+clean_method_args_str)
-                                #     exp_config.exp_id = last_exp_id+1
+                                    triplets =triplets)
+                            
+                                    
+                                    # if a similar experiment has been done in the current log directory we skip it
+
+                                    if len(same_exp_df)>0:
+                                        print(f"Skipping {method_config.method_name} run {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+clean_method_args_str)
+                                        p_est = same_exp_df['mean_est'].iloc[0]
+                                        std_est = same_exp_df['std_est'].iloc[0]
+                                        continue
+                                except KeyError:
+                                    if exp_config.verbose>=1:
+                                        print(f"No similar experiment found for {method_config.method_name} run {i_exp}/{nb_exps}, with model: {exp_config.model_name}, img_idx:{l},eps:{exp_config.epsilon},"+clean_method_args_str)
+                                    exp_config.exp_id = last_exp_id+1
                             else:
                                 exp_config.exp_id = last_exp_id+1
                         else:
