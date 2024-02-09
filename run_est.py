@@ -321,9 +321,14 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                                     else:
                                         triplets.append(('sigma_noise',exp_config.sigma_noise,'='))
                                     same_exp= get_sel_df(df=same_method_df, triplets=triplets)
-                                    print(same_exp)
+                                    print(f"same_exp:{same_exp}")
+                                    print(len(same_exp))
+                                    ss = same_exp_df[method_keys]
+                                    print(f"ss={ss}")
+                                    print(f"{method_vals}")
                                     #return samexp_df
                                     same_exp_df = get_sel_df(df=same_method_df, cols=method_keys, vals=method_vals, 
+
                                     triplets =triplets)
                                     print(same_exp_df)
                                     

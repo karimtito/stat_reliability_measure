@@ -169,7 +169,7 @@ def LineSampling(x_clean,gen,G,N:int=int(1e4),epsilon=None,y_clean=None,batch_si
     dict_out['var_est']=var_est
     dict_out['std_est']=np.sqrt(var_est)
     
-    
+   
     dict_out['mpp']=u_mpp.to('cpu').numpy()
     CI = stats.norm.interval(1-alpha_CI,loc=p_f.item(),scale=np.sqrt(var_est))
     dict_out['CI']=CI
