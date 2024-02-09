@@ -8,7 +8,7 @@ search_methods_list=['mpp_search','gradient_binary_search','carliniwagner'
                      'adv','adv_attack','hlrf']
 
 
-def binary_search_to_zero(G,x,lambda_min=0.,lambda_max=4.,eps=1e-3, max_iter=32,verbose=False):
+def binary_search_to_zero(G,x,lambda_min=0.,lambda_max=4.,eps=1e-4, max_iter=35,verbose=False):
     """binary search to find the zero of a function"""
     
     i=1
