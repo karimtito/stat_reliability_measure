@@ -309,7 +309,9 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                                 try:
                                     triplets=[('model_name',exp_config.model_name,'='),
                                     ('input_index',l,'='),('n_rep',exp_config.n_rep,'='),('noise_dist',exp_config.noise_dist,'=')]
-                                    
+                                    print(f"triplets:{triplets}")
+                                    keys_triplets = [k for k in triplets[0]]
+                                    print(same_method_df[keys_triplets])
                                     if exp_config.noise_dist=='uniform':
                                         triplets.append(('epsilon',exp_config.epsilon,'='))
                                     else:
