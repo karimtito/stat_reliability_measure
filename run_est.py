@@ -619,7 +619,7 @@ def run_est(model, X, y, method='mc', epsilon_range=[], fit_noise_to_input=False
                         
                           fontsize=fontsize_title)
                    
-                    ploterror_path=os.path.join(log_path,'errorbar.png')
+                    ploterror_path=os.path.join(log_path,'errorbar.pdf')
                     plt.savefig(ploterror_path,bbox_inches='tight')
                     if not no_show:
                         plt.show()
