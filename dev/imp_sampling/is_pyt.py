@@ -407,11 +407,16 @@ def gaussian_space_attack(x_clean,y_clean,model,noise_dist='uniform',default_par
         else:
             print(f"Random init with sigma_init={sigma_init}")
             x_0 = x_clean + sigma_init*torch.randn_like(x_clean)
-        
-        _,advs,success= attack(fmodel, x_0.unsqueeze(), y_clean.unsqueeze(0), epsilons=[max_dist])
-        assert success.item(), "The attack failed. Try to increase the number of iterations or steps."
-        design_point= advs[0]-x_clean
-        del advs
+        if 'bp' in attack.lower():
+            _,advs,success= attack(fmodel, x_0.unsqueeze()*255, y_clean.unsqueeze(0), epsilons=[max_dist])
+            assert success.item(), "The attack failed. Try to increase the number of iterations or steps."
+            design_point= advs[0]-x_clean
+            del advs
+        else:
+            _,advs,success= attack(fmodel, x_0.unsqueeze(), y_clean.unsqueeze(0), epsilons=[max_dist])
+            assert success.item(), "The attack failed. Try to increase the number of iterations or steps."
+            design_point= advs[0]-x_clean
+            del advs
         
     elif noise_dist.lower() in ('uniform','unif'):
         if t_transform is None:
