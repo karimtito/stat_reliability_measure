@@ -707,11 +707,11 @@ def plot_k_tensor(X,figsize=(10,10),img_size=None,x_0=None,y=None,fontsize=25,da
             labelleft=False)
         if y is not None:
             if dataset=='imagenet':
-                plt.title(label=f"Label predicted:{imagenet_labels[y[i]]}",fontsize=fontsize)
+                plt.title(label=f"Pred. label:{imagenet_labels[y[i]].capitalize()}",fontsize=fontsize)
             elif dataset=='cifar10':
-                plt.title(label=f"Label predicted:{cifar10_labels[y[i]]}",fontsize=fontsize)
+                plt.title(label=f"Pred. label: {cifar10_labels[y[i]].capitalize()}",fontsize=fontsize)
             else:
-                plt.title(label=f"Label predicted:{y[i]}",fontsize=fontsize)
+                plt.title(label=f"Label predicted: {y[i]}",fontsize=fontsize)
         del x_img
 
 
